@@ -3,7 +3,7 @@ from dataclasses import asdict
 from jinja2 import Environment, FileSystemLoader, select_autoescape
 
 import config
-from models import Risk, Section, all_questions
+from models import Question, Risk, Section, SubSection, all_questions
 
 
 def create_environment() -> Environment:
@@ -14,6 +14,27 @@ def create_environment() -> Environment:
     )
 
 
+def _prepare_question(q: Question) -> dict:
+    """Convert a Question dataclass to a template-ready dict with compiled visibility JS."""
+    d = asdict(q)
+    condition = d.pop("visible_when", None)
+    if q.visible_when is not None:
+        d["visible_when_js"] = q.visible_when.to_js()
+    return d
+
+
+def _prepare_subsection(sub: SubSection) -> dict:
+    """Convert a SubSection to a template-ready dict with compiled visibility JS."""
+    d = {
+        "title": sub.title,
+        "description": sub.description,
+        "questions": [_prepare_question(q) for q in sub.questions],
+    }
+    if sub.visible_when is not None:
+        d["visible_when_js"] = sub.visible_when.to_js()
+    return d
+
+
 def prepare_sections(sections: list[Section]) -> list[dict]:
     """Convert Section dataclasses to template-ready nested dicts."""
     return [
@@ -21,14 +42,7 @@ def prepare_sections(sections: list[Section]) -> list[dict]:
             "id": section.id,
             "title": section.title,
             "description": section.description,
-            "subsections": [
-                {
-                    "title": sub.title,
-                    "description": sub.description,
-                    "questions": [asdict(q) for q in sub.questions],
-                }
-                for sub in section.subsections
-            ],
+            "subsections": [_prepare_subsection(sub) for sub in section.subsections],
         }
         for section in sections
     ]
@@ -54,6 +68,6 @@ def render_form(sections: list[Section], risks: list[Risk]) -> str:
     template = env.get_template("page.html.j2")
     return template.render(
         sections=prepare_sections(sections),
-        questions=[asdict(q) for q in all_questions(sections)],
+        questions=[_prepare_question(q) for q in all_questions(sections)],
         risks=prepare_risks(risks),
     )

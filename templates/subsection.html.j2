@@ -1,4 +1,4 @@
-<div class="space-y-4">
+<div class="space-y-4"{% if subsection.visible_when_js is defined %} x-show="{{ subsection.visible_when_js }}"{% endif %}>
   <h2 class="text-lg font-semibold text-gray-800 border-b border-gray-200 pb-2">
     {{ subsection.title }}
   </h2>

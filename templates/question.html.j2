@@ -1,1 +1,7 @@
+{% if question.visible_when_js is defined %}
+<div x-show="{{ question.visible_when_js }}">
+{% endif %}
 {% include "questions/" ~ question.type ~ ".html.j2" %}
+{% if question.visible_when_js is defined %}
+</div>
+{% endif %}

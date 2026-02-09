@@ -3,13 +3,16 @@ import subprocess
 
 import config
 from models import (
+    Any,
     AnyYesRule,
     ChoiceMapRule,
     ContainsAnyRule,
     CountYesRule,
+    Equals,
     FreeTextQuestion,
     MultipleChoiceQuestion,
     MultipleSelectQuestion,
+    Not,
     Risk,
     Section,
     SubSection,
@@ -77,12 +80,17 @@ def define_sections() -> list[Section]:
                             id="active_hobbies",
                             text="Which active hobbies do you enjoy?",
                             options=("Swimming", "Cycling", "Running", "Hiking", "Team sports"),
+                            visible_when=Not(Equals("exercise_frequency", "Never")),
                         ),
                     ),
                 ),
                 SubSection(
                     title="Indoor Interests",
                     description="The things you enjoy when you're staying in.",
+                    visible_when=Any((
+                        Equals("exercise_frequency", "Rarely"),
+                        Equals("exercise_frequency", "Never"),
+                    )),
                     questions=(
                         YesNoQuestion(
                             id="enjoys_coding",

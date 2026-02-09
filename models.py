@@ -1,6 +1,68 @@
+from __future__ import annotations
+
 import json
 from collections.abc import Sequence
 from dataclasses import dataclass, field
+
+
+# ---------------------------------------------------------------------------
+# Visibility conditions
+# ---------------------------------------------------------------------------
+
+
+@dataclass(frozen=True)
+class Equals:
+    """True when a question's answer equals a specific value."""
+
+    question_id: str
+    value: str
+
+    def to_js(self) -> str:
+        return f"answers[{json.dumps(self.question_id)}] === {json.dumps(self.value)}"
+
+
+@dataclass(frozen=True)
+class Contains:
+    """True when a multi-select answer includes a specific value."""
+
+    question_id: str
+    value: str
+
+    def to_js(self) -> str:
+        return f"(answers[{json.dumps(self.question_id)}] || []).includes({json.dumps(self.value)})"
+
+
+@dataclass(frozen=True)
+class All:
+    """True when all child conditions are true (logical AND)."""
+
+    conditions: tuple[Condition, ...]
+
+    def to_js(self) -> str:
+        return " && ".join(f"({c.to_js()})" for c in self.conditions)
+
+
+@dataclass(frozen=True)
+class Any:
+    """True when any child condition is true (logical OR)."""
+
+    conditions: tuple[Condition, ...]
+
+    def to_js(self) -> str:
+        return " || ".join(f"({c.to_js()})" for c in self.conditions)
+
+
+@dataclass(frozen=True)
+class Not:
+    """Negation of a condition."""
+
+    condition: Condition
+
+    def to_js(self) -> str:
+        return f"!({self.condition.to_js()})"
+
+
+Condition = Equals | Contains | All | Any | Not
 
 
 # ---------------------------------------------------------------------------
@@ -14,6 +76,7 @@ class YesNoQuestion:
 
     id: str
     text: str
+    visible_when: Condition | None = None
     type: str = field(default="yes_no", init=False)
 
 
@@ -23,6 +86,7 @@ class FreeTextQuestion:
 
     id: str
     text: str
+    visible_when: Condition | None = None
     type: str = field(default="free_text", init=False)
 
 
@@ -33,6 +97,7 @@ class MultipleChoiceQuestion:
     id: str
     text: str
     options: tuple[str, ...]
+    visible_when: Condition | None = None
     type: str = field(default="multiple_choice", init=False)
 
 
@@ -43,6 +108,7 @@ class MultipleSelectQuestion:
     id: str
     text: str
     options: tuple[str, ...]
+    visible_when: Condition | None = None
     type: str = field(default="multiple_select", init=False)
 
 
@@ -61,6 +127,7 @@ class SubSection:
     title: str
     description: str
     questions: tuple[Question, ...]
+    visible_when: Condition | None = None
 
 
 @dataclass(frozen=True)
