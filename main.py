@@ -1,7 +1,7 @@
 import shutil
 import subprocess
-from pathlib import Path
 
+import config
 from models import (
     FreeTextQuestion,
     MultipleChoiceQuestion,
@@ -10,10 +10,6 @@ from models import (
     YesNoQuestion,
 )
 from render import render_form
-
-PROJECT_ROOT = Path(__file__).parent
-OUTPUT_DIR = PROJECT_ROOT / "output"
-ALPINE_SRC = PROJECT_ROOT / "alpine3.15.8.min.js"
 
 
 def define_questions() -> list[Question]:
@@ -37,13 +33,13 @@ def define_questions() -> list[Question]:
 
 def ensure_output_dir() -> None:
     """Create the output directory if it doesn't exist."""
-    OUTPUT_DIR.mkdir(exist_ok=True)
+    config.output_dir.mkdir(exist_ok=True)
 
 
 def write_html(questions: list[Question]) -> None:
     """Render and write the form HTML to output/index.html."""
     html = render_form(questions)
-    (OUTPUT_DIR / "index.html").write_text(html)
+    (config.output_dir / "index.html").write_text(html)
 
 
 def compile_css() -> None:
@@ -56,13 +52,13 @@ def compile_css() -> None:
             "--minify",
         ],
         check=True,
-        cwd=PROJECT_ROOT,
+        cwd=config.project_root,
     )
 
 
 def copy_alpine() -> None:
     """Copy the Alpine.js bundle into the output directory."""
-    shutil.copy2(ALPINE_SRC, OUTPUT_DIR / ALPINE_SRC.name)
+    shutil.copy2(config.alpine_src, config.output_dir / config.alpine_src.name)
 
 
 def main() -> None:
@@ -72,7 +68,7 @@ def main() -> None:
     write_html(questions)
     compile_css()
     copy_alpine()
-    print(f"Built form with {len(questions)} questions in {OUTPUT_DIR.resolve()}/")
+    print(f"Built form with {len(questions)} questions in {config.output_dir.resolve()}/")
 
 
 if __name__ == "__main__":

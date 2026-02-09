@@ -1,17 +1,15 @@
 from dataclasses import asdict
-from pathlib import Path
 
 from jinja2 import Environment, FileSystemLoader, select_autoescape
 
+import config
 from models import Question
-
-TEMPLATES_DIR = Path(__file__).parent / "templates"
 
 
 def create_environment() -> Environment:
     """Create a Jinja2 environment loading from the templates directory."""
     return Environment(
-        loader=FileSystemLoader(TEMPLATES_DIR),
+        loader=FileSystemLoader(config.templates_dir),
         autoescape=select_autoescape(default=True),
     )
 
