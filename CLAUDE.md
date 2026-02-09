@@ -42,15 +42,16 @@ The build pipeline has three phases:
 
 2. **TailwindCSS (build time)** — `input.css` is the v4 entry point (`@import "tailwindcss"`). The `tailwindcss` CLI scans all non-gitignored text files for class names and compiles only the used utilities into `output/styles.css`. No `tailwind.config.js` needed.
 
-3. **Alpine.js (runtime)** — A parent `<div>` holds the `x-data` scope shared by both the questions form and the risks panel. It contains reactive `answers` state, Alpine.js getters for each risk (compiled from Python rules at build time), and tab navigation. Each question partial binds inputs via `x-model`. Risk getters re-evaluate automatically as answers change. Multi-select answers are initialised as `[]` (array); all others as `''` (empty string).
+3. **Alpine.js (runtime)** — A parent `<div>` holds the `x-data` scope shared by all section forms and the risks panel. It contains reactive `answers` state, Alpine.js getters for each risk (compiled from Python rules at build time), and tab navigation. Each section renders as its own `<form>` shown/hidden via `x-show`; sub-sections provide visual grouping within sections. Each question partial binds inputs via `x-model`. Risk getters re-evaluate automatically as answers change. Multi-select answers are initialised as `[]` (array); all others as `''` (empty string).
 
 ### Key files
 
 | File | Purpose |
 |---|---|
-| `models.py` | Question dataclasses, `Question` union, risk rule dataclasses (`AnyYesRule`, `CountYesRule`, `ChoiceMapRule`, `ContainsAnyRule`), `RiskRule` union, and `Risk` dataclass |
-| `render.py` | Jinja2 environment setup, `prepare_risks()`, and `render_form()` |
-| `templates/page.html.j2` | Page skeleton with Alpine.js state, tab navigation, risk getters, and debug panel |
+| `models.py` | Question dataclasses, `Question` union, `SubSection`/`Section` dataclasses, `all_questions()` helper, risk rule dataclasses (`AnyYesRule`, `CountYesRule`, `ChoiceMapRule`, `ContainsAnyRule`), `RiskRule` union, and `Risk` dataclass |
+| `render.py` | Jinja2 environment setup, `prepare_sections()`, `prepare_risks()`, and `render_form()` |
+| `templates/page.html.j2` | Page skeleton with Alpine.js state, dynamic section tabs, risk getters, and debug panel |
+| `templates/subsection.html.j2` | Sub-section partial — heading + question loop |
 | `templates/question.html.j2` | Dispatcher — includes `questions/{type}.html.j2` |
 | `templates/questions/*.html.j2` | Per-type partials (one file per question type) |
 | `templates/risk_summary.html.j2` | Risk card partial with colour-coded level badge |
@@ -62,9 +63,18 @@ The build pipeline has three phases:
 1. **`models.py`** — Add a frozen dataclass with `id: str`, `text: str`, any type-specific fields, and a `type: str = field(default="my_type", init=False)` discriminator. Add the class to the `Question` union type alias.
 2. **`templates/questions/my_type.html.j2`** — Create a Jinja2 partial for the new type. Use `x-model="answers.{{ question.id }}"` to bind to Alpine.js state.
 3. **`templates/page.html.j2`** — If the new type needs a non-string default (like `[]` for arrays), add a condition to the `x-data` initialiser alongside the existing `multiple_select` check.
-4. **`main.py`** — Import the new class and add an example to `define_questions()`.
+4. **`main.py`** — Import the new class and add an example to the appropriate `SubSection` in `define_sections()`.
 
-No changes needed to `question.html.j2`, `render.py`, or the build pipeline — the dispatcher and renderer work generically.
+No changes needed to `question.html.j2`, `subsection.html.j2`, `render.py`, or the build pipeline — the dispatcher and renderer work generically.
+
+### Form structure: Sections and sub-sections
+
+Forms are organised into **Sections** (rendered as tabs) and **SubSections** (visual groupings within a section). In `main.py`, `define_sections()` returns a `list[Section]`, where each `Section` contains a tuple of `SubSection`s, each containing a tuple of `Question`s.
+
+- To add a new section, create a `Section(id="slug", title="Display Name", subsections=(...))` in `define_sections()`.
+- To add a sub-section, add a `SubSection(title="Heading", questions=(...))` to an existing section's `subsections` tuple.
+- Section `id` values are used as Alpine.js tab identifiers — keep them as simple slugs.
+- The Risk Analysis tab is always present (right-aligned, red accent) and is not defined in the sections list.
 
 ### Adding a new risk
 

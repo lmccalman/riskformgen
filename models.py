@@ -1,4 +1,5 @@
 import json
+from collections.abc import Sequence
 from dataclasses import dataclass, field
 
 
@@ -46,6 +47,35 @@ class MultipleSelectQuestion:
 
 
 Question = YesNoQuestion | FreeTextQuestion | MultipleChoiceQuestion | MultipleSelectQuestion
+
+
+# ---------------------------------------------------------------------------
+# Form structure
+# ---------------------------------------------------------------------------
+
+
+@dataclass(frozen=True)
+class SubSection:
+    """A visual grouping of questions within a section."""
+
+    title: str
+    description: str
+    questions: tuple[Question, ...]
+
+
+@dataclass(frozen=True)
+class Section:
+    """A major form section rendered as its own tab."""
+
+    id: str
+    title: str
+    description: str
+    subsections: tuple[SubSection, ...]
+
+
+def all_questions(sections: Sequence[Section]) -> list[Question]:
+    """Flatten sections into a single question list."""
+    return [q for s in sections for sub in s.subsections for q in sub.questions]
 
 
 # ---------------------------------------------------------------------------

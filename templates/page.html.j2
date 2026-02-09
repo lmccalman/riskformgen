@@ -13,7 +13,7 @@
 
       <div
         x-data="{
-          activeTab: 'questions',
+          activeTab: '{{ sections[0].id }}',
           answers: {
             {% for q in questions %}
             '{{ q.id }}': {% if q.type == 'multiple_select' %}[]{% else %}''{% endif %}{% if not loop.last %},{% endif %}
@@ -35,63 +35,69 @@
       >
         {# ── Tab navigation ── #}
         <div class="mb-6 flex border-b border-gray-200">
+          {% for section in sections %}
           <button
             type="button"
-            @click="activeTab = 'questions'"
-            :class="activeTab === 'questions'
+            @click="activeTab = '{{ section.id }}'"
+            :class="activeTab === '{{ section.id }}'
               ? 'border-indigo-500 text-indigo-600'
               : 'border-transparent text-gray-500 hover:border-gray-300 hover:text-gray-700'"
             class="border-b-2 px-4 py-2 text-sm font-medium transition-colors"
           >
-            Questions
+            {{ section.title }}
           </button>
+          {% endfor %}
           <button
             type="button"
             @click="activeTab = 'risks'"
             :class="activeTab === 'risks'
-              ? 'border-indigo-500 text-indigo-600'
+              ? 'border-red-500 text-red-600'
               : 'border-transparent text-gray-500 hover:border-gray-300 hover:text-gray-700'"
-            class="border-b-2 px-4 py-2 text-sm font-medium transition-colors"
+            class="ml-auto border-b-2 px-4 py-2 text-sm font-medium transition-colors"
           >
-            Risks
+            Risk Analysis
           </button>
         </div>
 
-        {# ── Questions tab ── #}
-        <form x-show="activeTab === 'questions'" class="space-y-6">
-          {% for question in questions %}
-          {% with question=question %}
-          {% include "question.html.j2" %}
+        {# ── Section tabs ── #}
+        {% for section in sections %}
+        <form x-show="activeTab === '{{ section.id }}'" class="space-y-8">
+          <p class="text-sm text-gray-500">{{ section.description }}</p>
+          {% for subsection in section.subsections %}
+          {% with subsection=subsection %}
+          {% include "subsection.html.j2" %}
           {% endwith %}
           {% endfor %}
-
-          <div class="rounded-lg border border-gray-200 bg-gray-800 p-6 shadow-sm space-y-4">
-            <div>
-              <h2 class="mb-3 text-sm font-semibold uppercase tracking-wide text-gray-400">
-                Debug — Current Answers
-              </h2>
-              <pre
-                class="text-sm text-green-400"
-                x-text="JSON.stringify(answers, null, 2)"
-              ></pre>
-            </div>
-            {% if risks %}
-            <div>
-              <h2 class="mb-3 text-sm font-semibold uppercase tracking-wide text-gray-400">
-                Debug — Risk Levels
-              </h2>
-              <pre
-                class="text-sm text-green-400"
-                x-text="JSON.stringify({
-                  {% for risk in risks %}
-                  '{{ risk.id }}': {{ risk.id }}{% if not loop.last %},{% endif %}
-                  {% endfor %}
-                }, null, 2)"
-              ></pre>
-            </div>
-            {% endif %}
-          </div>
         </form>
+        {% endfor %}
+
+        {# ── Debug panel (visible on all section tabs) ── #}
+        <div x-show="activeTab !== 'risks'" class="mt-8 rounded-lg border border-gray-200 bg-gray-800 p-6 shadow-sm space-y-4">
+          <div>
+            <h2 class="mb-3 text-sm font-semibold uppercase tracking-wide text-gray-400">
+              Debug — Current Answers
+            </h2>
+            <pre
+              class="text-sm text-green-400"
+              x-text="JSON.stringify(answers, null, 2)"
+            ></pre>
+          </div>
+          {% if risks %}
+          <div>
+            <h2 class="mb-3 text-sm font-semibold uppercase tracking-wide text-gray-400">
+              Debug — Risk Levels
+            </h2>
+            <pre
+              class="text-sm text-green-400"
+              x-text="JSON.stringify({
+                {% for risk in risks %}
+                '{{ risk.id }}': {{ risk.id }}{% if not loop.last %},{% endif %}
+                {% endfor %}
+              }, null, 2)"
+            ></pre>
+          </div>
+          {% endif %}
+        </div>
 
         {# ── Risks tab ── #}
         <div x-show="activeTab === 'risks'" class="space-y-4">
