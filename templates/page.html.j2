@@ -65,14 +65,31 @@
           {% endwith %}
           {% endfor %}
 
-          <div class="rounded-lg border border-gray-200 bg-gray-800 p-6 shadow-sm">
-            <h2 class="mb-3 text-sm font-semibold uppercase tracking-wide text-gray-400">
-              Debug — Current Answers
-            </h2>
-            <pre
-              class="text-sm text-green-400"
-              x-text="JSON.stringify(answers, null, 2)"
-            ></pre>
+          <div class="rounded-lg border border-gray-200 bg-gray-800 p-6 shadow-sm space-y-4">
+            <div>
+              <h2 class="mb-3 text-sm font-semibold uppercase tracking-wide text-gray-400">
+                Debug — Current Answers
+              </h2>
+              <pre
+                class="text-sm text-green-400"
+                x-text="JSON.stringify(answers, null, 2)"
+              ></pre>
+            </div>
+            {% if risks %}
+            <div>
+              <h2 class="mb-3 text-sm font-semibold uppercase tracking-wide text-gray-400">
+                Debug — Risk Levels
+              </h2>
+              <pre
+                class="text-sm text-green-400"
+                x-text="JSON.stringify({
+                  {% for risk in risks %}
+                  '{{ risk.id }}': {{ risk.id }}{% if not loop.last %},{% endif %}
+                  {% endfor %}
+                }, null, 2)"
+              ></pre>
+            </div>
+            {% endif %}
           </div>
         </form>
 
