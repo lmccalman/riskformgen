@@ -3,7 +3,7 @@ from pathlib import Path
 
 from jinja2 import Environment, FileSystemLoader, select_autoescape
 
-from models import YesNoQuestion
+from models import Question
 
 TEMPLATES_DIR = Path(__file__).parent / "templates"
 
@@ -16,7 +16,7 @@ def create_environment() -> Environment:
     )
 
 
-def render_form(questions: list[YesNoQuestion]) -> str:
+def render_form(questions: list[Question]) -> str:
     """Render the form page HTML from a list of questions."""
     env = create_environment()
     template = env.get_template("page.html.j2")

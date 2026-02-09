@@ -12,7 +12,7 @@
       <h1 class="mb-8 text-3xl font-bold text-gray-900">FormGen</h1>
 
       <form
-        x-data="{ answers: { {% for q in questions %}'{{ q.id }}': ''{% if not loop.last %}, {% endif %}{% endfor %} } }"
+        x-data="{ answers: { {% for q in questions %}'{{ q.id }}': {% if q.type == 'multiple_select' %}[]{% else %}''{% endif %}{% if not loop.last %}, {% endif %}{% endfor %} } }"
         class="space-y-6"
       >
         {% for question in questions %}
