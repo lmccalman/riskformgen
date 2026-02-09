@@ -1,5 +1,6 @@
-# formgen
-Engine to create static pages containing interactive forms.
+# riskformgen
+Engine to create static pages containing interactive forms for conducting risk
+assessments.
 
 ## Planned features
 
@@ -10,6 +11,7 @@ Engine to create static pages containing interactive forms.
 - Supports conditional logic such as rendering a subsection with additional
   questions based on the answer tow question 1
 - User can download a json with their form data at any time.
+- Risk model takes answers from user and creates a risk analysis.
 
 ## Current Status
 - No work done: planning phases only

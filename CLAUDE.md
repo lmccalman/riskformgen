@@ -4,7 +4,13 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Project Overview
 
-**formgen** is a static-page form generator. It renders Python dataclass-based form definitions into static HTML pages using Jinja2 templates, TailwindCSS, and Alpine.js for interactivity. Users interact with tabbed, multi-section forms that support conditional logic, and can download their responses as JSON.
+**riskformgen** is a static-page form generator for risk analysis. It renders
+Python dataclass-based form definitions into static HTML pages using Jinja2
+templates, TailwindCSS, and Alpine.js for interactivity. Users interact with
+tabbed, multi-section forms that support conditional logic, and can download
+their responses as JSON. There is a risk model that converts the users answers
+to risk levels across a given set of risks, and modifies these with controls
+and mitigations.
 
 Status: early development (hello-world skeleton working).
 
