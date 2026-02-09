@@ -1,0 +1,36 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>FormGen</title>
+    <link rel="stylesheet" href="styles.css" />
+    <script defer src="alpine3.15.8.min.js"></script>
+  </head>
+  <body class="min-h-screen bg-gray-50">
+    <main class="mx-auto max-w-2xl px-4 py-12">
+      <h1 class="mb-8 text-3xl font-bold text-gray-900">FormGen</h1>
+
+      <form
+        x-data="{ answers: { {% for q in questions %}'{{ q.id }}': ''{% if not loop.last %}, {% endif %}{% endfor %} } }"
+        class="space-y-6"
+      >
+        {% for question in questions %}
+        {% with question=question %}
+        {% include "question.html.j2" %}
+        {% endwith %}
+        {% endfor %}
+
+        <div class="rounded-lg border border-gray-200 bg-gray-800 p-6 shadow-sm">
+          <h2 class="mb-3 text-sm font-semibold uppercase tracking-wide text-gray-400">
+            Debug — Current Answers
+          </h2>
+          <pre
+            class="text-sm text-green-400"
+            x-text="JSON.stringify(answers, null, 2)"
+          ></pre>
+        </div>
+      </form>
+    </main>
+  </body>
+</html>
