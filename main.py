@@ -3,10 +3,15 @@ import subprocess
 
 import config
 from models import (
+    AnyYesRule,
+    ChoiceMapRule,
+    ContainsAnyRule,
+    CountYesRule,
     FreeTextQuestion,
     MultipleChoiceQuestion,
     MultipleSelectQuestion,
     Question,
+    Risk,
     YesNoQuestion,
 )
 from render import render_form
@@ -31,14 +36,79 @@ def define_questions() -> list[Question]:
     ]
 
 
+def define_risks() -> list[Risk]:
+    """Define example risks that reference the form questions."""
+    return [
+        Risk(
+            id="sedentary_risk",
+            name="Sedentary Lifestyle",
+            description="Risk of an overly sedentary lifestyle based on activity preferences.",
+            rules=(
+                AnyYesRule(
+                    question_ids=("likes_swimming",),
+                    level="low",
+                ),
+                ContainsAnyRule(
+                    question_id="hobbies",
+                    values=("Swimming", "Cycling"),
+                    level="low",
+                ),
+                CountYesRule(
+                    question_ids=("likes_swimming", "enjoys_coding"),
+                    threshold=2,
+                    level="medium",
+                ),
+            ),
+            default_level="high",
+        ),
+        Risk(
+            id="seasonal_mood_risk",
+            name="Seasonal Mood Impact",
+            description="Potential mood impact based on seasonal preference.",
+            rules=(
+                ChoiceMapRule(
+                    question_id="favourite_season",
+                    mapping={
+                        "Spring": "low",
+                        "Summer": "low",
+                        "Autumn": "medium",
+                        "Winter": "high",
+                    },
+                ),
+            ),
+        ),
+        Risk(
+            id="burnout_risk",
+            name="Burnout",
+            description="Risk of burnout from an indoor-heavy lifestyle.",
+            rules=(
+                AnyYesRule(
+                    question_ids=("enjoys_coding",),
+                    level="medium",
+                ),
+                ContainsAnyRule(
+                    question_id="hobbies",
+                    values=("Reading", "Cooking"),
+                    level="medium",
+                ),
+                ContainsAnyRule(
+                    question_id="hobbies",
+                    values=("Swimming", "Cycling"),
+                    level="low",
+                ),
+            ),
+        ),
+    ]
+
+
 def ensure_output_dir() -> None:
     """Create the output directory if it doesn't exist."""
     config.output_dir.mkdir(exist_ok=True)
 
 
-def write_html(questions: list[Question]) -> None:
+def write_html(questions: list[Question], risks: list[Risk]) -> None:
     """Render and write the form HTML to output/index.html."""
-    html = render_form(questions)
+    html = render_form(questions, risks)
     (config.output_dir / "index.html").write_text(html)
 
 
@@ -64,11 +134,15 @@ def copy_alpine() -> None:
 def main() -> None:
     """Build the static form page."""
     questions = define_questions()
+    risks = define_risks()
     ensure_output_dir()
-    write_html(questions)
+    write_html(questions, risks)
     compile_css()
     copy_alpine()
-    print(f"Built form with {len(questions)} questions in {config.output_dir.resolve()}/")
+    print(
+        f"Built form with {len(questions)} questions"
+        f" and {len(risks)} risks in {config.output_dir.resolve()}/"
+    )
 
 
 if __name__ == "__main__":

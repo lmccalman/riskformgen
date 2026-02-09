@@ -11,26 +11,84 @@
     <main class="mx-auto max-w-2xl px-4 py-12">
       <h1 class="mb-8 text-3xl font-bold text-gray-900">FormGen</h1>
 
-      <form
-        x-data="{ answers: { {% for q in questions %}'{{ q.id }}': {% if q.type == 'multiple_select' %}[]{% else %}''{% endif %}{% if not loop.last %}, {% endif %}{% endfor %} } }"
-        class="space-y-6"
+      <div
+        x-data="{
+          activeTab: 'questions',
+          answers: {
+            {% for q in questions %}
+            '{{ q.id }}': {% if q.type == 'multiple_select' %}[]{% else %}''{% endif %}{% if not loop.last %},{% endif %}
+            {% endfor %}
+          },
+          _levels: { not_applicable: 0, low: 1, medium: 2, high: 3 },
+          {% for risk in risks %}
+          get {{ risk.id }}() {
+            const results = [
+              {% for js in risk.rules_js %}
+              ({{ js }}),
+              {% endfor %}
+            ].filter(r => r !== null);
+            if (results.length === 0) return '{{ risk.default_level }}';
+            return results.reduce((w, r) => this._levels[r] > this._levels[w] ? r : w);
+          },
+          {% endfor %}
+        }"
       >
-        {% for question in questions %}
-        {% with question=question %}
-        {% include "question.html.j2" %}
-        {% endwith %}
-        {% endfor %}
-
-        <div class="rounded-lg border border-gray-200 bg-gray-800 p-6 shadow-sm">
-          <h2 class="mb-3 text-sm font-semibold uppercase tracking-wide text-gray-400">
-            Debug — Current Answers
-          </h2>
-          <pre
-            class="text-sm text-green-400"
-            x-text="JSON.stringify(answers, null, 2)"
-          ></pre>
+        {# ── Tab navigation ── #}
+        <div class="mb-6 flex border-b border-gray-200">
+          <button
+            type="button"
+            @click="activeTab = 'questions'"
+            :class="activeTab === 'questions'
+              ? 'border-indigo-500 text-indigo-600'
+              : 'border-transparent text-gray-500 hover:border-gray-300 hover:text-gray-700'"
+            class="border-b-2 px-4 py-2 text-sm font-medium transition-colors"
+          >
+            Questions
+          </button>
+          <button
+            type="button"
+            @click="activeTab = 'risks'"
+            :class="activeTab === 'risks'
+              ? 'border-indigo-500 text-indigo-600'
+              : 'border-transparent text-gray-500 hover:border-gray-300 hover:text-gray-700'"
+            class="border-b-2 px-4 py-2 text-sm font-medium transition-colors"
+          >
+            Risks
+          </button>
         </div>
-      </form>
+
+        {# ── Questions tab ── #}
+        <form x-show="activeTab === 'questions'" class="space-y-6">
+          {% for question in questions %}
+          {% with question=question %}
+          {% include "question.html.j2" %}
+          {% endwith %}
+          {% endfor %}
+
+          <div class="rounded-lg border border-gray-200 bg-gray-800 p-6 shadow-sm">
+            <h2 class="mb-3 text-sm font-semibold uppercase tracking-wide text-gray-400">
+              Debug — Current Answers
+            </h2>
+            <pre
+              class="text-sm text-green-400"
+              x-text="JSON.stringify(answers, null, 2)"
+            ></pre>
+          </div>
+        </form>
+
+        {# ── Risks tab ── #}
+        <div x-show="activeTab === 'risks'" class="space-y-4">
+          {% if risks %}
+          {% for risk in risks %}
+          {% with risk=risk %}
+          {% include "risk_summary.html.j2" %}
+          {% endwith %}
+          {% endfor %}
+          {% else %}
+          <p class="text-gray-500">No risks defined.</p>
+          {% endif %}
+        </div>
+      </div>
     </main>
   </body>
 </html>

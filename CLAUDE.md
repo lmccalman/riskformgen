@@ -12,7 +12,7 @@ their responses as JSON. There is a risk model that converts the users answers
 to risk levels across a given set of risks, and modifies these with controls
 and mitigations.
 
-Status: early development (hello-world skeleton working).
+Status: early development (questions and risk evaluation working).
 
 ## Tech Stack
 
@@ -42,17 +42,18 @@ The build pipeline has three phases:
 
 2. **TailwindCSS (build time)** — `input.css` is the v4 entry point (`@import "tailwindcss"`). The `tailwindcss` CLI scans all non-gitignored text files for class names and compiles only the used utilities into `output/styles.css`. No `tailwind.config.js` needed.
 
-3. **Alpine.js (runtime)** — The `<form>` element's `x-data` holds reactive state for all question answers. Each question partial binds inputs via `x-model`. A debug `<pre>` panel shows the live JSON state. Multi-select answers are initialised as `[]` (array); all others as `''` (empty string).
+3. **Alpine.js (runtime)** — A parent `<div>` holds the `x-data` scope shared by both the questions form and the risks panel. It contains reactive `answers` state, Alpine.js getters for each risk (compiled from Python rules at build time), and tab navigation. Each question partial binds inputs via `x-model`. Risk getters re-evaluate automatically as answers change. Multi-select answers are initialised as `[]` (array); all others as `''` (empty string).
 
 ### Key files
 
 | File | Purpose |
 |---|---|
-| `models.py` | Question dataclasses (`YesNoQuestion`, `FreeTextQuestion`, `MultipleChoiceQuestion`, `MultipleSelectQuestion`) and `Question` union type |
-| `render.py` | Jinja2 environment setup and `render_form()` |
-| `templates/page.html.j2` | Page skeleton with Alpine.js state and debug panel |
+| `models.py` | Question dataclasses, `Question` union, risk rule dataclasses (`AnyYesRule`, `CountYesRule`, `ChoiceMapRule`, `ContainsAnyRule`), `RiskRule` union, and `Risk` dataclass |
+| `render.py` | Jinja2 environment setup, `prepare_risks()`, and `render_form()` |
+| `templates/page.html.j2` | Page skeleton with Alpine.js state, tab navigation, risk getters, and debug panel |
 | `templates/question.html.j2` | Dispatcher — includes `questions/{type}.html.j2` |
 | `templates/questions/*.html.j2` | Per-type partials (one file per question type) |
+| `templates/risk_summary.html.j2` | Risk card partial with colour-coded level badge |
 | `input.css` | Tailwind v4 entry point |
 | `main.py` | Build orchestrator |
 
@@ -64,6 +65,27 @@ The build pipeline has three phases:
 4. **`main.py`** — Import the new class and add an example to `define_questions()`.
 
 No changes needed to `question.html.j2`, `render.py`, or the build pipeline — the dispatcher and renderer work generically.
+
+### Adding a new risk
+
+1. **`models.py`** — Create a `Risk` with an `id`, `name`, `description`, and a tuple of rules. Available rule types:
+   - `AnyYesRule(question_ids, level)` — fires if any listed yes/no question is "yes"
+   - `CountYesRule(question_ids, threshold, level)` — fires if ≥ threshold yes answers
+   - `ChoiceMapRule(question_id, mapping)` — maps a multiple-choice answer to a level via dict
+   - `ContainsAnyRule(question_id, values, level)` — fires if a multi-select answer contains any of the values
+2. **`main.py`** — Add the `Risk` to the list returned by `define_risks()`.
+
+No template changes needed. Each rule's `to_js()` method compiles to a JS expression that returns a risk level string or `null`. The page template loops over risks and generates Alpine.js getters that evaluate all rules and return the worst-case (highest severity) result.
+
+### Adding a new rule type
+
+1. **`models.py`** — Add a frozen dataclass with a `to_js()` method returning a JS expression (evaluates to a level string or `null`). Use `json.dumps` for JS literals. Add the class to the `RiskRule` union.
+
+No other changes needed — `prepare_risks()` and the template getter loop work generically.
+
+### Gotcha: Jinja2 autoescape and Alpine.js
+
+The Jinja2 environment uses `autoescape=True`. When rendering JS expressions inside `x-data="..."` attributes, **do NOT use `|safe`**. Autoescape produces HTML entities (`&#34;` for `"`, `&gt;` for `>`, `&#39;` for `'`) which the browser decodes back to the original characters when reading the attribute value — before Alpine evaluates the JS. Using `|safe` puts raw `"` into a `"`-delimited attribute, breaking HTML parsing.
 
 ### Output
 
