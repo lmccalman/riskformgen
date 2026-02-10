@@ -1,3 +1,4 @@
+import json
 from dataclasses import asdict
 
 from jinja2 import Environment, FileSystemLoader, select_autoescape
@@ -63,7 +64,8 @@ def prepare_risks(risks: list[Risk], questions: list[Question]) -> list[dict]:
                 "id": risk.id,
                 "name": risk.name,
                 "description": risk.description,
-                "default_level": risk.default_level,
+                "default_likelihood": risk.default_likelihood,
+                "default_consequence": risk.default_consequence,
                 "rules_js": [rule.to_js() for rule in risk.rules],
                 "questions": [{"id": qid, "text": q_text[qid]} for qid in ids],
             }
@@ -80,4 +82,8 @@ def render_form(sections: list[Section], risks: list[Risk]) -> str:
         sections=prepare_sections(sections),
         questions=[_prepare_question(q) for q in questions],
         risks=prepare_risks(risks, questions),
+        likelihoods_js=json.dumps(list(config.LIKELIHOODS)),
+        consequences_js=json.dumps(list(config.CONSEQUENCES)),
+        risk_levels=list(config.RISK_LEVELS),
+        risk_matrix_js=json.dumps(config.RISK_MATRIX),
     )

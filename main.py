@@ -162,30 +162,31 @@ def define_risks() -> list[Risk]:
             rules=(
                 AnyYesRule(
                     question_ids=("likes_swimming",),
-                    level="low",
+                    likelihood="unlikely",
                 ),
                 ContainsAnyRule(
                     question_id="active_hobbies",
                     values=("Swimming", "Cycling", "Running"),
-                    level="low",
+                    consequence="minor",
                 ),
                 ChoiceMapRule(
                     question_id="exercise_frequency",
                     mapping={
-                        "Daily": "low",
-                        "A few times a week": "low",
-                        "Weekly": "medium",
-                        "Rarely": "high",
-                        "Never": "high",
+                        "Daily": {"likelihood": "rare", "consequence": "minor"},
+                        "A few times a week": {"likelihood": "unlikely"},
+                        "Weekly": {"likelihood": "possible", "consequence": "medium"},
+                        "Rarely": {"likelihood": "likely", "consequence": "major"},
+                        "Never": {"likelihood": "almost_certain", "consequence": "major"},
                     },
                 ),
                 CountYesRule(
                     question_ids=("likes_swimming", "enjoys_coding"),
                     threshold=2,
-                    level="medium",
+                    likelihood="possible",
                 ),
             ),
-            default_level="high",
+            default_likelihood="likely",
+            default_consequence="medium",
         ),
         Risk(
             id="seasonal_mood_risk",
@@ -195,10 +196,10 @@ def define_risks() -> list[Risk]:
                 ChoiceMapRule(
                     question_id="favourite_season",
                     mapping={
-                        "Spring": "low",
-                        "Summer": "low",
-                        "Autumn": "medium",
-                        "Winter": "high",
+                        "Spring": {"likelihood": "unlikely", "consequence": "minor"},
+                        "Summer": {"likelihood": "rare", "consequence": "minor"},
+                        "Autumn": {"likelihood": "possible", "consequence": "medium"},
+                        "Winter": {"likelihood": "likely", "consequence": "major"},
                     },
                 ),
             ),
@@ -210,21 +211,23 @@ def define_risks() -> list[Risk]:
             rules=(
                 AnyYesRule(
                     question_ids=("enjoys_coding",),
-                    level="medium",
+                    likelihood="possible",
+                    consequence="medium",
                 ),
                 ContainsAnyRule(
                     question_id="indoor_hobbies",
                     values=("Reading", "Gaming"),
-                    level="medium",
+                    likelihood="likely",
                 ),
                 ContainsAnyRule(
                     question_id="active_hobbies",
                     values=("Swimming", "Cycling", "Hiking"),
-                    level="low",
+                    likelihood="unlikely",
+                    consequence="minor",
                 ),
                 AnyYesRule(
                     question_ids=("outdoor_access",),
-                    level="low",
+                    consequence="minor",
                 ),
             ),
         ),
@@ -236,19 +239,20 @@ def define_risks() -> list[Risk]:
                 ChoiceMapRule(
                     question_id="social_frequency",
                     mapping={
-                        "Daily": "low",
-                        "A few times a week": "low",
-                        "Weekly": "medium",
-                        "Rarely": "high",
+                        "Daily": {"likelihood": "rare", "consequence": "minor"},
+                        "A few times a week": {"likelihood": "unlikely", "consequence": "minor"},
+                        "Weekly": {"likelihood": "possible", "consequence": "medium"},
+                        "Rarely": {"likelihood": "likely", "consequence": "major"},
                     },
                 ),
                 ContainsAnyRule(
                     question_id="group_activities",
                     values=("Team sports", "Volunteering", "Social dining"),
-                    level="low",
+                    likelihood="unlikely",
                 ),
             ),
-            default_level="high",
+            default_likelihood="likely",
+            default_consequence="major",
         ),
     ]
 

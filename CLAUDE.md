@@ -48,6 +48,7 @@ The build pipeline has three phases:
 
 | File | Purpose |
 |---|---|
+| `config.py` | Project paths, risk scales (`LIKELIHOODS`, `CONSEQUENCES`, `RISK_LEVELS`), and `RISK_MATRIX` lookup table |
 | `models.py` | Question dataclasses, `Question` union, `SubSection`/`Section` dataclasses, `all_questions()` helper, risk rule dataclasses (`AnyYesRule`, `CountYesRule`, `ChoiceMapRule`, `ContainsAnyRule`), `RiskRule` union, and `Risk` dataclass |
 | `render.py` | Jinja2 environment setup, `prepare_sections()`, `prepare_risks()`, and `render_form()` |
 | `templates/page.html.j2` | Page skeleton with Alpine.js state, dynamic section tabs, risk getters, and debug panel |
@@ -76,20 +77,26 @@ Forms are organised into **Sections** (rendered as tabs) and **SubSections** (vi
 - Section `id` values are used as Alpine.js tab identifiers — keep them as simple slugs.
 - The Risk Analysis tab is always present (right-aligned, red accent) and is not defined in the sections list.
 
+### Risk model: Likelihood × Consequence
+
+Risk is decomposed into two independent dimensions — **likelihood** and **consequence** — with the overall risk level computed via a configurable **risk matrix** (ISO 31000 style). The scales and matrix are defined in `config.py`. Each rule can set one or both dimensions; a rule with only `likelihood` set won't affect the consequence reduction, and vice versa. The `_worst` helper on the JS side uses `scale.indexOf()` for ordering — the position in the configured tuple defines severity.
+
+Risk getters return `{likelihood, consequence, level}` objects. The `level` is looked up from the matrix using the worst-case likelihood and consequence across all fired rules.
+
 ### Adding a new risk
 
 1. **`models.py`** — Create a `Risk` with an `id`, `name`, `description`, and a tuple of rules. Available rule types:
-   - `AnyYesRule(question_ids, level)` — fires if any listed yes/no question is "yes"
-   - `CountYesRule(question_ids, threshold, level)` — fires if ≥ threshold yes answers
-   - `ChoiceMapRule(question_id, mapping)` — maps a multiple-choice answer to a level via dict
-   - `ContainsAnyRule(question_id, values, level)` — fires if a multi-select answer contains any of the values
-2. **`main.py`** — Add the `Risk` to the list returned by `define_risks()`.
+   - `AnyYesRule(question_ids, likelihood=, consequence=)` — fires if any listed yes/no question is "yes" (at least one dimension required)
+   - `CountYesRule(question_ids, threshold, likelihood=, consequence=)` — fires if ≥ threshold yes answers
+   - `ChoiceMapRule(question_id, mapping)` — maps a multiple-choice answer to `{"likelihood": ..., "consequence": ...}` via dict (either key optional per entry)
+   - `ContainsAnyRule(question_id, values, likelihood=, consequence=)` — fires if a multi-select answer contains any of the values
+2. **`main.py`** — Add the `Risk` to the list returned by `define_risks()`. Set `default_likelihood` and `default_consequence` for the fallback when no rules fire.
 
-No template changes needed. Each rule's `to_js()` method compiles to a JS expression that returns a risk level string or `null`. The page template loops over risks and generates Alpine.js getters that evaluate all rules and return the worst-case (highest severity) result.
+No template changes needed. Each rule's `to_js()` method compiles to a JS expression that returns a `{likelihood, consequence}` object or `null`. The page template loops over risks and generates Alpine.js getters that reduce results per dimension (worst-case-wins) and look up the overall level from the risk matrix.
 
 ### Adding a new rule type
 
-1. **`models.py`** — Add a frozen dataclass with a `to_js()` method returning a JS expression (evaluates to a level string or `null`). Use `json.dumps` for JS literals. Add the class to the `RiskRule` union.
+1. **`models.py`** — Add a frozen dataclass with a `to_js()` method returning a JS expression (evaluates to a `{likelihood, consequence}` object or `null`). Use `_js_result()` helper and `json.dumps` for JS literals. Add the class to the `RiskRule` union.
 
 No other changes needed — `prepare_risks()` and the template getter loop work generically.
 

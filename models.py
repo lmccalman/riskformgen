@@ -153,24 +153,34 @@ def all_questions(sections: Sequence[Section]) -> list[Question]:
 # Risk model
 # ---------------------------------------------------------------------------
 
-RISK_LEVELS = ("not_applicable", "low", "medium", "high")
-
-
 def _js_ids(ids: tuple[str, ...]) -> str:
     """Format a tuple of IDs as a JS array literal."""
     return json.dumps(list(ids))
 
 
+def _js_result(likelihood: str | None, consequence: str | None) -> str:
+    """Build a JS object literal string for a {likelihood, consequence} result."""
+    l = json.dumps(likelihood) if likelihood else "null"
+    c = json.dumps(consequence) if consequence else "null"
+    return f"{{likelihood: {l}, consequence: {c}}}"
+
+
 @dataclass(frozen=True)
 class AnyYesRule:
-    """Evaluates to *level* if any of the given yes/no questions are 'yes'."""
+    """Returns {likelihood, consequence} if any of the given yes/no questions are 'yes'."""
 
     question_ids: tuple[str, ...]
-    level: str
+    likelihood: str | None = None
+    consequence: str | None = None
+
+    def __post_init__(self) -> None:
+        if self.likelihood is None and self.consequence is None:
+            raise ValueError("AnyYesRule requires at least one of likelihood or consequence")
 
     def to_js(self) -> str:
         ids = _js_ids(self.question_ids)
-        return f"{ids}.some(id => this.answers[id] === 'yes') ? {json.dumps(self.level)} : null"
+        result = _js_result(self.likelihood, self.consequence)
+        return f"{ids}.some(id => this.answers[id] === 'yes') ? {result} : null"
 
     def referenced_question_ids(self) -> tuple[str, ...]:
         return self.question_ids
@@ -178,17 +188,23 @@ class AnyYesRule:
 
 @dataclass(frozen=True)
 class CountYesRule:
-    """Evaluates to *level* if at least *threshold* yes/no questions are 'yes'."""
+    """Returns {likelihood, consequence} if at least *threshold* yes/no questions are 'yes'."""
 
     question_ids: tuple[str, ...]
     threshold: int
-    level: str
+    likelihood: str | None = None
+    consequence: str | None = None
+
+    def __post_init__(self) -> None:
+        if self.likelihood is None and self.consequence is None:
+            raise ValueError("CountYesRule requires at least one of likelihood or consequence")
 
     def to_js(self) -> str:
         ids = _js_ids(self.question_ids)
+        result = _js_result(self.likelihood, self.consequence)
         return (
             f"{ids}.filter(id => this.answers[id] === 'yes').length >= {self.threshold}"
-            f" ? {json.dumps(self.level)} : null"
+            f" ? {result} : null"
         )
 
     def referenced_question_ids(self) -> tuple[str, ...]:
@@ -197,13 +213,21 @@ class CountYesRule:
 
 @dataclass(frozen=True)
 class ChoiceMapRule:
-    """Maps a multiple-choice answer to a risk level via a lookup dict."""
+    """Maps a multiple-choice answer to {likelihood, consequence} via a lookup dict."""
 
     question_id: str
-    mapping: dict[str, str]
+    mapping: dict[str, dict[str, str]]
 
     def to_js(self) -> str:
-        return f"{json.dumps(self.mapping)}[this.answers[{json.dumps(self.question_id)}]] || null"
+        # Normalise each entry so both keys are always present (missing → null)
+        normalised = {
+            answer: {
+                "likelihood": dims.get("likelihood"),
+                "consequence": dims.get("consequence"),
+            }
+            for answer, dims in self.mapping.items()
+        }
+        return f"{json.dumps(normalised)}[this.answers[{json.dumps(self.question_id)}]] || null"
 
     def referenced_question_ids(self) -> tuple[str, ...]:
         return (self.question_id,)
@@ -211,16 +235,22 @@ class ChoiceMapRule:
 
 @dataclass(frozen=True)
 class ContainsAnyRule:
-    """Evaluates to *level* if a multi-select answer contains any of *values*."""
+    """Returns {likelihood, consequence} if a multi-select answer contains any of *values*."""
 
     question_id: str
     values: tuple[str, ...]
-    level: str
+    likelihood: str | None = None
+    consequence: str | None = None
+
+    def __post_init__(self) -> None:
+        if self.likelihood is None and self.consequence is None:
+            raise ValueError("ContainsAnyRule requires at least one of likelihood or consequence")
 
     def to_js(self) -> str:
         vals = json.dumps(list(self.values))
         qid = json.dumps(self.question_id)
-        return f"{vals}.some(v => (this.answers[{qid}] || []).includes(v)) ? {json.dumps(self.level)} : null"
+        result = _js_result(self.likelihood, self.consequence)
+        return f"{vals}.some(v => (this.answers[{qid}] || []).includes(v)) ? {result} : null"
 
     def referenced_question_ids(self) -> tuple[str, ...]:
         return (self.question_id,)
@@ -237,4 +267,5 @@ class Risk:
     name: str
     description: str
     rules: tuple[RiskRule, ...]
-    default_level: str = "not_applicable"
+    default_likelihood: str = "rare"
+    default_consequence: str = "minor"

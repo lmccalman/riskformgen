@@ -27,7 +27,14 @@
             {% for risk in risks %}'{{ risk.id }}': ''{% if not loop.last %},{% endif %}
             {% endfor %}
           },
-          _levels: { not_applicable: 0, low: 1, medium: 2, high: 3 },
+          _likelihoods: {{ likelihoods_js }},
+          _consequences: {{ consequences_js }},
+          _risk_matrix: {{ risk_matrix_js }},
+          _worst(results, dim, scale) {
+            const vals = results.map(r => r[dim]).filter(v => v !== null);
+            if (vals.length === 0) return null;
+            return vals.reduce((w, v) => scale.indexOf(v) > scale.indexOf(w) ? v : w);
+          },
           _formatAnswer(val) {
             if (Array.isArray(val)) return val.length ? val.join(', ') : 'Not answered';
             return val || 'Not answered';
@@ -39,8 +46,14 @@
               ({{ js }}),
               {% endfor %}
             ].filter(r => r !== null);
-            if (results.length === 0) return '{{ risk.default_level }}';
-            return results.reduce((w, r) => this._levels[r] > this._levels[w] ? r : w);
+            const likelihood = this._worst(results, 'likelihood', this._likelihoods)
+              || '{{ risk.default_likelihood }}';
+            const consequence = this._worst(results, 'consequence', this._consequences)
+              || '{{ risk.default_consequence }}';
+            return {
+              likelihood, consequence,
+              level: (this._risk_matrix[likelihood] || {})[consequence] || 'not_applicable'
+            };
           },
           {% endfor %}
         }"
