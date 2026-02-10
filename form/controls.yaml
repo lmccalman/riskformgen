@@ -1,0 +1,28 @@
+- id: outdoor_access
+  name: Access to outdoor spaces
+  question_id: outdoor_access
+  present_value: "yes"
+  effects:
+    - risk_id: burnout_risk
+      reduces_consequence: true
+    - risk_id: isolation_risk
+      reduces_likelihood: true
+
+- id: active_hobbies
+  name: Active hobbies
+  question_id: active_hobbies
+  present_value: Swimming
+  effects:
+    - risk_id: sedentary_risk
+      reduces_likelihood: true
+      reduces_consequence: true
+
+- id: group_activities
+  name: Group activity participation
+  question_id: group_activities
+  present_value: Team sports
+  effects:
+    - risk_id: isolation_risk
+      reduces_likelihood: true
+    - risk_id: sedentary_risk
+      reduces_likelihood: true

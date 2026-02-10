@@ -1,0 +1,91 @@
+- id: personal
+  title: Personal
+  description: "Tell us a bit about yourself \u2014 who you are and what makes you tick."
+  subsections:
+    - title: About You
+      description: "Some basics so we know who we're talking to."
+      questions:
+        - type: free_text
+          id: name
+          text: What is your name?
+          guidance: "Your full legal name, or the name you prefer to go by."
+        - type: free_text
+          id: favourite_memory
+          text: What is your favourite memory?
+
+    - title: Preferences
+      description: Your general likes and daily rhythms.
+      questions:
+        - type: multiple_choice
+          id: favourite_season
+          text: What is your favourite season?
+          options: [Spring, Summer, Autumn, Winter]
+        - type: yes_no
+          id: morning_person
+          text: Are you a morning person?
+
+- id: activities
+  title: Activities
+  description: "What you do with your time \u2014 both active pursuits and quieter interests."
+  subsections:
+    - title: Exercise & Sport
+      description: How you move your body and stay active.
+      questions:
+        - type: yes_no
+          id: likes_swimming
+          text: Do you enjoy swimming?
+        - type: multiple_choice
+          id: exercise_frequency
+          text: How often do you exercise?
+          options: [Daily, A few times a week, Weekly, Rarely, Never]
+          guidance: Include both structured workouts and informal activity like walking.
+        - type: multiple_select
+          id: active_hobbies
+          text: Which active hobbies do you enjoy?
+          options: [Swimming, Cycling, Running, Hiking, Team sports]
+          visible_when:
+            not:
+              equals: { question_id: exercise_frequency, value: Never }
+
+    - title: Indoor Interests
+      description: The things you enjoy when you're staying in.
+      visible_when:
+        any:
+          - equals: { question_id: exercise_frequency, value: Rarely }
+          - equals: { question_id: exercise_frequency, value: Never }
+      questions:
+        - type: yes_no
+          id: enjoys_coding
+          text: Do you enjoy coding?
+        - type: multiple_select
+          id: indoor_hobbies
+          text: Which indoor hobbies do you enjoy?
+          options: [Reading, Cooking, Gaming, Music, Crafts]
+
+- id: environment
+  title: Environment
+  description: Your surroundings and how you connect with the people around you.
+  subsections:
+    - title: Living Situation
+      description: Your daily environment and access to the outdoors.
+      questions:
+        - type: multiple_choice
+          id: commute_method
+          text: How do you usually commute?
+          options: [Walk, Cycle, Public transport, Drive, Work from home]
+        - type: yes_no
+          id: outdoor_access
+          text: Do you have easy access to outdoor spaces?
+          guidance: "Parks, gardens, or open areas within a 10-minute walk count."
+
+    - title: Social
+      description: How often and in what ways you spend time with others.
+      questions:
+        - type: multiple_choice
+          id: social_frequency
+          text: How often do you socialise?
+          options: [Daily, A few times a week, Weekly, Rarely]
+        - type: multiple_select
+          id: group_activities
+          text: Which group activities do you participate in?
+          options: [Team sports, Book clubs, Volunteering, Classes, Social dining]

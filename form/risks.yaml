@@ -1,0 +1,76 @@
+- id: sedentary_risk
+  name: Sedentary Lifestyle
+  description: Risk of an overly sedentary lifestyle based on activity preferences.
+  default_likelihood: likely
+  default_consequence: medium
+  rules:
+    - type: any_yes
+      question_ids: [likes_swimming]
+      likelihood: unlikely
+    - type: contains_any
+      question_id: active_hobbies
+      values: [Swimming, Cycling, Running]
+      consequence: minor
+    - type: choice_map
+      question_id: exercise_frequency
+      mapping:
+        Daily: { likelihood: rare, consequence: minor }
+        A few times a week: { likelihood: unlikely }
+        Weekly: { likelihood: possible, consequence: medium }
+        Rarely: { likelihood: likely, consequence: major }
+        Never: { likelihood: almost_certain, consequence: major }
+    - type: count_yes
+      question_ids: [likes_swimming, enjoys_coding]
+      threshold: 2
+      likelihood: possible
+
+- id: seasonal_mood_risk
+  name: Seasonal Mood Impact
+  description: Potential mood impact based on seasonal preference.
+  rules:
+    - type: choice_map
+      question_id: favourite_season
+      mapping:
+        Spring: { likelihood: unlikely, consequence: minor }
+        Summer: { likelihood: rare, consequence: minor }
+        Autumn: { likelihood: possible, consequence: medium }
+        Winter: { likelihood: likely, consequence: major }
+
+- id: burnout_risk
+  name: Burnout
+  description: Risk of burnout from an indoor-heavy lifestyle.
+  rules:
+    - type: any_yes
+      question_ids: [enjoys_coding]
+      likelihood: possible
+      consequence: medium
+    - type: contains_any
+      question_id: indoor_hobbies
+      values: [Reading, Gaming]
+      likelihood: likely
+    - type: contains_any
+      question_id: active_hobbies
+      values: [Swimming, Cycling, Hiking]
+      likelihood: unlikely
+      consequence: minor
+    - type: any_yes
+      question_ids: [outdoor_access]
+      consequence: minor
+
+- id: isolation_risk
+  name: Social Isolation
+  description: Risk of social isolation based on socialising habits.
+  default_likelihood: likely
+  default_consequence: major
+  rules:
+    - type: choice_map
+      question_id: social_frequency
+      mapping:
+        Daily: { likelihood: rare, consequence: minor }
+        A few times a week: { likelihood: unlikely, consequence: minor }
+        Weekly: { likelihood: possible, consequence: medium }
+        Rarely: { likelihood: likely, consequence: major }
+    - type: contains_any
+      question_id: group_activities
+      values: [Team sports, Volunteering, Social dining]
+      likelihood: unlikely
