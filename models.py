@@ -168,6 +168,9 @@ class AnyYesRule:
         ids = _js_ids(self.question_ids)
         return f"{ids}.some(id => this.answers[id] === 'yes') ? {json.dumps(self.level)} : null"
 
+    def referenced_question_ids(self) -> tuple[str, ...]:
+        return self.question_ids
+
 
 @dataclass(frozen=True)
 class CountYesRule:
@@ -184,6 +187,9 @@ class CountYesRule:
             f" ? {json.dumps(self.level)} : null"
         )
 
+    def referenced_question_ids(self) -> tuple[str, ...]:
+        return self.question_ids
+
 
 @dataclass(frozen=True)
 class ChoiceMapRule:
@@ -194,6 +200,9 @@ class ChoiceMapRule:
 
     def to_js(self) -> str:
         return f"{json.dumps(self.mapping)}[this.answers[{json.dumps(self.question_id)}]] || null"
+
+    def referenced_question_ids(self) -> tuple[str, ...]:
+        return (self.question_id,)
 
 
 @dataclass(frozen=True)
@@ -208,6 +217,9 @@ class ContainsAnyRule:
         vals = json.dumps(list(self.values))
         qid = json.dumps(self.question_id)
         return f"{vals}.some(v => (this.answers[{qid}] || []).includes(v)) ? {json.dumps(self.level)} : null"
+
+    def referenced_question_ids(self) -> tuple[str, ...]:
+        return (self.question_id,)
 
 
 RiskRule = AnyYesRule | CountYesRule | ChoiceMapRule | ContainsAnyRule

@@ -48,26 +48,36 @@ def prepare_sections(sections: list[Section]) -> list[dict]:
     ]
 
 
-def prepare_risks(risks: list[Risk]) -> list[dict]:
+def prepare_risks(risks: list[Risk], questions: list[Question]) -> list[dict]:
     """Convert Risk dataclasses to template-ready dicts with compiled JS expressions."""
-    return [
-        {
-            "id": risk.id,
-            "name": risk.name,
-            "description": risk.description,
-            "default_level": risk.default_level,
-            "rules_js": [rule.to_js() for rule in risk.rules],
-        }
-        for risk in risks
-    ]
+    q_text = {q.id: q.text for q in questions}
+    result = []
+    for risk in risks:
+        ids = list(
+            dict.fromkeys(
+                qid for rule in risk.rules for qid in rule.referenced_question_ids()
+            )
+        )
+        result.append(
+            {
+                "id": risk.id,
+                "name": risk.name,
+                "description": risk.description,
+                "default_level": risk.default_level,
+                "rules_js": [rule.to_js() for rule in risk.rules],
+                "questions": [{"id": qid, "text": q_text[qid]} for qid in ids],
+            }
+        )
+    return result
 
 
 def render_form(sections: list[Section], risks: list[Risk]) -> str:
     """Render the form page HTML from sections and risks."""
     env = create_environment()
     template = env.get_template("page.html.j2")
+    questions = all_questions(sections)
     return template.render(
         sections=prepare_sections(sections),
-        questions=[_prepare_question(q) for q in all_questions(sections)],
-        risks=prepare_risks(risks),
+        questions=[_prepare_question(q) for q in questions],
+        risks=prepare_risks(risks, questions),
     )

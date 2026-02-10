@@ -20,6 +20,10 @@
             {% endfor %}
           },
           _levels: { not_applicable: 0, low: 1, medium: 2, high: 3 },
+          _formatAnswer(val) {
+            if (Array.isArray(val)) return val.length ? val.join(', ') : 'Not answered';
+            return val || 'Not answered';
+          },
           {% for risk in risks %}
           get {{ risk.id }}() {
             const results = [

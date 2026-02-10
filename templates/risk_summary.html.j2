@@ -15,4 +15,21 @@
       x-text="{{ risk.id }}.replace('_', ' ')"
     ></span>
   </div>
+  {% if risk.questions %}
+  <hr class="my-3 border-gray-100" />
+  <ul class="space-y-1">
+    {% for q in risk.questions %}
+    <li class="flex items-baseline justify-between gap-4 text-sm">
+      <span class="text-gray-600">{{ q.text }}</span>
+      <span
+        class="shrink-0"
+        :class="_formatAnswer(answers['{{ q.id }}']) === 'Not answered'
+          ? 'italic text-gray-400'
+          : 'text-gray-900'"
+        x-text="_formatAnswer(answers['{{ q.id }}'])"
+      ></span>
+    </li>
+    {% endfor %}
+  </ul>
+  {% endif %}
 </div>
