@@ -269,3 +269,44 @@ class Risk:
     rules: tuple[RiskRule, ...]
     default_likelihood: str = "rare"
     default_consequence: str = "minor"
+
+
+# ---------------------------------------------------------------------------
+# Controls
+# ---------------------------------------------------------------------------
+
+
+@dataclass(frozen=True)
+class ControlEffect:
+    """Links a control to a risk, indicating which dimensions it reduces."""
+
+    risk_id: str
+    reduces_likelihood: bool = False
+    reduces_consequence: bool = False
+
+    def __post_init__(self) -> None:
+        if not self.reduces_likelihood and not self.reduces_consequence:
+            raise ValueError(
+                "ControlEffect requires at least one of reduces_likelihood or reduces_consequence"
+            )
+
+
+@dataclass(frozen=True)
+class Control:
+    """A safeguard whose presence is determined by a question answer."""
+
+    id: str
+    name: str
+    question_id: str
+    present_value: str
+    effects: tuple[ControlEffect, ...]
+
+    def presence_js(self) -> str:
+        """JS expression evaluating to true/false for control presence."""
+        qid = json.dumps(self.question_id)
+        val = json.dumps(self.present_value)
+        return (
+            f"Array.isArray(this.answers[{qid}])"
+            f" ? this.answers[{qid}].includes({val})"
+            f" : this.answers[{qid}] === {val}"
+        )

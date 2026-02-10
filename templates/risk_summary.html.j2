@@ -41,6 +41,35 @@
     </div>
   </div>
 
+  {# ── Controls ── #}
+  {% if risk.controls %}
+  <div>
+    <span class="block text-xs font-medium uppercase tracking-wide text-gray-400 mb-2">Controls</span>
+    <div class="space-y-1">
+      {% for ctrl in risk.controls %}
+      <div class="flex items-center gap-2 text-sm">
+        <span
+          class="inline-flex h-5 w-5 shrink-0 items-center justify-center rounded-full text-xs font-bold"
+          :class="ctrl_{{ ctrl.id }}
+            ? 'bg-green-100 text-green-600'
+            : 'bg-gray-100 text-gray-400'"
+          x-text="ctrl_{{ ctrl.id }} ? '✓' : '✗'"
+        ></span>
+        <span
+          :class="ctrl_{{ ctrl.id }} ? 'text-gray-900' : 'text-gray-400'"
+          >{{ ctrl.name }}</span>
+        <span class="ml-auto text-xs text-gray-400">
+          {% if ctrl.reduces_likelihood and ctrl.reduces_consequence %}↓ Likelihood &amp; Consequence
+          {% elif ctrl.reduces_likelihood %}↓ Likelihood
+          {% else %}↓ Consequence
+          {% endif %}
+        </span>
+      </div>
+      {% endfor %}
+    </div>
+  </div>
+  {% endif %}
+
   {# ── Assessed risk (user-selected) ── #}
   <div>
     <span class="block text-xs font-medium uppercase tracking-wide text-gray-400 mb-1">Assessed Risk</span>

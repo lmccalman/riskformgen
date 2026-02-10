@@ -39,6 +39,9 @@
             if (Array.isArray(val)) return val.length ? val.join(', ') : 'Not answered';
             return val || 'Not answered';
           },
+          {% for ctrl in control_getters %}
+          get ctrl_{{ ctrl.id }}() { return {{ ctrl.js }}; },
+          {% endfor %}
           {% for risk in risks %}
           get {{ risk.id }}() {
             const results = [

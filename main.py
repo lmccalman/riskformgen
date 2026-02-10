@@ -7,6 +7,8 @@ from models import (
     AnyYesRule,
     ChoiceMapRule,
     ContainsAnyRule,
+    Control,
+    ControlEffect,
     CountYesRule,
     Equals,
     FreeTextQuestion,
@@ -257,14 +259,57 @@ def define_risks() -> list[Risk]:
     ]
 
 
+def define_controls() -> list[Control]:
+    """Define controls that may mitigate identified risks."""
+    return [
+        Control(
+            id="outdoor_access",
+            name="Access to outdoor spaces",
+            question_id="outdoor_access",
+            present_value="yes",
+            effects=(
+                ControlEffect(risk_id="burnout_risk", reduces_consequence=True),
+                ControlEffect(risk_id="isolation_risk", reduces_likelihood=True),
+            ),
+        ),
+        Control(
+            id="active_hobbies",
+            name="Active hobbies",
+            question_id="active_hobbies",
+            present_value="Swimming",
+            effects=(
+                ControlEffect(
+                    risk_id="sedentary_risk",
+                    reduces_likelihood=True,
+                    reduces_consequence=True,
+                ),
+            ),
+        ),
+        Control(
+            id="group_activities",
+            name="Group activity participation",
+            question_id="group_activities",
+            present_value="Team sports",
+            effects=(
+                ControlEffect(risk_id="isolation_risk", reduces_likelihood=True),
+                ControlEffect(risk_id="sedentary_risk", reduces_likelihood=True),
+            ),
+        ),
+    ]
+
+
 def ensure_output_dir() -> None:
     """Create the output directory if it doesn't exist."""
     config.output_dir.mkdir(exist_ok=True)
 
 
-def write_html(sections: list[Section], risks: list[Risk]) -> None:
+def write_html(
+    sections: list[Section],
+    risks: list[Risk],
+    controls: list[Control],
+) -> None:
     """Render and write the form HTML to output/index.html."""
-    html = render_form(sections, risks)
+    html = render_form(sections, risks, controls)
     (config.output_dir / "index.html").write_text(html)
 
 
@@ -291,14 +336,16 @@ def main() -> None:
     """Build the static form page."""
     sections = define_sections()
     risks = define_risks()
+    controls = define_controls()
     questions = all_questions(sections)
     ensure_output_dir()
-    write_html(sections, risks)
+    write_html(sections, risks, controls)
     compile_css()
     copy_alpine()
     print(
-        f"Built form with {len(sections)} sections, {len(questions)} questions"
-        f" and {len(risks)} risks in {config.output_dir.resolve()}/"
+        f"Built form with {len(sections)} sections, {len(questions)} questions,"
+        f" {len(risks)} risks and {len(controls)} controls"
+        f" in {config.output_dir.resolve()}/"
     )
 
 
