@@ -34,7 +34,11 @@ def define_sections() -> list[Section]:
                     title="About You",
                     description="Some basics so we know who we're talking to.",
                     questions=(
-                        FreeTextQuestion(id="name", text="What is your name?"),
+                        FreeTextQuestion(
+                            id="name",
+                            text="What is your name?",
+                            guidance="Your full legal name, or the name you prefer to go by.",
+                        ),
                         FreeTextQuestion(
                             id="favourite_memory",
                             text="What is your favourite memory?",
@@ -75,6 +79,7 @@ def define_sections() -> list[Section]:
                             id="exercise_frequency",
                             text="How often do you exercise?",
                             options=("Daily", "A few times a week", "Weekly", "Rarely", "Never"),
+                            guidance="Include both structured workouts and informal activity like walking.",
                         ),
                         MultipleSelectQuestion(
                             id="active_hobbies",
@@ -122,6 +127,7 @@ def define_sections() -> list[Section]:
                         YesNoQuestion(
                             id="outdoor_access",
                             text="Do you have easy access to outdoor spaces?",
+                            guidance="Parks, gardens, or open areas within a 10-minute walk count.",
                         ),
                     ),
                 ),

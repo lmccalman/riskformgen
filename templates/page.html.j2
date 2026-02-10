@@ -19,6 +19,14 @@
             '{{ q.id }}': {% if q.type == 'multiple_select' %}[]{% else %}''{% endif %}{% if not loop.last %},{% endif %}
             {% endfor %}
           },
+          assessed_risks: {
+            {% for risk in risks %}'{{ risk.id }}': ''{% if not loop.last %},{% endif %}
+            {% endfor %}
+          },
+          justifications: {
+            {% for risk in risks %}'{{ risk.id }}': ''{% if not loop.last %},{% endif %}
+            {% endfor %}
+          },
           _levels: { not_applicable: 0, low: 1, medium: 2, high: 3 },
           _formatAnswer(val) {
             if (Array.isArray(val)) return val.length ? val.join(', ') : 'Not answered';
@@ -98,6 +106,24 @@
                 '{{ risk.id }}': {{ risk.id }}{% if not loop.last %},{% endif %}
                 {% endfor %}
               }, null, 2)"
+            ></pre>
+          </div>
+          <div>
+            <h2 class="mb-3 text-sm font-semibold uppercase tracking-wide text-gray-400">
+              Debug — Assessed Risks
+            </h2>
+            <pre
+              class="text-sm text-green-400"
+              x-text="JSON.stringify(assessed_risks, null, 2)"
+            ></pre>
+          </div>
+          <div>
+            <h2 class="mb-3 text-sm font-semibold uppercase tracking-wide text-gray-400">
+              Debug — Justifications
+            </h2>
+            <pre
+              class="text-sm text-green-400"
+              x-text="JSON.stringify(justifications, null, 2)"
             ></pre>
           </div>
           {% endif %}

@@ -1,22 +1,75 @@
-<div class="rounded-lg border border-gray-200 bg-white p-5 shadow-sm">
-  <div class="flex items-start justify-between">
-    <div>
-      <h3 class="text-base font-semibold text-gray-900">{{ risk.name }}</h3>
-      <p class="mt-1 text-sm text-gray-500">{{ risk.description }}</p>
-    </div>
-    <span
-      class="ml-4 inline-flex shrink-0 items-center rounded-full px-2.5 py-0.5 text-xs font-medium"
-      :class="{
-        'bg-gray-100 text-gray-600': {{ risk.id }} === 'not_applicable',
-        'bg-green-100 text-green-700': {{ risk.id }} === 'low',
-        'bg-amber-100 text-amber-700': {{ risk.id }} === 'medium',
-        'bg-red-100 text-red-700': {{ risk.id }} === 'high',
-      }"
-      x-text="{{ risk.id }}.replace('_', ' ')"
-    ></span>
+<div class="rounded-lg border border-gray-200 bg-white p-5 shadow-sm space-y-4">
+  {# ── Header ── #}
+  <div>
+    <h3 class="text-base font-semibold text-gray-900">{{ risk.name }}</h3>
+    <p class="mt-1 text-sm text-gray-500">{{ risk.description }}</p>
   </div>
+
+  {# ── Modelled / Assessed row ── #}
+  <div class="grid grid-cols-2 gap-4">
+    {# Modelled risk (read-only) #}
+    <div>
+      <span class="block text-xs font-medium uppercase tracking-wide text-gray-400 mb-1">Modelled Risk</span>
+      <span
+        class="inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-medium"
+        :class="{
+          'bg-gray-100 text-gray-600': {{ risk.id }} === 'not_applicable',
+          'bg-green-100 text-green-700': {{ risk.id }} === 'low',
+          'bg-amber-100 text-amber-700': {{ risk.id }} === 'medium',
+          'bg-red-100 text-red-700': {{ risk.id }} === 'high',
+        }"
+        x-text="{{ risk.id }}.replace('_', ' ')"
+      ></span>
+    </div>
+
+    {# Assessed risk (user-selected) #}
+    <div>
+      <span class="block text-xs font-medium uppercase tracking-wide text-gray-400 mb-1">Assessed Risk</span>
+      <div class="flex items-center gap-2">
+        <select
+          x-model="assessed_risks.{{ risk.id }}"
+          class="rounded-md border border-gray-300 bg-white px-2 py-1 text-sm text-gray-700 shadow-sm focus:border-blue-500 focus:ring-blue-500"
+        >
+          <option value="">— Select —</option>
+          <option value="not_applicable">Not applicable</option>
+          <option value="low">Low</option>
+          <option value="medium">Medium</option>
+          <option value="high">High</option>
+        </select>
+        <span
+          x-show="assessed_risks.{{ risk.id }}"
+          x-cloak
+          class="inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-medium"
+          :class="{
+            'bg-gray-100 text-gray-600': assessed_risks.{{ risk.id }} === 'not_applicable',
+            'bg-green-100 text-green-700': assessed_risks.{{ risk.id }} === 'low',
+            'bg-amber-100 text-amber-700': assessed_risks.{{ risk.id }} === 'medium',
+            'bg-red-100 text-red-700': assessed_risks.{{ risk.id }} === 'high',
+          }"
+          x-text="assessed_risks.{{ risk.id }}.replace('_', ' ')"
+        ></span>
+      </div>
+    </div>
+  </div>
+
+  {# ── Justification ── #}
+  <div>
+    <label
+      for="justification_{{ risk.id }}"
+      class="block text-xs font-medium uppercase tracking-wide text-gray-400 mb-1"
+    >Justification</label>
+    <textarea
+      id="justification_{{ risk.id }}"
+      x-model="justifications.{{ risk.id }}"
+      rows="2"
+      placeholder="Provide reasoning for the assessed risk level…"
+      class="w-full rounded-md border border-gray-300 px-3 py-2 text-sm text-gray-700 shadow-sm focus:border-blue-500 focus:ring-blue-500"
+    ></textarea>
+  </div>
+
+  {# ── Linked answers ── #}
   {% if risk.questions %}
-  <hr class="my-3 border-gray-100" />
+  <hr class="border-gray-100" />
   <ul class="space-y-1">
     {% for q in risk.questions %}
     <li class="flex items-baseline justify-between gap-4 text-sm">

@@ -76,6 +76,7 @@ class YesNoQuestion:
 
     id: str
     text: str
+    guidance: str | None = None
     visible_when: Condition | None = None
     type: str = field(default="yes_no", init=False)
 
@@ -86,6 +87,7 @@ class FreeTextQuestion:
 
     id: str
     text: str
+    guidance: str | None = None
     visible_when: Condition | None = None
     type: str = field(default="free_text", init=False)
 
@@ -97,6 +99,7 @@ class MultipleChoiceQuestion:
     id: str
     text: str
     options: tuple[str, ...]
+    guidance: str | None = None
     visible_when: Condition | None = None
     type: str = field(default="multiple_choice", init=False)
 
@@ -108,6 +111,7 @@ class MultipleSelectQuestion:
     id: str
     text: str
     options: tuple[str, ...]
+    guidance: str | None = None
     visible_when: Condition | None = None
     type: str = field(default="multiple_select", init=False)
 

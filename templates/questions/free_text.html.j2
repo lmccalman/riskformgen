@@ -2,6 +2,9 @@
   <legend class="px-2 text-lg font-medium text-gray-900">
     {{ question.text }}
   </legend>
+  {% if question.guidance %}
+  <p class="mt-1 px-2 text-sm text-gray-500 italic">{{ question.guidance }}</p>
+  {% endif %}
   <div class="mt-4">
     <textarea
       name="{{ question.id }}"
