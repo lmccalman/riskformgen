@@ -6,6 +6,7 @@
     <title>FormGen</title>
     <link rel="stylesheet" href="pico.jade.min.css" />
     <link rel="stylesheet" href="input.css" />
+    <script defer src="alpine-persist.min.js"></script>
     <script defer src="alpine3.15.8.min.js"></script>
   </head>
   <body>
@@ -14,20 +15,20 @@
 
       <div
         x-data="{
-          activeTab: '{{ sections[0].id }}',
-          answers: {
+          activeTab: $persist('{{ sections[0].id }}'),
+          answers: $persist({
             {% for q in questions %}
             '{{ q.id }}': {% if q.type == 'multiple_select' %}[]{% else %}''{% endif %}{% if not loop.last %},{% endif %}
             {% endfor %}
-          },
-          assessed_risks: {
+          }),
+          assessed_risks: $persist({
             {% for risk in risks %}'{{ risk.id }}': ''{% if not loop.last %},{% endif %}
             {% endfor %}
-          },
-          justifications: {
+          }),
+          justifications: $persist({
             {% for risk in risks %}'{{ risk.id }}': ''{% if not loop.last %},{% endif %}
             {% endfor %}
-          },
+          }),
           _likelihoods: {{ likelihoods_js }},
           _consequences: {{ consequences_js }},
           _risk_matrix: {{ risk_matrix_js }},

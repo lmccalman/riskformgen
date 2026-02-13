@@ -24,7 +24,8 @@ def copy_css() -> None:
 
 
 def copy_alpine() -> None:
-    """Copy the Alpine.js bundle into the output directory."""
+    """Copy the Alpine.js bundle and persist plugin into the output directory."""
+    shutil.copy2(config.persist_src, config.output_dir / config.persist_src.name)
     shutil.copy2(config.alpine_src, config.output_dir / config.alpine_src.name)
 
 
