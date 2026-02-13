@@ -6,7 +6,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 **riskformgen** is a static-page form generator for risk analysis. It renders
 Python dataclass-based form definitions into static HTML pages using Jinja2
-templates, TailwindCSS, and Alpine.js for interactivity. Users interact with
+templates, Pico CSS (jade theme), and Alpine.js for interactivity. Users interact with
 tabbed, multi-section forms that support conditional logic, and can download
 their responses as JSON. There is a risk model that converts the users answers
 to risk levels across a given set of risks, and modifies these with controls
@@ -18,7 +18,7 @@ Status: early development (questions and risk evaluation working).
 
 - Python 3.13, managed with uv
 - Jinja2 for HTML templating
-- TailwindCSS v4 for styling (compiled via `tailwindcss` CLI)
+- Pico CSS v2 (jade theme) for classless/semantic styling (vendored as `pico.jade.min.css`)
 - Alpine.js for client-side interactivity (vendored as `alpine3.15.8.min.js`)
 
 ## Commands
@@ -40,7 +40,7 @@ The build pipeline has three phases:
 
 1. **Python/Jinja2 (build time)** — `main.py` orchestrates the build. Dataclasses in `models.py` define form structure declaratively. `render.py` converts them to dicts and renders `templates/page.html.j2` (which includes `templates/question.html.j2` per question) into static HTML.
 
-2. **TailwindCSS (build time)** — `input.css` is the v4 entry point (`@import "tailwindcss"`). The `tailwindcss` CLI scans all non-gitignored text files for class names and compiles only the used utilities into `output/styles.css`. No `tailwind.config.js` needed.
+2. **CSS (build time)** — `pico.jade.min.css` provides classless/semantic base styling. `input.css` contains custom CSS for app-specific components (tabs, badges, risk grid, spacing stacks, etc.). Both are copied directly to `output/` — no compilation step needed.
 
 3. **Alpine.js (runtime)** — A parent `<div>` holds the `x-data` scope shared by all section forms and the risks panel. It contains reactive `answers` state, Alpine.js getters for each risk (compiled from Python rules at build time), and tab navigation. Each section renders as its own `<form>` shown/hidden via `x-show`; sub-sections provide visual grouping within sections. Each question partial binds inputs via `x-model`. Risk getters re-evaluate automatically as answers change. Multi-select answers are initialised as `[]` (array); all others as `''` (empty string).
 
@@ -48,7 +48,7 @@ The build pipeline has three phases:
 
 | File | Purpose |
 |---|---|
-| `config.py` | Project paths, risk scales (`LIKELIHOODS`, `CONSEQUENCES`, `RISK_LEVELS`), and `RISK_MATRIX` lookup table |
+| `config.py` | Project paths (including `pico_src`), risk scales (`LIKELIHOODS`, `CONSEQUENCES`, `RISK_LEVELS`), and `RISK_MATRIX` lookup table |
 | `models.py` | Question dataclasses, `Question` union, `SubSection`/`Section` dataclasses, `all_questions()` helper, risk rule dataclasses (`AnyYesRule`, `CountYesRule`, `ChoiceMapRule`, `ContainsAnyRule`), `RiskRule` union, and `Risk` dataclass |
 | `render.py` | Jinja2 environment setup, `prepare_sections()`, `prepare_risks()`, and `render_form()` |
 | `templates/page.html.j2` | Page skeleton with Alpine.js state, dynamic section tabs, risk getters, and debug panel |
@@ -56,7 +56,7 @@ The build pipeline has three phases:
 | `templates/question.html.j2` | Dispatcher — includes `questions/{type}.html.j2` |
 | `templates/questions/*.html.j2` | Per-type partials (one file per question type) |
 | `templates/risk_summary.html.j2` | Risk card partial with colour-coded level badge |
-| `input.css` | Tailwind v4 entry point |
+| `input.css` | Custom CSS for app-specific components (tabs, badges, risk grid, spacing, etc.) |
 | `main.py` | Build orchestrator |
 
 ### Adding a new question type
@@ -100,10 +100,22 @@ No template changes needed. Each rule's `to_js()` method compiles to a JS expres
 
 No other changes needed — `prepare_risks()` and the template getter loop work generically.
 
+### Semantic HTML and Pico CSS
+
+Templates use semantic HTML elements that Pico styles automatically:
+- `<article>` for risk cards (Pico renders as bordered card with padding/shadow)
+- `<section>` for sub-section groupings
+- `<nav>` for tab navigation
+- `<details>` for the collapsible debug panel (`data-theme="dark"` for per-element theming)
+- `<fieldset>` / `<legend>` for questions (Pico styles natively)
+- `<label><input/> Text</label>` pattern for radio/checkbox (Pico expects input-first)
+
+Custom classes in `input.css` handle app-specific components: `.tabs`, `.badge-{color}`, `.risk-grid`, `.control-row`, `.stack-{lg,md,sm}`, `.options-{row,col}`, `.assessed-row`, `.linked-answer`.
+
 ### Gotcha: Jinja2 autoescape and Alpine.js
 
 The Jinja2 environment uses `autoescape=True`. When rendering JS expressions inside `x-data="..."` attributes, **do NOT use `|safe`**. Autoescape produces HTML entities (`&#34;` for `"`, `&gt;` for `>`, `&#39;` for `'`) which the browser decodes back to the original characters when reading the attribute value — before Alpine evaluates the JS. Using `|safe` puts raw `"` into a `"`-delimited attribute, breaking HTML parsing.
 
 ### Output
 
-All generated files go to `output/` (gitignored): `index.html`, `styles.css`, `alpine3.15.8.min.js`.
+All generated files go to `output/` (gitignored): `index.html`, `pico.jade.min.css`, `input.css`, `alpine3.15.8.min.js`.

@@ -1,16 +1,11 @@
-<fieldset class="rounded-lg border border-gray-200 bg-white p-6 shadow-sm">
-  <legend class="px-2 text-lg font-medium text-gray-900">
-    {{ question.text }}
-  </legend>
+<fieldset>
+  <legend>{{ question.text }}</legend>
   {% if question.guidance %}
-  <p class="mt-1 px-2 text-sm text-gray-500 italic">{{ question.guidance }}</p>
+  <p><small><em>{{ question.guidance }}</em></small></p>
   {% endif %}
-  <div class="mt-4">
-    <textarea
-      name="{{ question.id }}"
-      x-model="answers.{{ question.id }}"
-      rows="3"
-      class="w-full rounded-md border border-gray-300 px-3 py-2 text-gray-700 shadow-sm focus:border-blue-500 focus:ring-blue-500"
-    ></textarea>
-  </div>
+  <textarea
+    name="{{ question.id }}"
+    x-model="answers.{{ question.id }}"
+    rows="3"
+  ></textarea>
 </fieldset>

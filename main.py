@@ -1,5 +1,4 @@
 import shutil
-import subprocess
 
 import config
 from models import all_questions
@@ -18,18 +17,10 @@ def write_html(sections, risks, controls) -> None:
     (config.output_dir / "index.html").write_text(html)
 
 
-def compile_css() -> None:
-    """Compile Tailwind CSS from input.css into output/styles.css."""
-    subprocess.run(
-        [
-            "tailwindcss",
-            "--input", "input.css",
-            "--output", "output/styles.css",
-            "--minify",
-        ],
-        check=True,
-        cwd=config.project_root,
-    )
+def copy_css() -> None:
+    """Copy Pico CSS and custom styles into the output directory."""
+    shutil.copy2(config.pico_src, config.output_dir / config.pico_src.name)
+    shutil.copy2(config.project_root / "input.css", config.output_dir / "input.css")
 
 
 def copy_alpine() -> None:
@@ -45,7 +36,7 @@ def main() -> None:
     questions = all_questions(sections)
     ensure_output_dir()
     write_html(sections, risks, controls)
-    compile_css()
+    copy_css()
     copy_alpine()
     print(
         f"Built form with {len(sections)} sections, {len(questions)} questions,"

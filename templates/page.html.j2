@@ -4,12 +4,13 @@
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <title>FormGen</title>
-    <link rel="stylesheet" href="styles.css" />
+    <link rel="stylesheet" href="pico.jade.min.css" />
+    <link rel="stylesheet" href="input.css" />
     <script defer src="alpine3.15.8.min.js"></script>
   </head>
-  <body class="min-h-screen bg-gray-50">
-    <main class="mx-auto max-w-2xl px-4 py-12">
-      <h1 class="mb-8 text-3xl font-bold text-gray-900">FormGen</h1>
+  <body>
+    <main class="container">
+      <h1>FormGen</h1>
 
       <div
         x-data="{
@@ -62,35 +63,38 @@
         }"
       >
         {# ── Tab navigation ── #}
-        <div class="mb-6 flex border-b border-gray-200">
+        <nav class="tabs">
           {% for section in sections %}
           <button
             type="button"
             @click="activeTab = '{{ section.id }}'"
-            :class="activeTab === '{{ section.id }}'
-              ? 'border-indigo-500 text-indigo-600'
-              : 'border-transparent text-gray-500 hover:border-gray-300 hover:text-gray-700'"
-            class="border-b-2 px-4 py-2 text-sm font-medium transition-colors"
+            :class="activeTab === '{{ section.id }}' && 'active'"
           >
             {{ section.title }}
           </button>
           {% endfor %}
           <button
             type="button"
+            class="tab-risk"
             @click="activeTab = 'risks'"
-            :class="activeTab === 'risks'
-              ? 'border-red-500 text-red-600'
-              : 'border-transparent text-gray-500 hover:border-gray-300 hover:text-gray-700'"
-            class="ml-auto border-b-2 px-4 py-2 text-sm font-medium transition-colors"
+            :class="activeTab === 'risks' && 'active'"
           >
             Risk Analysis
           </button>
-        </div>
+          <button
+            type="button"
+            class="tab-debug"
+            @click="activeTab = 'debug'"
+            :class="activeTab === 'debug' && 'active'"
+          >
+            Debug
+          </button>
+        </nav>
 
         {# ── Section tabs ── #}
         {% for section in sections %}
-        <form x-show="activeTab === '{{ section.id }}'" class="space-y-8">
-          <p class="text-sm text-gray-500">{{ section.description }}</p>
+        <form x-show="activeTab === '{{ section.id }}'" class="stack-lg">
+          <p><small>{{ section.description }}</small></p>
           {% for subsection in section.subsections %}
           {% with subsection=subsection %}
           {% include "subsection.html.j2" %}
@@ -99,54 +103,26 @@
         </form>
         {% endfor %}
 
-        {# ── Debug panel (visible on all section tabs) ── #}
-        <div x-show="activeTab !== 'risks'" class="mt-8 rounded-lg border border-gray-200 bg-gray-800 p-6 shadow-sm space-y-4">
-          <div>
-            <h2 class="mb-3 text-sm font-semibold uppercase tracking-wide text-gray-400">
-              Debug — Current Answers
-            </h2>
-            <pre
-              class="text-sm text-green-400"
-              x-text="JSON.stringify(answers, null, 2)"
-            ></pre>
-          </div>
+        {# ── Debug tab ── #}
+        <div x-show="activeTab === 'debug'" data-theme="dark" class="stack-md">
+          <h3>Current Answers</h3>
+          <pre x-text="JSON.stringify(answers, null, 2)"></pre>
           {% if risks %}
-          <div>
-            <h2 class="mb-3 text-sm font-semibold uppercase tracking-wide text-gray-400">
-              Debug — Risk Levels
-            </h2>
-            <pre
-              class="text-sm text-green-400"
-              x-text="JSON.stringify({
-                {% for risk in risks %}
-                '{{ risk.id }}': {{ risk.id }}{% if not loop.last %},{% endif %}
-                {% endfor %}
-              }, null, 2)"
-            ></pre>
-          </div>
-          <div>
-            <h2 class="mb-3 text-sm font-semibold uppercase tracking-wide text-gray-400">
-              Debug — Assessed Risks
-            </h2>
-            <pre
-              class="text-sm text-green-400"
-              x-text="JSON.stringify(assessed_risks, null, 2)"
-            ></pre>
-          </div>
-          <div>
-            <h2 class="mb-3 text-sm font-semibold uppercase tracking-wide text-gray-400">
-              Debug — Justifications
-            </h2>
-            <pre
-              class="text-sm text-green-400"
-              x-text="JSON.stringify(justifications, null, 2)"
-            ></pre>
-          </div>
+          <h3>Risk Levels</h3>
+          <pre x-text="JSON.stringify({
+            {% for risk in risks %}
+            '{{ risk.id }}': {{ risk.id }}{% if not loop.last %},{% endif %}
+            {% endfor %}
+          }, null, 2)"></pre>
+          <h3>Assessed Risks</h3>
+          <pre x-text="JSON.stringify(assessed_risks, null, 2)"></pre>
+          <h3>Justifications</h3>
+          <pre x-text="JSON.stringify(justifications, null, 2)"></pre>
           {% endif %}
         </div>
 
         {# ── Risks tab ── #}
-        <div x-show="activeTab === 'risks'" class="space-y-4">
+        <div x-show="activeTab === 'risks'" class="stack-md">
           {% if risks %}
           {% for risk in risks %}
           {% with risk=risk %}
@@ -154,7 +130,7 @@
           {% endwith %}
           {% endfor %}
           {% else %}
-          <p class="text-gray-500">No risks defined.</p>
+          <p>No risks defined.</p>
           {% endif %}
         </div>
       </div>

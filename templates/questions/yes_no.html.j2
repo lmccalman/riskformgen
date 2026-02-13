@@ -1,30 +1,26 @@
-<fieldset class="rounded-lg border border-gray-200 bg-white p-6 shadow-sm">
-  <legend class="px-2 text-lg font-medium text-gray-900">
-    {{ question.text }}
-  </legend>
+<fieldset>
+  <legend>{{ question.text }}</legend>
   {% if question.guidance %}
-  <p class="mt-1 px-2 text-sm text-gray-500 italic">{{ question.guidance }}</p>
+  <p><small><em>{{ question.guidance }}</em></small></p>
   {% endif %}
-  <div class="mt-4 flex gap-6">
-    <label class="flex cursor-pointer items-center gap-2">
+  <div class="options-row">
+    <label>
       <input
         type="radio"
         name="{{ question.id }}"
         value="yes"
         x-model="answers.{{ question.id }}"
-        class="h-4 w-4 text-blue-600 focus:ring-blue-500"
       />
-      <span class="text-gray-700">Yes</span>
+      Yes
     </label>
-    <label class="flex cursor-pointer items-center gap-2">
+    <label>
       <input
         type="radio"
         name="{{ question.id }}"
         value="no"
         x-model="answers.{{ question.id }}"
-        class="h-4 w-4 text-blue-600 focus:ring-blue-500"
       />
-      <span class="text-gray-700">No</span>
+      No
     </label>
   </div>
 </fieldset>

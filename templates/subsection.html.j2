@@ -1,11 +1,9 @@
-<div class="space-y-4"{% if subsection.visible_when_js is defined %} x-show="{{ subsection.visible_when_js }}"{% endif %}>
-  <h2 class="text-lg font-semibold text-gray-800 border-b border-gray-200 pb-2">
-    {{ subsection.title }}
-  </h2>
-  <p class="text-sm text-gray-500">{{ subsection.description }}</p>
+<section class="stack-md"{% if subsection.visible_when_js is defined %} x-show="{{ subsection.visible_when_js }}"{% endif %}>
+  <h2>{{ subsection.title }}</h2>
+  <p><small>{{ subsection.description }}</small></p>
   {% for question in subsection.questions %}
   {% with question=question %}
   {% include "question.html.j2" %}
   {% endwith %}
   {% endfor %}
-</div>
+</section>
