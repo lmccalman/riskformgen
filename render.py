@@ -18,7 +18,7 @@ def create_environment() -> Environment:
 def _prepare_question(q: Question) -> dict:
     """Convert a Question dataclass to a template-ready dict with compiled visibility JS."""
     d = asdict(q)
-    condition = d.pop("visible_when", None)
+    d.pop("visible_when", None)
     if q.visible_when is not None:
         d["visible_when_js"] = q.visible_when.to_js()
     return d
@@ -55,9 +55,7 @@ def prepare_risks(risks: list[Risk], questions: list[Question]) -> list[dict]:
     result = []
     for risk in risks:
         ids = list(
-            dict.fromkeys(
-                qid for rule in risk.rules for qid in rule.referenced_question_ids()
-            )
+            dict.fromkeys(qid for rule in risk.rules for qid in rule.referenced_question_ids())
         )
         result.append(
             {
@@ -78,10 +76,7 @@ def prepare_controls(
     risk_dicts: list[dict],
 ) -> list[dict]:
     """Build control getters and attach per-risk control lists to risk dicts."""
-    control_getters = [
-        {"id": ctrl.id, "js": ctrl.presence_js()}
-        for ctrl in controls
-    ]
+    control_getters = [{"id": ctrl.id, "js": ctrl.presence_js()} for ctrl in controls]
 
     # Index risk dicts by id for fast lookup
     risk_by_id = {r["id"]: r for r in risk_dicts}
@@ -93,17 +88,21 @@ def prepare_controls(
     for ctrl in controls:
         for effect in ctrl.effects:
             if effect.risk_id in risk_by_id:
-                risk_by_id[effect.risk_id]["controls"].append({
-                    "id": ctrl.id,
-                    "name": ctrl.name,
-                    "reduces_likelihood": effect.reduces_likelihood,
-                    "reduces_consequence": effect.reduces_consequence,
-                })
+                risk_by_id[effect.risk_id]["controls"].append(
+                    {
+                        "id": ctrl.id,
+                        "name": ctrl.name,
+                        "reduces_likelihood": effect.reduces_likelihood,
+                        "reduces_consequence": effect.reduces_consequence,
+                    }
+                )
 
     return control_getters
 
 
-def render_form(sections: list[Section], risks: list[Risk], controls: list[Control] | None = None) -> str:
+def render_form(
+    sections: list[Section], risks: list[Risk], controls: list[Control] | None = None
+) -> str:
     """Render the form page HTML from sections and risks."""
     env = create_environment()
     template = env.get_template("page.html.j2")

@@ -4,7 +4,6 @@ import json
 from collections.abc import Sequence
 from dataclasses import dataclass, field
 
-
 # ---------------------------------------------------------------------------
 # Visibility conditions
 # ---------------------------------------------------------------------------
@@ -29,7 +28,9 @@ class Contains:
     value: str
 
     def to_js(self) -> str:
-        return f"(answers[{json.dumps(self.question_id)}] || []).includes({json.dumps(self.value)})"
+        qid = json.dumps(self.question_id)
+        val = json.dumps(self.value)
+        return f"(answers[{qid}] || []).includes({val})"
 
 
 @dataclass(frozen=True)
@@ -153,6 +154,7 @@ def all_questions(sections: Sequence[Section]) -> list[Question]:
 # Risk model
 # ---------------------------------------------------------------------------
 
+
 def _js_ids(ids: tuple[str, ...]) -> str:
     """Format a tuple of IDs as a JS array literal."""
     return json.dumps(list(ids))
@@ -160,9 +162,9 @@ def _js_ids(ids: tuple[str, ...]) -> str:
 
 def _js_result(likelihood: str | None, consequence: str | None) -> str:
     """Build a JS object literal string for a {likelihood, consequence} result."""
-    l = json.dumps(likelihood) if likelihood else "null"
-    c = json.dumps(consequence) if consequence else "null"
-    return f"{{likelihood: {l}, consequence: {c}}}"
+    lk = json.dumps(likelihood) if likelihood else "null"
+    cq = json.dumps(consequence) if consequence else "null"
+    return f"{{likelihood: {lk}, consequence: {cq}}}"
 
 
 @dataclass(frozen=True)

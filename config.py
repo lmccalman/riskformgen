@@ -18,9 +18,9 @@ CONSEQUENCES = ("minor", "medium", "major")
 RISK_LEVELS = ("not_applicable", "low", "medium", "high")
 
 RISK_MATRIX: dict[str, dict[str, str]] = {
-    "rare":            {"minor": "low",    "medium": "low",    "major": "medium"},
-    "unlikely":        {"minor": "low",    "medium": "medium", "major": "medium"},
-    "possible":        {"minor": "medium", "medium": "medium", "major": "high"},
-    "likely":          {"minor": "medium", "medium": "high",   "major": "high"},
-    "almost_certain":  {"minor": "high",   "medium": "high",   "major": "high"},
+    "rare": {"minor": "low", "medium": "low", "major": "medium"},
+    "unlikely": {"minor": "low", "medium": "medium", "major": "medium"},
+    "possible": {"minor": "medium", "medium": "medium", "major": "high"},
+    "likely": {"minor": "medium", "medium": "high", "major": "high"},
+    "almost_certain": {"minor": "high", "medium": "high", "major": "high"},
 }

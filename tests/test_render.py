@@ -2,15 +2,11 @@
 
 from __future__ import annotations
 
-import pytest
-
 from models import (
     AnyYesRule,
-    ChoiceMapRule,
     Control,
     ControlEffect,
     Equals,
-    MultipleChoiceQuestion,
     Risk,
     Section,
     SubSection,
@@ -18,7 +14,6 @@ from models import (
     all_questions,
 )
 from render import prepare_controls, prepare_risks, prepare_sections, render_form
-
 
 # ---------------------------------------------------------------------------
 # prepare_sections
@@ -134,7 +129,7 @@ class TestPrepareControls:
         assert "js" in getters[0]
 
     def test_effects_grouped_by_risk(self, sample_control):
-        risk_dicts = [{"id": "r1", "name": "R"}]
+        risk_dicts: list[dict] = [{"id": "r1", "name": "R"}]
         prepare_controls([sample_control], risk_dicts)
         assert len(risk_dicts[0]["controls"]) == 1
         assert risk_dicts[0]["controls"][0]["id"] == "ctrl1"

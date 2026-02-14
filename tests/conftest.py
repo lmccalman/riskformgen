@@ -17,7 +17,6 @@ from models import (
     Control,
     ControlEffect,
     CountYesRule,
-    Equals,
     FreeTextQuestion,
     MultipleChoiceQuestion,
     MultipleSelectQuestion,
@@ -35,16 +34,12 @@ def yes_no_q():
 
 @pytest.fixture
 def choice_q():
-    return MultipleChoiceQuestion(
-        id="q_mc", text="Pick one", options=("alpha", "beta", "gamma")
-    )
+    return MultipleChoiceQuestion(id="q_mc", text="Pick one", options=("alpha", "beta", "gamma"))
 
 
 @pytest.fixture
 def multi_select_q():
-    return MultipleSelectQuestion(
-        id="q_ms", text="Pick many", options=("x", "y", "z")
-    )
+    return MultipleSelectQuestion(id="q_ms", text="Pick many", options=("x", "y", "z"))
 
 
 @pytest.fixture
@@ -120,7 +115,5 @@ def sample_control():
         name="Encryption enabled",
         question_id="q_yn",
         present_value="yes",
-        effects=(
-            ControlEffect(risk_id="r1", reduces_likelihood=True),
-        ),
+        effects=(ControlEffect(risk_id="r1", reduces_likelihood=True),),
     )

@@ -18,15 +18,11 @@ from models import (
     CountYesRule,
     Equals,
     Not,
-    Risk,
     Section,
-    SubSection,
-    YesNoQuestion,
     _js_ids,
     _js_result,
     all_questions,
 )
-
 
 # ---------------------------------------------------------------------------
 # Visibility conditions — to_js()
@@ -60,10 +56,12 @@ class TestContains:
 
 class TestAll:
     def test_joins_with_and(self):
-        c = All(conditions=(
-            Equals(question_id="a", value="1"),
-            Equals(question_id="b", value="2"),
-        ))
+        c = All(
+            conditions=(
+                Equals(question_id="a", value="1"),
+                Equals(question_id="b", value="2"),
+            )
+        )
         js = c.to_js()
         assert "&&" in js
         assert "(answers" in js
@@ -78,10 +76,12 @@ class TestAll:
 
 class TestAny:
     def test_joins_with_or(self):
-        c = Any(conditions=(
-            Equals(question_id="a", value="1"),
-            Equals(question_id="b", value="2"),
-        ))
+        c = Any(
+            conditions=(
+                Equals(question_id="a", value="1"),
+                Equals(question_id="b", value="2"),
+            )
+        )
         js = c.to_js()
         assert "||" in js
 
@@ -107,13 +107,17 @@ class TestNot:
 
 class TestNestedConditions:
     def test_any_containing_all(self):
-        c = Any(conditions=(
-            All(conditions=(
-                Equals(question_id="a", value="1"),
-                Equals(question_id="b", value="2"),
-            )),
-            Equals(question_id="c", value="3"),
-        ))
+        c = Any(
+            conditions=(
+                All(
+                    conditions=(
+                        Equals(question_id="a", value="1"),
+                        Equals(question_id="b", value="2"),
+                    )
+                ),
+                Equals(question_id="c", value="3"),
+            )
+        )
         js = c.to_js()
         assert "||" in js
         assert "&&" in js
@@ -143,7 +147,7 @@ class TestJsResult:
 
     def test_consequence_only(self):
         r = _js_result(None, "major")
-        assert r == "{likelihood: null, consequence: \"major\"}"
+        assert r == '{likelihood: null, consequence: "major"}'
 
     def test_both_none(self):
         r = _js_result(None, None)
@@ -160,7 +164,7 @@ class TestAnyYesRule:
         rule = AnyYesRule(question_ids=("q1", "q2"), likelihood="likely")
         js = rule.to_js()
         assert ".some(" in js
-        assert "=== 'yes'" in js or "=== \"yes\"" in js
+        assert "=== 'yes'" in js or '=== "yes"' in js
         assert "likely" in js
 
     def test_validation_both_none(self):
@@ -174,9 +178,7 @@ class TestAnyYesRule:
 
 class TestCountYesRule:
     def test_basic_js(self):
-        rule = CountYesRule(
-            question_ids=("q1", "q2", "q3"), threshold=2, consequence="major"
-        )
+        rule = CountYesRule(question_ids=("q1", "q2", "q3"), threshold=2, consequence="major")
         js = rule.to_js()
         assert ".filter(" in js
         assert ">= 2" in js
@@ -187,9 +189,7 @@ class TestCountYesRule:
             CountYesRule(question_ids=("q1",), threshold=1)
 
     def test_referenced_question_ids(self):
-        rule = CountYesRule(
-            question_ids=("a", "b"), threshold=1, likelihood="rare"
-        )
+        rule = CountYesRule(question_ids=("a", "b"), threshold=1, likelihood="rare")
         assert rule.referenced_question_ids() == ("a", "b")
 
 
@@ -221,9 +221,7 @@ class TestChoiceMapRule:
 
 class TestContainsAnyRule:
     def test_basic_js(self):
-        rule = ContainsAnyRule(
-            question_id="q1", values=("a", "b"), likelihood="possible"
-        )
+        rule = ContainsAnyRule(question_id="q1", values=("a", "b"), likelihood="possible")
         js = rule.to_js()
         assert ".some(" in js
         assert ".includes(" in js
@@ -234,9 +232,7 @@ class TestContainsAnyRule:
             ContainsAnyRule(question_id="q1", values=("a",))
 
     def test_referenced_question_ids(self):
-        rule = ContainsAnyRule(
-            question_id="q1", values=("a",), likelihood="rare"
-        )
+        rule = ContainsAnyRule(question_id="q1", values=("a",), likelihood="rare")
         assert rule.referenced_question_ids() == ("q1",)
 
 
@@ -256,9 +252,7 @@ class TestControlEffect:
         assert not e.reduces_consequence
 
     def test_valid_both(self):
-        e = ControlEffect(
-            risk_id="r1", reduces_likelihood=True, reduces_consequence=True
-        )
+        e = ControlEffect(risk_id="r1", reduces_likelihood=True, reduces_consequence=True)
         assert e.reduces_likelihood and e.reduces_consequence
 
 
@@ -303,7 +297,5 @@ class TestAllQuestions:
         assert all_questions([]) == []
 
     def test_empty_subsections(self):
-        section = Section(
-            id="empty", title="Empty", description="", subsections=()
-        )
+        section = Section(id="empty", title="Empty", description="", subsections=())
         assert all_questions([section]) == []

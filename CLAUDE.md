@@ -30,6 +30,13 @@ uv run main.py
 # Run tests
 uv run pytest tests/ -v
 
+# Lint and format
+uv run ruff check .
+uv run ruff format --check .
+
+# Type check
+uv run basedpyright
+
 # Serve locally at http://localhost:8000
 python -m http.server -d output
 
@@ -37,7 +44,16 @@ python -m http.server -d output
 uv add <package>
 ```
 
-**Always run `uv run pytest tests/ -v` after implementing a new feature or fixing a bug to verify correctness.** Tests should pass before considering work complete.
+**After any code change, run all four checks before considering work complete:**
+
+```bash
+uv run ruff check .
+uv run ruff format --check .
+uv run basedpyright
+uv run pytest tests/ -v
+```
+
+Use `uv run ruff check --fix .` and `uv run ruff format .` to auto-fix lint and formatting issues.
 
 ## Architecture
 
