@@ -27,12 +27,17 @@ Status: early development (questions and risk evaluation working).
 # Build the static site into output/
 uv run main.py
 
+# Run tests
+uv run pytest tests/ -v
+
 # Serve locally at http://localhost:8000
 python -m http.server -d output
 
 # Add a dependency
 uv add <package>
 ```
+
+**Always run `uv run pytest tests/ -v` after implementing a new feature or fixing a bug to verify correctness.** Tests should pass before considering work complete.
 
 ## Architecture
 
