@@ -1,7 +1,7 @@
 import shutil
 
 import config
-from models import all_questions
+from models import Control, Risk, Section, all_questions
 from parse import load_controls, load_risks, load_sections
 from render import render_form
 
@@ -11,7 +11,7 @@ def ensure_output_dir() -> None:
     config.output_dir.mkdir(exist_ok=True)
 
 
-def write_html(sections, risks, controls) -> None:
+def write_html(sections: list[Section], risks: list[Risk], controls: list[Control]) -> None:
     """Render and write the form HTML to output/index.html."""
     html = render_form(sections, risks, controls)
     (config.output_dir / "index.html").write_text(html)

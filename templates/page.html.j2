@@ -62,7 +62,7 @@
               answers: this.answers,
             }, 'riskformgen-answers.json');
           },
-          importAnswers(event) {
+          _importJson(event, {format, fileIdsKey, currentIds, label, count, apply}) {
             const file = event.target.files[0];
             if (!file) return;
             event.target.value = '';
@@ -71,42 +71,52 @@
               let data;
               try { data = JSON.parse(reader.result); }
               catch { alert('Invalid JSON file.'); return; }
-              if (data.format !== 'riskformgen-answers') {
-                alert('This is not an answers file. Expected format: riskformgen-answers');
+              if (data.format !== format) {
+                alert(`This is not a ${label} file. Expected format: ${format}`);
                 return;
               }
-              const fileIds = new Set(data.question_ids || []);
-              const currentIds = new Set(this._questionIds);
-              const arrayIds = new Set(this._arrayQuestionIds);
-              const added = this._questionIds.filter(id => !fileIds.has(id));
-              const removed = (data.question_ids || []).filter(id => !currentIds.has(id));
-              let skippedType = 0;
-              let loaded = 0;
-              for (const id of this._questionIds) {
-                if (!(id in data.answers)) continue;
-                const val = data.answers[id];
-                const expectArray = arrayIds.has(id);
-                if (expectArray !== Array.isArray(val)) { skippedType++; continue; }
-                loaded++;
-              }
-              const parts = [`Load ${loaded} of ${this._questionIds.length} answers?`];
-              if (added.length) parts.push(`${added.length} new question(s) since export (left at defaults).`);
-              if (removed.length) parts.push(`${removed.length} exported answer(s) skipped (question removed).`);
+              const fileIds = new Set(data[fileIdsKey] || []);
+              const currentIdSet = new Set(currentIds);
+              const added = currentIds.filter(id => !fileIds.has(id));
+              const removed = (data[fileIdsKey] || []).filter(id => !currentIdSet.has(id));
+              const {loaded, skippedType = 0} = count(data, currentIds);
+              const parts = [`Load ${loaded} of ${currentIds.length} ${label}?`];
+              if (added.length) parts.push(`${added.length} new since export (left at defaults).`);
+              if (removed.length) parts.push(`${removed.length} exported skipped (removed).`);
               if (skippedType) parts.push(`${skippedType} skipped (type mismatch).`);
-              if (loaded === this._questionIds.length && !removed.length && !skippedType) {
+              if (loaded === currentIds.length && !removed.length && !skippedType) {
                 /* no mismatches — load silently */
               } else if (!confirm(parts.join(' '))) {
                 return;
               }
-              for (const id of this._questionIds) {
-                if (!(id in data.answers)) continue;
-                const val = data.answers[id];
-                const expectArray = arrayIds.has(id);
-                if (expectArray !== Array.isArray(val)) continue;
-                this.answers[id] = val;
-              }
+              apply(data, currentIds);
             };
             reader.readAsText(file);
+          },
+          importAnswers(event) {
+            const arrayIds = new Set(this._arrayQuestionIds);
+            this._importJson(event, {
+              format: 'riskformgen-answers',
+              fileIdsKey: 'question_ids',
+              currentIds: this._questionIds,
+              label: 'answers',
+              count: (data, ids) => {
+                let loaded = 0, skippedType = 0;
+                for (const id of ids) {
+                  if (!(id in data.answers)) continue;
+                  if (arrayIds.has(id) !== Array.isArray(data.answers[id])) { skippedType++; continue; }
+                  loaded++;
+                }
+                return {loaded, skippedType};
+              },
+              apply: (data, ids) => {
+                for (const id of ids) {
+                  if (!(id in data.answers)) continue;
+                  if (arrayIds.has(id) !== Array.isArray(data.answers[id])) continue;
+                  this.answers[id] = data.answers[id];
+                }
+              },
+            });
           },
           exportAssessment() {
             this._downloadJson({
@@ -119,44 +129,29 @@
             }, 'riskformgen-assessment.json');
           },
           importAssessment(event) {
-            const file = event.target.files[0];
-            if (!file) return;
-            event.target.value = '';
-            const reader = new FileReader();
-            reader.onload = () => {
-              let data;
-              try { data = JSON.parse(reader.result); }
-              catch { alert('Invalid JSON file.'); return; }
-              if (data.format !== 'riskformgen-assessment') {
-                alert('This is not an assessment file. Expected format: riskformgen-assessment');
-                return;
-              }
-              const fileIds = new Set(data.risk_ids || []);
-              const currentIds = new Set(this._riskIds);
-              const added = this._riskIds.filter(id => !fileIds.has(id));
-              const removed = (data.risk_ids || []).filter(id => !currentIds.has(id));
-              let loaded = 0;
-              for (const id of this._riskIds) {
-                if (id in (data.assessed_risks || {}) || id in (data.justifications || {})) loaded++;
-              }
-              const parts = [`Load ${loaded} of ${this._riskIds.length} assessments?`];
-              if (added.length) parts.push(`${added.length} new risk(s) since export (left at defaults).`);
-              if (removed.length) parts.push(`${removed.length} exported assessment(s) skipped (risk removed).`);
-              if (loaded === this._riskIds.length && !removed.length) {
-                /* no mismatches — load silently */
-              } else if (!confirm(parts.join(' '))) {
-                return;
-              }
-              for (const id of this._riskIds) {
-                if (data.assessed_risks && id in data.assessed_risks) {
-                  this.assessed_risks[id] = data.assessed_risks[id];
+            this._importJson(event, {
+              format: 'riskformgen-assessment',
+              fileIdsKey: 'risk_ids',
+              currentIds: this._riskIds,
+              label: 'assessments',
+              count: (data, ids) => {
+                let loaded = 0;
+                for (const id of ids) {
+                  if (id in (data.assessed_risks || {}) || id in (data.justifications || {})) loaded++;
                 }
-                if (data.justifications && id in data.justifications) {
-                  this.justifications[id] = data.justifications[id];
+                return {loaded};
+              },
+              apply: (data, ids) => {
+                for (const id of ids) {
+                  if (data.assessed_risks && id in data.assessed_risks) {
+                    this.assessed_risks[id] = data.assessed_risks[id];
+                  }
+                  if (data.justifications && id in data.justifications) {
+                    this.justifications[id] = data.justifications[id];
+                  }
                 }
-              }
-            };
-            reader.readAsText(file);
+              },
+            });
           },
           {% for ctrl in control_getters %}
           get ctrl_{{ ctrl.id }}() { return {{ ctrl.js }}; },
@@ -218,11 +213,15 @@
           {% include "subsection.html.j2" %}
           {% endwith %}
           {% endfor %}
-          {% with export_fn="exportAnswers", import_fn="importAnswers", import_ref="answersFile_" ~ section.id, file_label="answers" %}
-          {% include "save_load.html.j2" %}
-          {% endwith %}
         </form>
         {% endfor %}
+
+        {# ── Answers save/load (shared across all section tabs) ── #}
+        <div x-show="activeTab !== 'risks' && activeTab !== 'debug'">
+          {% with export_fn="exportAnswers", import_fn="importAnswers", import_ref="answersFile", file_label="answers" %}
+          {% include "save_load.html.j2" %}
+          {% endwith %}
+        </div>
 
         {# ── Debug tab ── #}
         <div x-show="activeTab === 'debug'" data-theme="dark" class="stack-md">

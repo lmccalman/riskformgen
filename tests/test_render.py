@@ -16,7 +16,13 @@ from models import (
     YesNoQuestion,
     all_questions,
 )
-from render import prepare_controls, prepare_risks, prepare_sections, render_form
+from render import (
+    prepare_controls,
+    prepare_risks,
+    prepare_sections,
+    render_form,
+    validate_question_ids,
+)
 
 # ---------------------------------------------------------------------------
 # prepare_sections
@@ -299,3 +305,69 @@ class TestRenderFormSaveLoad:
     def test_hidden_file_inputs_present(self, mixed_html):
         assert 'type="file"' in mixed_html
         assert 'accept=".json"' in mixed_html
+
+
+# ---------------------------------------------------------------------------
+# validate_question_ids
+# ---------------------------------------------------------------------------
+
+
+class TestValidateQuestionIds:
+    def test_valid_ids_pass(self):
+        q = YesNoQuestion(id="q1", text="Q")
+        risk = Risk(
+            id="r1",
+            name="R",
+            description="D",
+            rules=(AnyYesRule(question_ids=("q1",), likelihood="likely"),),
+        )
+        ctrl = Control(
+            id="c1",
+            name="C",
+            question_id="q1",
+            present_value="yes",
+            effects=(ControlEffect(risk_id="r1", reduces_likelihood=True),),
+        )
+        validate_question_ids([q], [risk], [ctrl])  # should not raise
+
+    def test_invalid_risk_rule_question_id(self):
+        q = YesNoQuestion(id="q1", text="Q")
+        risk = Risk(
+            id="r1",
+            name="R",
+            description="D",
+            rules=(AnyYesRule(question_ids=("q_typo",), likelihood="likely"),),
+        )
+        with pytest.raises(ValueError, match="unknown question 'q_typo'"):
+            validate_question_ids([q], [risk], [])
+
+    def test_invalid_control_question_id(self):
+        q = YesNoQuestion(id="q1", text="Q")
+        ctrl = Control(
+            id="c1",
+            name="C",
+            question_id="q_typo",
+            present_value="yes",
+            effects=(ControlEffect(risk_id="r1", reduces_likelihood=True),),
+        )
+        with pytest.raises(ValueError, match="unknown question 'q_typo'"):
+            validate_question_ids([q], [], [ctrl])
+
+    def test_multiple_errors_reported(self):
+        q = YesNoQuestion(id="q1", text="Q")
+        risk = Risk(
+            id="r1",
+            name="R",
+            description="D",
+            rules=(AnyYesRule(question_ids=("bad1",), likelihood="likely"),),
+        )
+        ctrl = Control(
+            id="c1",
+            name="C",
+            question_id="bad2",
+            present_value="yes",
+            effects=(ControlEffect(risk_id="r1", reduces_likelihood=True),),
+        )
+        with pytest.raises(ValueError, match="bad1") as exc_info:
+            validate_question_ids([q], [risk], [ctrl])
+        assert "bad2" in str(exc_info.value)

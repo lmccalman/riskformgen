@@ -30,12 +30,7 @@
       <span class="dim-label">Modelled Risk</span>
       <span
         class="badge"
-        :class="{
-          'badge-gray': {{ risk.id }}.level === 'not_applicable',
-          'badge-green': {{ risk.id }}.level === 'low',
-          'badge-amber': {{ risk.id }}.level === 'medium',
-          'badge-red': {{ risk.id }}.level === 'high',
-        }"
+        :class="'badge-' + ({ {% for level, colour in risk_level_colours.items() %}'{{ level }}': '{{ colour }}'{% if not loop.last %}, {% endif %}{% endfor %} }[{{ risk.id }}.level] || 'gray')"
         x-text="{{ risk.id }}.level.replace(/_/g, ' ')"
       ></span>
     </div>
@@ -84,12 +79,7 @@
         x-show="assessed_risks.{{ risk.id }}"
         x-cloak
         class="badge"
-        :class="{
-          'badge-gray': assessed_risks.{{ risk.id }} === 'not_applicable',
-          'badge-green': assessed_risks.{{ risk.id }} === 'low',
-          'badge-amber': assessed_risks.{{ risk.id }} === 'medium',
-          'badge-red': assessed_risks.{{ risk.id }} === 'high',
-        }"
+        :class="'badge-' + ({ {% for level, colour in risk_level_colours.items() %}'{{ level }}': '{{ colour }}'{% if not loop.last %}, {% endif %}{% endfor %} }[assessed_risks.{{ risk.id }}] || 'gray')"
         x-text="assessed_risks.{{ risk.id }}.replace(/_/g, ' ')"
       ></span>
     </div>

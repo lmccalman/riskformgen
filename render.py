@@ -1,5 +1,5 @@
 import json
-from dataclasses import asdict
+from dataclasses import fields
 
 from jinja2 import Environment, FileSystemLoader, select_autoescape
 
@@ -12,13 +12,14 @@ def create_environment() -> Environment:
     return Environment(
         loader=FileSystemLoader(config.templates_dir),
         autoescape=select_autoescape(default=True),
+        trim_blocks=True,
+        lstrip_blocks=True,
     )
 
 
 def _prepare_question(q: Question) -> dict:
     """Convert a Question dataclass to a template-ready dict with compiled visibility JS."""
-    d = asdict(q)
-    d.pop("visible_when", None)
+    d = {f.name: getattr(q, f.name) for f in fields(q) if f.name != "visible_when"}
     if q.visible_when is not None:
         d["visible_when_js"] = q.visible_when.to_js()
     return d
@@ -100,6 +101,24 @@ def prepare_controls(
     return control_getters
 
 
+def validate_question_ids(
+    questions: list[Question], risks: list[Risk], controls: list[Control]
+) -> None:
+    """Raise ValueError if any risk rule or control references a nonexistent question ID."""
+    valid_ids = {q.id for q in questions}
+    errors: list[str] = []
+    for risk in risks:
+        for rule in risk.rules:
+            for qid in rule.referenced_question_ids():
+                if qid not in valid_ids:
+                    errors.append(f"Risk '{risk.id}' references unknown question '{qid}'")
+    for ctrl in controls:
+        if ctrl.question_id not in valid_ids:
+            errors.append(f"Control '{ctrl.id}' references unknown question '{ctrl.question_id}'")
+    if errors:
+        raise ValueError("Invalid question ID references:\n  " + "\n  ".join(errors))
+
+
 def render_form(
     sections: list[Section], risks: list[Risk], controls: list[Control] | None = None
 ) -> str:
@@ -107,15 +126,21 @@ def render_form(
     env = create_environment()
     template = env.get_template("page.html.j2")
     questions = all_questions(sections)
+    validate_question_ids(questions, risks, controls or [])
+    section_dicts = prepare_sections(sections)
+    question_dicts = [
+        q for sec in section_dicts for sub in sec["subsections"] for q in sub["questions"]
+    ]
     risk_dicts = prepare_risks(risks, questions)
     control_getters = prepare_controls(controls or [], risk_dicts)
     return template.render(
-        sections=prepare_sections(sections),
-        questions=[_prepare_question(q) for q in questions],
+        sections=section_dicts,
+        questions=question_dicts,
         risks=risk_dicts,
         control_getters=control_getters,
         likelihoods_js=json.dumps(list(config.LIKELIHOODS)),
         consequences_js=json.dumps(list(config.CONSEQUENCES)),
         risk_levels=list(config.RISK_LEVELS),
+        risk_level_colours=config.RISK_LEVEL_COLOURS,
         risk_matrix_js=json.dumps(config.RISK_MATRIX),
     )

@@ -18,10 +18,14 @@ from models import (
     ControlEffect,
     CountYesRule,
     Equals,
+    FreeTextQuestion,
+    MultipleChoiceQuestion,
+    MultipleSelectQuestion,
     Not,
     Risk,
     Section,
     SubSection,
+    YesNoQuestion,
 )
 from models import (
     Any as AnyCondition,
@@ -78,13 +82,6 @@ def parse_condition(data: YamlDict) -> Equals | Contains | All | AnyCondition | 
 
 def parse_question(data: YamlDict):
     """Parse a question dict into a Question dataclass, dispatching on 'type'."""
-    from models import (
-        FreeTextQuestion,
-        MultipleChoiceQuestion,
-        MultipleSelectQuestion,
-        YesNoQuestion,
-    )
-
     qtype = data["type"]
     common = {
         "id": data["id"],

@@ -162,8 +162,8 @@ def _js_ids(ids: tuple[str, ...]) -> str:
 
 def _js_result(likelihood: str | None, consequence: str | None) -> str:
     """Build a JS object literal string for a {likelihood, consequence} result."""
-    lk = json.dumps(likelihood) if likelihood else "null"
-    cq = json.dumps(consequence) if consequence else "null"
+    lk = json.dumps(likelihood) if likelihood is not None else "null"
+    cq = json.dumps(consequence) if consequence is not None else "null"
     return f"{{likelihood: {lk}, consequence: {cq}}}"
 
 
