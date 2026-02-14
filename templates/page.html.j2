@@ -29,6 +29,9 @@
             {% for risk in risks %}'{{ risk.id }}': ''{% if not loop.last %},{% endif %}
             {% endfor %}
           }),
+          _questionIds: [{% for q in questions %}'{{ q.id }}'{% if not loop.last %}, {% endif %}{% endfor %}],
+          _arrayQuestionIds: [{% for q in questions %}{% if q.type == 'multiple_select' %}'{{ q.id }}', {% endif %}{% endfor %}],
+          _riskIds: [{% for risk in risks %}'{{ risk.id }}'{% if not loop.last %}, {% endif %}{% endfor %}],
           _likelihoods: {{ likelihoods_js }},
           _consequences: {{ consequences_js }},
           _risk_matrix: {{ risk_matrix_js }},
@@ -40,6 +43,120 @@
           _formatAnswer(val) {
             if (Array.isArray(val)) return val.length ? val.join(', ') : 'Not answered';
             return val || 'Not answered';
+          },
+          _downloadJson(data, filename) {
+            const blob = new Blob([JSON.stringify(data, null, 2)], {type: 'application/json'});
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = filename;
+            a.click();
+            URL.revokeObjectURL(url);
+          },
+          exportAnswers() {
+            this._downloadJson({
+              format: 'riskformgen-answers',
+              version: 1,
+              exported_at: new Date().toISOString(),
+              question_ids: this._questionIds,
+              answers: this.answers,
+            }, 'riskformgen-answers.json');
+          },
+          importAnswers(event) {
+            const file = event.target.files[0];
+            if (!file) return;
+            event.target.value = '';
+            const reader = new FileReader();
+            reader.onload = () => {
+              let data;
+              try { data = JSON.parse(reader.result); }
+              catch { alert('Invalid JSON file.'); return; }
+              if (data.format !== 'riskformgen-answers') {
+                alert('This is not an answers file. Expected format: riskformgen-answers');
+                return;
+              }
+              const fileIds = new Set(data.question_ids || []);
+              const currentIds = new Set(this._questionIds);
+              const arrayIds = new Set(this._arrayQuestionIds);
+              const added = this._questionIds.filter(id => !fileIds.has(id));
+              const removed = (data.question_ids || []).filter(id => !currentIds.has(id));
+              let skippedType = 0;
+              let loaded = 0;
+              for (const id of this._questionIds) {
+                if (!(id in data.answers)) continue;
+                const val = data.answers[id];
+                const expectArray = arrayIds.has(id);
+                if (expectArray !== Array.isArray(val)) { skippedType++; continue; }
+                loaded++;
+              }
+              const parts = [`Load ${loaded} of ${this._questionIds.length} answers?`];
+              if (added.length) parts.push(`${added.length} new question(s) since export (left at defaults).`);
+              if (removed.length) parts.push(`${removed.length} exported answer(s) skipped (question removed).`);
+              if (skippedType) parts.push(`${skippedType} skipped (type mismatch).`);
+              if (loaded === this._questionIds.length && !removed.length && !skippedType) {
+                /* no mismatches — load silently */
+              } else if (!confirm(parts.join(' '))) {
+                return;
+              }
+              for (const id of this._questionIds) {
+                if (!(id in data.answers)) continue;
+                const val = data.answers[id];
+                const expectArray = arrayIds.has(id);
+                if (expectArray !== Array.isArray(val)) continue;
+                this.answers[id] = val;
+              }
+            };
+            reader.readAsText(file);
+          },
+          exportAssessment() {
+            this._downloadJson({
+              format: 'riskformgen-assessment',
+              version: 1,
+              exported_at: new Date().toISOString(),
+              risk_ids: this._riskIds,
+              assessed_risks: this.assessed_risks,
+              justifications: this.justifications,
+            }, 'riskformgen-assessment.json');
+          },
+          importAssessment(event) {
+            const file = event.target.files[0];
+            if (!file) return;
+            event.target.value = '';
+            const reader = new FileReader();
+            reader.onload = () => {
+              let data;
+              try { data = JSON.parse(reader.result); }
+              catch { alert('Invalid JSON file.'); return; }
+              if (data.format !== 'riskformgen-assessment') {
+                alert('This is not an assessment file. Expected format: riskformgen-assessment');
+                return;
+              }
+              const fileIds = new Set(data.risk_ids || []);
+              const currentIds = new Set(this._riskIds);
+              const added = this._riskIds.filter(id => !fileIds.has(id));
+              const removed = (data.risk_ids || []).filter(id => !currentIds.has(id));
+              let loaded = 0;
+              for (const id of this._riskIds) {
+                if (id in (data.assessed_risks || {}) || id in (data.justifications || {})) loaded++;
+              }
+              const parts = [`Load ${loaded} of ${this._riskIds.length} assessments?`];
+              if (added.length) parts.push(`${added.length} new risk(s) since export (left at defaults).`);
+              if (removed.length) parts.push(`${removed.length} exported assessment(s) skipped (risk removed).`);
+              if (loaded === this._riskIds.length && !removed.length) {
+                /* no mismatches — load silently */
+              } else if (!confirm(parts.join(' '))) {
+                return;
+              }
+              for (const id of this._riskIds) {
+                if (data.assessed_risks && id in data.assessed_risks) {
+                  this.assessed_risks[id] = data.assessed_risks[id];
+                }
+                if (data.justifications && id in data.justifications) {
+                  this.justifications[id] = data.justifications[id];
+                }
+              }
+            };
+            reader.readAsText(file);
           },
           {% for ctrl in control_getters %}
           get ctrl_{{ ctrl.id }}() { return {{ ctrl.js }}; },
@@ -101,6 +218,9 @@
           {% include "subsection.html.j2" %}
           {% endwith %}
           {% endfor %}
+          {% with export_fn="exportAnswers", import_fn="importAnswers", import_ref="answersFile_" ~ section.id, file_label="answers" %}
+          {% include "save_load.html.j2" %}
+          {% endwith %}
         </form>
         {% endfor %}
 
@@ -130,6 +250,9 @@
           {% include "risk_summary.html.j2" %}
           {% endwith %}
           {% endfor %}
+          {% with export_fn="exportAssessment", import_fn="importAssessment", import_ref="assessmentFile", file_label="assessment" %}
+          {% include "save_load.html.j2" %}
+          {% endwith %}
           {% else %}
           <p>No risks defined.</p>
           {% endif %}

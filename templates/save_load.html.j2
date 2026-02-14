@@ -1,0 +1,14 @@
+{# Save/load button bar — include with export_fn, import_fn, file_label set #}
+<div class="save-load-bar">
+  <button type="button" @click="{{ export_fn }}()">Save {{ file_label }}</button>
+  <button type="button" class="secondary" @click="$refs.{{ import_ref }}.click()">
+    Load {{ file_label }}
+  </button>
+  <input
+    type="file"
+    accept=".json"
+    x-ref="{{ import_ref }}"
+    @change="{{ import_fn }}($event)"
+    hidden
+  />
+</div>

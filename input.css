@@ -190,6 +190,21 @@
   width: auto;
 }
 
+/* ── Save/load bar ── */
+.save-load-bar {
+  display: flex;
+  gap: 0.5rem;
+  justify-content: flex-end;
+  padding-top: 1rem;
+  border-top: 1px solid var(--pico-muted-border-color);
+}
+
+.save-load-bar button {
+  width: auto;
+  font-size: 0.875rem;
+  padding: 0.375rem 1rem;
+}
+
 /* ── Debug tab ── */
 .tabs .tab-debug.active {
   color: var(--pico-muted-color);

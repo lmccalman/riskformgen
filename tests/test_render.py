@@ -2,11 +2,14 @@
 
 from __future__ import annotations
 
+import pytest
+
 from models import (
     AnyYesRule,
     Control,
     ControlEffect,
     Equals,
+    MultipleSelectQuestion,
     Risk,
     Section,
     SubSection,
@@ -208,3 +211,91 @@ class TestRenderForm:
         )
         html = render_form(sample_sections, [risk], [sample_control])
         assert "Encryption enabled" in html
+
+
+# ---------------------------------------------------------------------------
+# render_form — save/load export/import
+# ---------------------------------------------------------------------------
+
+
+@pytest.fixture
+def mixed_sections():
+    """Sections with both scalar and array question types."""
+    q1 = YesNoQuestion(id="q_yn", text="Yes or no?")
+    q2 = MultipleSelectQuestion(id="q_ms", text="Pick many", options=("a", "b"))
+    sub = SubSection(title="Mixed", description="", questions=(q1, q2))
+    return [Section(id="mixed", title="Mixed", description="", subsections=(sub,))]
+
+
+@pytest.fixture
+def mixed_risk():
+    return Risk(
+        id="test_risk",
+        name="Test Risk",
+        description="A test risk",
+        rules=(AnyYesRule(question_ids=("q_yn",), likelihood="likely"),),
+    )
+
+
+@pytest.fixture
+def mixed_html(mixed_sections, mixed_risk):
+    return render_form(mixed_sections, [mixed_risk])
+
+
+class TestRenderFormMetadata:
+    """Verify build-time metadata arrays are embedded in rendered output."""
+
+    def test_question_ids_present(self, mixed_html):
+        assert "'q_yn'" in mixed_html
+        assert "'q_ms'" in mixed_html
+
+    def test_array_question_ids_only_multiple_select(self, mixed_html):
+        # _arrayQuestionIds should contain q_ms but not q_yn
+        assert "_arrayQuestionIds: [" in mixed_html
+        # Extract the array content between _arrayQuestionIds: [ and the next ]
+        start = mixed_html.index("_arrayQuestionIds: [")
+        end = mixed_html.index("]", start)
+        array_content = mixed_html[start:end]
+        assert "'q_ms'" in array_content
+        assert "'q_yn'" not in array_content
+
+    def test_risk_ids_present(self, mixed_html):
+        assert "_riskIds: [" in mixed_html
+        start = mixed_html.index("_riskIds: [")
+        end = mixed_html.index("]", start)
+        assert "'test_risk'" in mixed_html[start:end]
+
+    def test_no_risks_means_empty_risk_ids(self, mixed_sections):
+        html = render_form(mixed_sections, [])
+        start = html.index("_riskIds: [")
+        end = html.index("]", start)
+        assert html[start:end].strip() == "_riskIds: ["
+
+
+class TestRenderFormSaveLoad:
+    """Verify save/load buttons and file inputs are rendered."""
+
+    def test_answers_save_button_in_section(self, mixed_html):
+        assert "exportAnswers()" in mixed_html
+        assert "Save answers" in mixed_html
+
+    def test_answers_load_button_in_section(self, mixed_html):
+        assert "importAnswers($event)" in mixed_html
+        assert "Load answers" in mixed_html
+
+    def test_assessment_save_button_in_risks_tab(self, mixed_html):
+        assert "exportAssessment()" in mixed_html
+        assert "Save assessment" in mixed_html
+
+    def test_assessment_load_button_in_risks_tab(self, mixed_html):
+        assert "importAssessment($event)" in mixed_html
+        assert "Load assessment" in mixed_html
+
+    def test_no_assessment_buttons_without_risks(self, mixed_sections):
+        html = render_form(mixed_sections, [])
+        assert "Save assessment" not in html
+        assert "Load assessment" not in html
+
+    def test_hidden_file_inputs_present(self, mixed_html):
+        assert 'type="file"' in mixed_html
+        assert 'accept=".json"' in mixed_html
