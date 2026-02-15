@@ -1,11 +1,14 @@
-<fieldset>
-  <legend>{{ question.text }}</legend>
+<div class="field">
+  <label class="label">{{ question.text }}</label>
   {% if question.guidance %}
-  <p><small><em>{{ question.guidance }}</em></small></p>
+  <p class="help"><em>{{ question.guidance }}</em></p>
   {% endif %}
-  <textarea
-    name="{{ question.id }}"
-    x-model="answers.{{ question.id }}"
-    rows="3"
-  ></textarea>
-</fieldset>
+  <div class="control">
+    <textarea
+      class="textarea"
+      name="{{ question.id }}"
+      x-model="answers.{{ question.id }}"
+      rows="3"
+    ></textarea>
+  </div>
+</div>

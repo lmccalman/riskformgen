@@ -18,8 +18,8 @@ def write_html(sections: list[Section], risks: list[Risk], controls: list[Contro
 
 
 def copy_css() -> None:
-    """Copy Pico CSS and custom styles into the output directory."""
-    shutil.copy2(config.pico_src, config.output_dir / config.pico_src.name)
+    """Copy Bulma CSS and custom styles into the output directory."""
+    shutil.copy2(config.bulma_src, config.output_dir / config.bulma_src.name)
     shutil.copy2(config.project_root / "input.css", config.output_dir / "input.css")
 
 

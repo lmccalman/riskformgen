@@ -4,14 +4,14 @@
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <title>FormGen</title>
-    <link rel="stylesheet" href="pico.jade.min.css" />
+    <link rel="stylesheet" href="bulma.min.css" />
     <link rel="stylesheet" href="input.css" />
     <script defer src="alpine-persist.min.js"></script>
     <script defer src="alpine3.15.8.min.js"></script>
   </head>
   <body>
     <main class="container">
-      <h1>FormGen</h1>
+      <h1 class="title is-3">FormGen</h1>
 
       <div
         x-data="{
@@ -208,38 +208,27 @@
         }"
       >
         {# ── Tab navigation ── #}
-        <nav class="tabs">
-          {% for section in sections %}
-          <button
-            type="button"
-            @click="activeTab = '{{ section.id }}'"
-            :class="activeTab === '{{ section.id }}' && 'active'"
-          >
-            {{ section.title }}
-          </button>
-          {% endfor %}
-          <button
-            type="button"
-            class="tab-risk"
-            @click="activeTab = 'risks'"
-            :class="activeTab === 'risks' && 'active'"
-          >
-            Risk Analysis
-          </button>
-          <button
-            type="button"
-            class="tab-debug"
-            @click="activeTab = 'debug'"
-            :class="activeTab === 'debug' && 'active'"
-          >
-            Debug
-          </button>
-        </nav>
+        <div class="tabs is-boxed">
+          <ul>
+            {% for section in sections %}
+            <li :class="activeTab === '{{ section.id }}' && 'is-active'">
+              <a @click="activeTab = '{{ section.id }}'">{{ section.title }}</a>
+            </li>
+            {% endfor %}
+            <li class="tab-spacer"></li>
+            <li class="tab-risk" :class="activeTab === 'risks' && 'is-active'">
+              <a @click="activeTab = 'risks'">Risk Analysis</a>
+            </li>
+            <li class="tab-debug" :class="activeTab === 'debug' && 'is-active'">
+              <a @click="activeTab = 'debug'">Debug</a>
+            </li>
+          </ul>
+        </div>
 
         {# ── Section tabs ── #}
         {% for section in sections %}
         <form x-show="activeTab === '{{ section.id }}'" class="stack-lg">
-          <p><small>{{ section.description }}</small></p>
+          <p class="has-text-grey">{{ section.description }}</p>
           {% for subsection in section.subsections %}
           {% with subsection=subsection %}
           {% include "subsection.html.j2" %}
@@ -256,23 +245,23 @@
         </div>
 
         {# ── Debug tab ── #}
-        <div x-show="activeTab === 'debug'" data-theme="dark" class="stack-md">
-          <h3>Current Answers</h3>
+        <div x-show="activeTab === 'debug'" class="debug-panel stack-md">
+          <h3 class="title is-5">Current Answers</h3>
           <pre x-text="JSON.stringify(answers, null, 2)"></pre>
           {% if risks %}
-          <h3>Risk Levels</h3>
+          <h3 class="title is-5">Risk Levels</h3>
           <pre x-text="JSON.stringify({
             {% for risk in risks %}
             '{{ risk.id }}': {{ risk.id }}{% if not loop.last %},{% endif %}
             {% endfor %}
           }, null, 2)"></pre>
-          <h3>Assessed Risks</h3>
+          <h3 class="title is-5">Assessed Risks</h3>
           <pre x-text="JSON.stringify(assessed_risks, null, 2)"></pre>
-          <h3>Justifications</h3>
+          <h3 class="title is-5">Justifications</h3>
           <pre x-text="JSON.stringify(justifications, null, 2)"></pre>
-          <h3>Mandated Controls</h3>
+          <h3 class="title is-5">Mandated Controls</h3>
           <pre x-text="JSON.stringify(mandated_controls, null, 2)"></pre>
-          <h3>Mandated Comments</h3>
+          <h3 class="title is-5">Mandated Comments</h3>
           <pre x-text="JSON.stringify(mandated_comments, null, 2)"></pre>
           {% endif %}
         </div>

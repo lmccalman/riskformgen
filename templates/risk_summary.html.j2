@@ -1,144 +1,153 @@
-<article>
+<div class="card mb-4">
   {# ── Header ── #}
-  <header>
-    <h3>{{ risk.name }}</h3>
-    <p><small>{{ risk.description }}</small></p>
+  <header class="card-header">
+    <p class="card-header-title">{{ risk.name }}</p>
   </header>
 
-  {# ── Modelled risk: likelihood × consequence → level ── #}
-  <div class="risk-grid">
-    {# Likelihood #}
-    <div>
-      <span class="dim-label">Likelihood</span>
-      <span
-        class="badge badge-blue"
-        x-text="{{ risk.id }}.likelihood.replace(/_/g, ' ')"
-      ></span>
-    </div>
+  <div class="card-content">
+    <p class="subtitle is-6 has-text-grey">{{ risk.description }}</p>
 
-    {# Consequence #}
-    <div>
-      <span class="dim-label">Consequence</span>
-      <span
-        class="badge badge-purple"
-        x-text="{{ risk.id }}.consequence.replace(/_/g, ' ')"
-      ></span>
-    </div>
-
-    {# Modelled risk level (colour-coded) #}
-    <div>
-      <span class="dim-label">Modelled Risk</span>
-      <span
-        class="badge"
-        :class="'badge-' + ({ {% for level, colour in risk_level_colours.items() %}'{{ level }}': '{{ colour }}'{% if not loop.last %}, {% endif %}{% endfor %} }[{{ risk.id }}.level] || 'gray')"
-        x-text="{{ risk.id }}.level.replace(/_/g, ' ')"
-      ></span>
-    </div>
-  </div>
-
-  {# ── Controls ── #}
-  {% if risk.controls %}
-  <div>
-    <span class="dim-label">Controls</span>
-    <div class="stack-sm">
-      {% for ctrl in risk.controls %}
-      <div class="control-row">
+    {# ── Modelled risk: likelihood × consequence → level ── #}
+    <div class="risk-grid">
+      {# Likelihood #}
+      <div>
+        <span class="dim-label">Likelihood</span>
         <span
-          class="control-icon"
-          :class="ctrl_{{ ctrl.id }}
-            ? 'control-icon-active'
-            : 'control-icon-inactive'"
-          x-text="ctrl_{{ ctrl.id }} ? '✓' : '✗'"
+          class="badge badge-blue"
+          x-text="{{ risk.id }}.likelihood.replace(/_/g, ' ')"
         ></span>
-        <span
-          :class="ctrl_{{ ctrl.id }} ? '' : 'answer-missing'"
-          >{{ ctrl.name }}</span>
-        <span class="control-effect">
-          {% if ctrl.reduces_likelihood and ctrl.reduces_consequence %}↓ Likelihood &amp; Consequence
-          {% elif ctrl.reduces_likelihood %}↓ Likelihood
-          {% else %}↓ Consequence
-          {% endif %}
-        </span>
       </div>
-      {% endfor %}
-    </div>
-  </div>
-  {% endif %}
 
-  {# ── Mandate Controls ── #}
-  {% if risk.controls %}
-  <div>
-    <span class="dim-label">Mandate Controls</span>
-    <div class="stack-sm">
-      {% for ctrl in risk.controls %}
-      <template x-if="!ctrl_{{ ctrl.id }}">
-        <div>
-          <label>
-            <input type="checkbox"
-              x-model="mandated_controls['{{ risk.id }}']['{{ ctrl.id }}']"
-            />
-            {{ ctrl.name }}
-          </label>
-          <div x-show="mandated_controls['{{ risk.id }}']['{{ ctrl.id }}']" x-cloak>
-            <textarea
-              x-model="mandated_comments['{{ risk.id }}']['{{ ctrl.id }}']"
-              rows="2"
-              placeholder="How should this control be implemented…"
-            ></textarea>
-          </div>
+      {# Consequence #}
+      <div>
+        <span class="dim-label">Consequence</span>
+        <span
+          class="badge badge-purple"
+          x-text="{{ risk.id }}.consequence.replace(/_/g, ' ')"
+        ></span>
+      </div>
+
+      {# Modelled risk level (colour-coded) #}
+      <div>
+        <span class="dim-label">Modelled Risk</span>
+        <span
+          class="badge"
+          :class="'badge-' + ({ {% for level, colour in risk_level_colours.items() %}'{{ level }}': '{{ colour }}'{% if not loop.last %}, {% endif %}{% endfor %} }[{{ risk.id }}.level] || 'gray')"
+          x-text="{{ risk.id }}.level.replace(/_/g, ' ')"
+        ></span>
+      </div>
+    </div>
+
+    {# ── Controls ── #}
+    {% if risk.controls %}
+    <div>
+      <span class="dim-label">Controls</span>
+      <div class="stack-sm">
+        {% for ctrl in risk.controls %}
+        <div class="control-row">
+          <span
+            class="control-icon"
+            :class="ctrl_{{ ctrl.id }}
+              ? 'control-icon-active'
+              : 'control-icon-inactive'"
+            x-text="ctrl_{{ ctrl.id }} ? '✓' : '✗'"
+          ></span>
+          <span
+            :class="ctrl_{{ ctrl.id }} ? '' : 'answer-missing'"
+            >{{ ctrl.name }}</span>
+          <span class="control-effect">
+            {% if ctrl.reduces_likelihood and ctrl.reduces_consequence %}↓ Likelihood &amp; Consequence
+            {% elif ctrl.reduces_likelihood %}↓ Likelihood
+            {% else %}↓ Consequence
+            {% endif %}
+          </span>
         </div>
-      </template>
-      {% endfor %}
-    </div>
-  </div>
-  {% endif %}
-
-  {# ── Assessed risk (user-selected) ── #}
-  <div>
-    <span class="dim-label">Assessed Risk</span>
-    <div class="assessed-row">
-      <select x-model="assessed_risks.{{ risk.id }}">
-        <option value="">— Select —</option>
-        {% for level in risk_levels %}
-        <option value="{{ level }}">{{ level | replace("_", " ") | title }}</option>
         {% endfor %}
-      </select>
-      <span
-        x-show="assessed_risks.{{ risk.id }}"
-        x-cloak
-        class="badge"
-        :class="'badge-' + ({ {% for level, colour in risk_level_colours.items() %}'{{ level }}': '{{ colour }}'{% if not loop.last %}, {% endif %}{% endfor %} }[assessed_risks.{{ risk.id }}] || 'gray')"
-        x-text="assessed_risks.{{ risk.id }}.replace(/_/g, ' ')"
-      ></span>
+      </div>
     </div>
-  </div>
+    {% endif %}
 
-  {# ── Justification ── #}
-  <div>
-    <label class="dim-label" for="justification_{{ risk.id }}">Justification</label>
-    <textarea
-      id="justification_{{ risk.id }}"
-      x-model="justifications.{{ risk.id }}"
-      rows="2"
-      placeholder="Provide reasoning for the assessed risk level…"
-    ></textarea>
-  </div>
+    {# ── Mandate Controls ── #}
+    {% if risk.controls %}
+    <div>
+      <span class="dim-label">Mandate Controls</span>
+      <div class="stack-sm">
+        {% for ctrl in risk.controls %}
+        <template x-if="!ctrl_{{ ctrl.id }}">
+          <div>
+            <label class="checkbox">
+              <input type="checkbox"
+                x-model="mandated_controls['{{ risk.id }}']['{{ ctrl.id }}']"
+              />
+              {{ ctrl.name }}
+            </label>
+            <div x-show="mandated_controls['{{ risk.id }}']['{{ ctrl.id }}']" x-cloak>
+              <textarea
+                class="textarea"
+                x-model="mandated_comments['{{ risk.id }}']['{{ ctrl.id }}']"
+                rows="2"
+                placeholder="How should this control be implemented…"
+              ></textarea>
+            </div>
+          </div>
+        </template>
+        {% endfor %}
+      </div>
+    </div>
+    {% endif %}
 
-  {# ── Linked answers ── #}
-  {% if risk.questions %}
-  <hr />
-  <ul class="stack-sm">
-    {% for q in risk.questions %}
-    <li class="linked-answer">
-      <span>{{ q.text }}</span>
-      <span
-        :class="_formatAnswer(answers['{{ q.id }}']) === 'Not answered'
-          ? 'answer-missing'
-          : ''"
-        x-text="_formatAnswer(answers['{{ q.id }}'])"
-      ></span>
-    </li>
-    {% endfor %}
-  </ul>
-  {% endif %}
-</article>
+    {# ── Assessed risk (user-selected) ── #}
+    <div>
+      <span class="dim-label">Assessed Risk</span>
+      <div class="assessed-row">
+        <div class="select is-small">
+          <select x-model="assessed_risks.{{ risk.id }}">
+            <option value="">— Select —</option>
+            {% for level in risk_levels %}
+            <option value="{{ level }}">{{ level | replace("_", " ") | title }}</option>
+            {% endfor %}
+          </select>
+        </div>
+        <span
+          x-show="assessed_risks.{{ risk.id }}"
+          x-cloak
+          class="badge"
+          :class="'badge-' + ({ {% for level, colour in risk_level_colours.items() %}'{{ level }}': '{{ colour }}'{% if not loop.last %}, {% endif %}{% endfor %} }[assessed_risks.{{ risk.id }}] || 'gray')"
+          x-text="assessed_risks.{{ risk.id }}.replace(/_/g, ' ')"
+        ></span>
+      </div>
+    </div>
+
+    {# ── Justification ── #}
+    <div class="field">
+      <label class="label dim-label" for="justification_{{ risk.id }}">Justification</label>
+      <div class="control">
+        <textarea
+          class="textarea"
+          id="justification_{{ risk.id }}"
+          x-model="justifications.{{ risk.id }}"
+          rows="2"
+          placeholder="Provide reasoning for the assessed risk level…"
+        ></textarea>
+      </div>
+    </div>
+
+    {# ── Linked answers ── #}
+    {% if risk.questions %}
+    <hr />
+    <ul class="stack-sm">
+      {% for q in risk.questions %}
+      <li class="linked-answer">
+        <span>{{ q.text }}</span>
+        <span
+          :class="_formatAnswer(answers['{{ q.id }}']) === 'Not answered'
+            ? 'answer-missing'
+            : ''"
+          x-text="_formatAnswer(answers['{{ q.id }}'])"
+        ></span>
+      </li>
+      {% endfor %}
+    </ul>
+    {% endif %}
+  </div>
+</div>

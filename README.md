@@ -4,7 +4,7 @@ A static-page generator for interactive risk assessment forms. Define your
 questions, risks, and controls in YAML, then build a self-contained HTML page
 that runs entirely in the browser — no server required.
 
-Built with Jinja2 templates, [Pico CSS](https://picocss.com/) (jade theme), and
+Built with Jinja2 templates, [Bulma](https://bulma.io/), and
 [Alpine.js](https://alpinejs.dev/) for client-side interactivity.
 
 ## Quick start

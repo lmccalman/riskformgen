@@ -42,7 +42,7 @@ The build pipeline has three phases:
 
 1. **Python/Jinja2 (build time)** — `main.py` orchestrates the build. Form structure is defined in YAML files under `form/` (see `README.md`), parsed by `parse.py` into frozen dataclasses from `models.py`. `render.py` converts them to dicts and renders `templates/page.html.j2` into static HTML.
 
-2. **CSS (build time)** — `pico.jade.min.css` provides classless/semantic base styling. `input.css` contains custom CSS for app-specific components (tabs, badges, risk grid, spacing stacks, etc.). Both are copied directly to `output/` — no compilation step needed.
+2. **CSS (build time)** — `bulma.min.css` provides class-based styling (layout, typography, form controls, cards, tabs). `input.css` contains custom CSS for app-specific components (badges, risk grid, spacing stacks, etc.). Both are copied directly to `output/` — no compilation step needed.
 
 3. **Alpine.js (runtime)** — A parent `<div>` holds the `x-data` scope shared by all section forms and the risks panel. It contains reactive `answers` state, Alpine.js getters for each risk (compiled from Python rules at build time), and tab navigation. Each section renders as its own `<form>` shown/hidden via `x-show`; sub-sections provide visual grouping within sections. Each question partial binds inputs via `x-model`. Risk getters re-evaluate automatically as answers change. Multi-select answers are initialised as `[]` (array); all others as `''` (empty string).
 
@@ -87,17 +87,20 @@ No other changes needed — `prepare_risks()` and the template getter loop work 
 
 Forms are organised into **Sections** (rendered as tabs) and **SubSections** (visual groupings within a section), defined in `form/sections.yaml`. Section `id` values are used as Alpine.js tab identifiers — keep them as simple slugs. The Risk Analysis tab is always present (right-aligned, red accent) and is not defined in the sections list.
 
-### Semantic HTML and Pico CSS
+### Bulma CSS conventions
 
-Templates use semantic HTML elements that Pico styles automatically:
-- `<article>` for risk cards (Pico renders as bordered card with padding/shadow)
-- `<section>` for sub-section groupings
-- `<nav>` for tab navigation
-- `<details>` for the collapsible debug panel (`data-theme="dark"` for per-element theming)
-- `<fieldset>` / `<legend>` for questions (Pico styles natively)
-- `<label><input/> Text</label>` pattern for radio/checkbox (Pico expects input-first)
+Templates use Bulma's class-based styling:
+- `.card` / `.card-header` / `.card-content` for risk cards
+- `.box` for sub-section groupings
+- `.tabs.is-boxed` for tab navigation (active state via `.is-active` on `<li>`)
+- `.field` / `.label` / `.control` for form question layout
+- `.radio` / `.checkbox` on labels for radio/checkbox inputs
+- `.textarea` on `<textarea>` elements
+- `.select` wrapper around `<select>` elements
+- `.button.is-primary` / `.button.is-light` for action buttons
+- `.title` / `.subtitle` / `.has-text-grey` for typography
 
-Custom classes in `input.css` handle app-specific components: `.tabs`, `.badge-{color}`, `.risk-grid`, `.control-row`, `.stack-{lg,md,sm}`, `.options-{row,col}`, `.assessed-row`, `.linked-answer`.
+Custom classes in `input.css` handle app-specific components: `.badge-{color}`, `.risk-grid`, `.control-row`, `.stack-{lg,md,sm}`, `.options-{row,col}`, `.assessed-row`, `.linked-answer`, `.debug-panel`.
 
 ### Gotcha: Jinja2 autoescape and Alpine.js
 
@@ -105,4 +108,4 @@ The Jinja2 environment uses `autoescape=True`. When rendering JS expressions ins
 
 ### Output
 
-All generated files go to `output/` (gitignored): `index.html`, `pico.jade.min.css`, `input.css`, `alpine3.15.8.min.js`.
+All generated files go to `output/` (gitignored): `index.html`, `bulma.min.css`, `input.css`, `alpine3.15.8.min.js`.

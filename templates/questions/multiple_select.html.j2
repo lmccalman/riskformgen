@@ -1,11 +1,11 @@
-<fieldset>
-  <legend>{{ question.text }}</legend>
+<div class="field">
+  <label class="label">{{ question.text }}</label>
   {% if question.guidance %}
-  <p><small><em>{{ question.guidance }}</em></small></p>
+  <p class="help"><em>{{ question.guidance }}</em></p>
   {% endif %}
-  <div class="options-col">
+  <div class="control options-col">
     {% for option in question.options %}
-    <label>
+    <label class="checkbox">
       <input
         type="checkbox"
         name="{{ question.id }}"
@@ -16,4 +16,4 @@
     </label>
     {% endfor %}
   </div>
-</fieldset>
+</div>
