@@ -1,25 +1,6 @@
 # CLAUDE.md
 
-This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
-
-## Project Overview
-
-**riskformgen** is a static-page form generator for risk analysis. It renders
-Python dataclass-based form definitions into static HTML pages using Jinja2
-templates, Pico CSS (jade theme), and Alpine.js for interactivity. Users interact with
-tabbed, multi-section forms that support conditional logic, and can download
-their responses as JSON. There is a risk model that converts the users answers
-to risk levels across a given set of risks, and modifies these with controls
-and mitigations.
-
-Status: early development (questions and risk evaluation working).
-
-## Tech Stack
-
-- Python 3.13, managed with uv
-- Jinja2 for HTML templating
-- Pico CSS v2 (jade theme) for classless/semantic styling (vendored as `pico.jade.min.css`)
-- Alpine.js for client-side interactivity (vendored as `alpine3.15.8.min.js`)
+This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository. For project overview, YAML schema reference, risk model, and usage instructions, see `README.md`.
 
 ## Commands
 
@@ -59,7 +40,7 @@ Use `uv run ruff check --fix .` and `uv run ruff format .` to auto-fix lint and 
 
 The build pipeline has three phases:
 
-1. **Python/Jinja2 (build time)** — `main.py` orchestrates the build. Dataclasses in `models.py` define form structure declaratively. `render.py` converts them to dicts and renders `templates/page.html.j2` (which includes `templates/question.html.j2` per question) into static HTML.
+1. **Python/Jinja2 (build time)** — `main.py` orchestrates the build. Form structure is defined in YAML files under `form/` (see `README.md`), parsed by `parse.py` into frozen dataclasses from `models.py`. `render.py` converts them to dicts and renders `templates/page.html.j2` into static HTML.
 
 2. **CSS (build time)** — `pico.jade.min.css` provides classless/semantic base styling. `input.css` contains custom CSS for app-specific components (tabs, badges, risk grid, spacing stacks, etc.). Both are copied directly to `output/` — no compilation step needed.
 
@@ -69,57 +50,42 @@ The build pipeline has three phases:
 
 | File | Purpose |
 |---|---|
-| `config.py` | Project paths (including `pico_src`), risk scales (`LIKELIHOODS`, `CONSEQUENCES`, `RISK_LEVELS`), and `RISK_MATRIX` lookup table |
-| `models.py` | Question dataclasses, `Question` union, `SubSection`/`Section` dataclasses, `all_questions()` helper, risk rule dataclasses (`AnyYesRule`, `CountYesRule`, `ChoiceMapRule`, `ContainsAnyRule`), `RiskRule` union, and `Risk` dataclass |
-| `render.py` | Jinja2 environment setup, `prepare_sections()`, `prepare_risks()`, and `render_form()` |
+| `config.py` | Project paths, risk scales (`LIKELIHOODS`, `CONSEQUENCES`, `RISK_LEVELS`), and `RISK_MATRIX` lookup table |
+| `models.py` | Frozen dataclasses for questions, sections, risk rules, risks, controls, and visibility conditions |
+| `parse.py` | YAML → dataclass parsing (one `load_*` function per YAML file) |
+| `render.py` | Jinja2 environment setup, `prepare_sections()`, `prepare_risks()`, `prepare_controls()`, and `render_form()` |
+| `main.py` | Build orchestrator — loads YAML, renders HTML, copies assets |
+| `form/*.yaml` | Form definitions (see `README.md` for schema) |
 | `templates/page.html.j2` | Page skeleton with Alpine.js state, dynamic section tabs, risk getters, and debug panel |
 | `templates/subsection.html.j2` | Sub-section partial — heading + question loop |
 | `templates/question.html.j2` | Dispatcher — includes `questions/{type}.html.j2` |
 | `templates/questions/*.html.j2` | Per-type partials (one file per question type) |
 | `templates/risk_summary.html.j2` | Risk card partial with colour-coded level badge |
 | `input.css` | Custom CSS for app-specific components (tabs, badges, risk grid, spacing, etc.) |
-| `main.py` | Build orchestrator |
 
 ### Adding a new question type
 
 1. **`models.py`** — Add a frozen dataclass with `id: str`, `text: str`, any type-specific fields, and a `type: str = field(default="my_type", init=False)` discriminator. Add the class to the `Question` union type alias.
-2. **`templates/questions/my_type.html.j2`** — Create a Jinja2 partial for the new type. Use `x-model="answers.{{ question.id }}"` to bind to Alpine.js state.
-3. **`templates/page.html.j2`** — If the new type needs a non-string default (like `[]` for arrays), add a condition to the `x-data` initialiser alongside the existing `multiple_select` check.
-4. **`main.py`** — Import the new class and add an example to the appropriate `SubSection` in `define_sections()`.
+2. **`parse.py`** — Add a `case` branch in `parse_question()` to construct the new dataclass from YAML dicts.
+3. **`templates/questions/my_type.html.j2`** — Create a Jinja2 partial for the new type. Use `x-model="answers.{{ question.id }}"` to bind to Alpine.js state.
+4. **`templates/page.html.j2`** — If the new type needs a non-string default (like `[]` for arrays), add a condition to the `x-data` initialiser alongside the existing `multiple_select` check.
 
 No changes needed to `question.html.j2`, `subsection.html.j2`, `render.py`, or the build pipeline — the dispatcher and renderer work generically.
 
-### Form structure: Sections and sub-sections
+### Adding a new risk or rule type
 
-Forms are organised into **Sections** (rendered as tabs) and **SubSections** (visual groupings within a section). In `main.py`, `define_sections()` returns a `list[Section]`, where each `Section` contains a tuple of `SubSection`s, each containing a tuple of `Question`s.
+To add a new **risk**, add an entry to `form/risks.yaml` — see `README.md` for the schema and available rule types.
 
-- To add a new section, create a `Section(id="slug", title="Display Name", subsections=(...))` in `define_sections()`.
-- To add a sub-section, add a `SubSection(title="Heading", questions=(...))` to an existing section's `subsections` tuple.
-- Section `id` values are used as Alpine.js tab identifiers — keep them as simple slugs.
-- The Risk Analysis tab is always present (right-aligned, red accent) and is not defined in the sections list.
-
-### Risk model: Likelihood × Consequence
-
-Risk is decomposed into two independent dimensions — **likelihood** and **consequence** — with the overall risk level computed via a configurable **risk matrix** (ISO 31000 style). The scales and matrix are defined in `config.py`. Each rule can set one or both dimensions; a rule with only `likelihood` set won't affect the consequence reduction, and vice versa. The `_worst` helper on the JS side uses `scale.indexOf()` for ordering — the position in the configured tuple defines severity.
-
-Risk getters return `{likelihood, consequence, level}` objects. The `level` is looked up from the matrix using the worst-case likelihood and consequence across all fired rules.
-
-### Adding a new risk
-
-1. **`models.py`** — Create a `Risk` with an `id`, `name`, `description`, and a tuple of rules. Available rule types:
-   - `AnyYesRule(question_ids, likelihood=, consequence=)` — fires if any listed yes/no question is "yes" (at least one dimension required)
-   - `CountYesRule(question_ids, threshold, likelihood=, consequence=)` — fires if ≥ threshold yes answers
-   - `ChoiceMapRule(question_id, mapping)` — maps a multiple-choice answer to `{"likelihood": ..., "consequence": ...}` via dict (either key optional per entry)
-   - `ContainsAnyRule(question_id, values, likelihood=, consequence=)` — fires if a multi-select answer contains any of the values
-2. **`main.py`** — Add the `Risk` to the list returned by `define_risks()`. Set `default_likelihood` and `default_consequence` for the fallback when no rules fire.
-
-No template changes needed. Each rule's `to_js()` method compiles to a JS expression that returns a `{likelihood, consequence}` object or `null`. The page template loops over risks and generates Alpine.js getters that reduce results per dimension (worst-case-wins) and look up the overall level from the risk matrix.
-
-### Adding a new rule type
+To add a new **rule type**:
 
 1. **`models.py`** — Add a frozen dataclass with a `to_js()` method returning a JS expression (evaluates to a `{likelihood, consequence}` object or `null`). Use `_js_result()` helper and `json.dumps` for JS literals. Add the class to the `RiskRule` union.
+2. **`parse.py`** — Add a `case` branch in `parse_rule()` to construct the new dataclass from YAML dicts.
 
 No other changes needed — `prepare_risks()` and the template getter loop work generically.
+
+### Form structure
+
+Forms are organised into **Sections** (rendered as tabs) and **SubSections** (visual groupings within a section), defined in `form/sections.yaml`. Section `id` values are used as Alpine.js tab identifiers — keep them as simple slugs. The Risk Analysis tab is always present (right-aligned, red accent) and is not defined in the sections list.
 
 ### Semantic HTML and Pico CSS
 

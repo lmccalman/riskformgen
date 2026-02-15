@@ -1,25 +1,46 @@
+# risks.yaml — Risk definitions assessed from form answers.
+#
+# Each risk is evaluated on two dimensions: likelihood and consequence.
+# The overall risk level is looked up from the matrix in config.py.
+#
+# Likelihood scale (ascending): rare, unlikely, possible, likely, almost_certain
+# Consequence scale (ascending): minor, medium, major
+#
+# Rule types:
+#   any_yes      — fires if any listed yes/no question is "yes"
+#   count_yes    — fires if >= threshold yes/no questions are "yes"
+#   choice_map   — maps a multiple-choice answer to {likelihood, consequence}
+#   contains_any — fires if a multi-select answer includes any listed value
+#
+# Rules can set likelihood, consequence, or both. When multiple rules fire,
+# worst-case-wins per dimension independently.
+#
+# Optional defaults (fallback when no rules fire):
+#   default_likelihood  — defaults to "rare" if omitted
+#   default_consequence — defaults to "minor" if omitted
+
 - id: sedentary_risk
   name: Sedentary Lifestyle
   description: Risk of an overly sedentary lifestyle based on activity preferences.
-  default_likelihood: likely
+  default_likelihood: likely          # Higher default — assume sedentary unless proven otherwise
   default_consequence: medium
   rules:
-    - type: any_yes
+    - type: any_yes                   # Fires if any listed question is answered "yes"
       question_ids: [likes_swimming]
-      likelihood: unlikely
-    - type: contains_any
+      likelihood: unlikely            # Sets only likelihood; consequence unaffected
+    - type: contains_any              # Fires if multi-select includes any listed value
       question_id: active_hobbies
       values: [Swimming, Cycling, Running]
       consequence: minor
-    - type: choice_map
+    - type: choice_map                # Maps each answer to a {likelihood, consequence} pair
       question_id: exercise_frequency
       mapping:
         Daily: { likelihood: rare, consequence: minor }
-        A few times a week: { likelihood: unlikely }
+        A few times a week: { likelihood: unlikely }              # Consequence omitted — unaffected
         Weekly: { likelihood: possible, consequence: medium }
         Rarely: { likelihood: likely, consequence: major }
         Never: { likelihood: almost_certain, consequence: major }
-    - type: count_yes
+    - type: count_yes                 # Fires if >= threshold questions are "yes"
       question_ids: [likes_swimming, enjoys_coding]
       threshold: 2
       likelihood: possible
@@ -27,6 +48,7 @@
 - id: seasonal_mood_risk
   name: Seasonal Mood Impact
   description: Potential mood impact based on seasonal preference.
+  # No defaults specified — uses rare/minor fallback
   rules:
     - type: choice_map
       question_id: favourite_season
@@ -43,7 +65,7 @@
     - type: any_yes
       question_ids: [enjoys_coding]
       likelihood: possible
-      consequence: medium
+      consequence: medium             # Sets both dimensions
     - type: contains_any
       question_id: indoor_hobbies
       values: [Reading, Gaming]
@@ -55,7 +77,7 @@
       consequence: minor
     - type: any_yes
       question_ids: [outdoor_access]
-      consequence: minor
+      consequence: minor              # Sets only consequence
 
 - id: isolation_risk
   name: Social Isolation

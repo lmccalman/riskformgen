@@ -1,6 +1,17 @@
+# controls.yaml — Safeguards that reduce assessed risk when present.
+#
+# Each control is linked to a question. It is "present" when the question's
+# answer matches present_value (exact match for single-select, membership
+# check for multi-select).
+#
+# Effects list which risks are reduced, and in which dimension:
+#   reduces_likelihood:  true — drops likelihood by one step on the scale
+#   reduces_consequence: true — drops consequence by one step on the scale
+# At least one of these must be true per effect.
+
 - id: outdoor_access
   name: Access to outdoor spaces
-  question_id: outdoor_access
+  question_id: outdoor_access        # Yes/no question — present when "yes"
   present_value: "yes"
   effects:
     - risk_id: burnout_risk
@@ -10,16 +21,16 @@
 
 - id: active_hobbies
   name: Active hobbies
-  question_id: active_hobbies
+  question_id: active_hobbies        # Multi-select — present if "Swimming" is selected
   present_value: Swimming
   effects:
     - risk_id: sedentary_risk
       reduces_likelihood: true
-      reduces_consequence: true
+      reduces_consequence: true       # Can reduce both dimensions
 
 - id: group_activities
   name: Group activity participation
-  question_id: group_activities
+  question_id: group_activities       # Multi-select — present if "Team sports" is selected
   present_value: Team sports
   effects:
     - risk_id: isolation_risk

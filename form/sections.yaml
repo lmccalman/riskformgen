@@ -1,12 +1,31 @@
-- id: personal
-  title: Personal
+# sections.yaml — Form structure: sections (tabs) > subsections > questions.
+#
+# Question types:
+#   yes_no           — yes/no radio buttons (answer: "yes" or "no")
+#   free_text        — textarea (answer: string)
+#   multiple_choice  — single-select radio buttons (answer: one option string)
+#   multiple_select  — multi-select checkboxes (answer: array of option strings)
+#
+# Optional fields (all question types):
+#   guidance     — help text shown below the question
+#   visible_when — show/hide based on other answers (see below)
+#
+# Visibility conditions (usable on questions and subsections):
+#   equals:   { question_id: ..., value: ... }   — exact match
+#   contains: { question_id: ..., value: ... }   — multi-select includes value
+#   not: <condition>                              — negation
+#   any: [<conditions>]                           — logical OR
+#   all: [<conditions>]                           — logical AND
+
+- id: personal                    # Section ID — used as Alpine.js tab identifier
+  title: Personal                 # Tab display name
   description: "Tell us a bit about yourself \u2014 who you are and what makes you tick."
   subsections:
     - title: About You
       description: "Some basics so we know who we're talking to."
       questions:
         - type: free_text
-          id: name
+          id: name                # Question IDs must be unique across all sections
           text: What is your name?
           guidance: "Your full legal name, or the name you prefer to go by."
         - type: free_text
@@ -19,7 +38,7 @@
         - type: multiple_choice
           id: favourite_season
           text: What is your favourite season?
-          options: [Spring, Summer, Autumn, Winter]
+          options: [Spring, Summer, Autumn, Winter]   # Options as inline YAML list
         - type: yes_no
           id: morning_person
           text: Are you a morning person?
@@ -43,14 +62,14 @@
           id: active_hobbies
           text: Which active hobbies do you enjoy?
           options: [Swimming, Cycling, Running, Hiking, Team sports]
-          visible_when:
+          visible_when:              # Only shown when exercise_frequency != "Never"
             not:
               equals: { question_id: exercise_frequency, value: Never }
 
     - title: Indoor Interests
       description: The things you enjoy when you're staying in.
-      visible_when:
-        any:
+      visible_when:                  # Subsection-level visibility — hides entire group
+        any:                         # Logical OR: shown if either condition is true
           - equals: { question_id: exercise_frequency, value: Rarely }
           - equals: { question_id: exercise_frequency, value: Never }
       questions:
