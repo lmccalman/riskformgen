@@ -29,6 +29,22 @@
             {% for risk in risks %}'{{ risk.id }}': ''{% if not loop.last %},{% endif %}
             {% endfor %}
           }),
+          mandated_controls: $persist({
+            {% for risk in risks %}
+            '{{ risk.id }}': {
+              {% for ctrl in risk.controls %}'{{ ctrl.id }}': false{% if not loop.last %},{% endif %}
+              {% endfor %}
+            }{% if not loop.last %},{% endif %}
+            {% endfor %}
+          }),
+          mandated_comments: $persist({
+            {% for risk in risks %}
+            '{{ risk.id }}': {
+              {% for ctrl in risk.controls %}'{{ ctrl.id }}': ''{% if not loop.last %},{% endif %}
+              {% endfor %}
+            }{% if not loop.last %},{% endif %}
+            {% endfor %}
+          }),
           _questionIds: [{% for q in questions %}'{{ q.id }}'{% if not loop.last %}, {% endif %}{% endfor %}],
           _arrayQuestionIds: [{% for q in questions %}{% if q.type == 'multiple_select' %}'{{ q.id }}', {% endif %}{% endfor %}],
           _riskIds: [{% for risk in risks %}'{{ risk.id }}'{% if not loop.last %}, {% endif %}{% endfor %}],
@@ -126,6 +142,8 @@
               risk_ids: this._riskIds,
               assessed_risks: this.assessed_risks,
               justifications: this.justifications,
+              mandated_controls: this.mandated_controls,
+              mandated_comments: this.mandated_comments,
             }, 'riskformgen-assessment.json');
           },
           importAssessment(event) {
@@ -148,6 +166,20 @@
                   }
                   if (data.justifications && id in data.justifications) {
                     this.justifications[id] = data.justifications[id];
+                  }
+                  if (data.mandated_controls && data.mandated_controls[id]) {
+                    for (const [ctrl, val] of Object.entries(data.mandated_controls[id])) {
+                      if (this.mandated_controls[id] && ctrl in this.mandated_controls[id]) {
+                        this.mandated_controls[id][ctrl] = val;
+                      }
+                    }
+                  }
+                  if (data.mandated_comments && data.mandated_comments[id]) {
+                    for (const [ctrl, val] of Object.entries(data.mandated_comments[id])) {
+                      if (this.mandated_comments[id] && ctrl in this.mandated_comments[id]) {
+                        this.mandated_comments[id][ctrl] = val;
+                      }
+                    }
                   }
                 }
               },
@@ -238,6 +270,10 @@
           <pre x-text="JSON.stringify(assessed_risks, null, 2)"></pre>
           <h3>Justifications</h3>
           <pre x-text="JSON.stringify(justifications, null, 2)"></pre>
+          <h3>Mandated Controls</h3>
+          <pre x-text="JSON.stringify(mandated_controls, null, 2)"></pre>
+          <h3>Mandated Comments</h3>
+          <pre x-text="JSON.stringify(mandated_comments, null, 2)"></pre>
           {% endif %}
         </div>
 

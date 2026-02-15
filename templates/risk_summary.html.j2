@@ -65,6 +65,34 @@
   </div>
   {% endif %}
 
+  {# ── Mandate Controls ── #}
+  {% if risk.controls %}
+  <div>
+    <span class="dim-label">Mandate Controls</span>
+    <div class="stack-sm">
+      {% for ctrl in risk.controls %}
+      <template x-if="!ctrl_{{ ctrl.id }}">
+        <div>
+          <label>
+            <input type="checkbox"
+              x-model="mandated_controls['{{ risk.id }}']['{{ ctrl.id }}']"
+            />
+            {{ ctrl.name }}
+          </label>
+          <div x-show="mandated_controls['{{ risk.id }}']['{{ ctrl.id }}']" x-cloak>
+            <textarea
+              x-model="mandated_comments['{{ risk.id }}']['{{ ctrl.id }}']"
+              rows="2"
+              placeholder="How should this control be implemented…"
+            ></textarea>
+          </div>
+        </div>
+      </template>
+      {% endfor %}
+    </div>
+  </div>
+  {% endif %}
+
   {# ── Assessed risk (user-selected) ── #}
   <div>
     <span class="dim-label">Assessed Risk</span>
