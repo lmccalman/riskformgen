@@ -1,8 +1,13 @@
 import shutil
 
 import config
-from models import Control, Risk, Section, all_questions
-from parse import load_controls, load_properties, load_risks, load_sections, validate_property_dag
+from models import Property, Section, all_questions
+from parse import (
+    load_properties,
+    load_sections,
+    validate_property_dag,
+    validate_question_properties,
+)
 from render import render_form
 
 
@@ -11,9 +16,9 @@ def ensure_output_dir() -> None:
     config.output_dir.mkdir(exist_ok=True)
 
 
-def write_html(sections: list[Section], risks: list[Risk], controls: list[Control]) -> None:
+def write_html(sections: list[Section], properties: list[Property]) -> None:
     """Render and write the form HTML to output/index.html."""
-    html = render_form(sections, risks, controls)
+    html = render_form(sections, risks=[], controls=[], properties=properties)
     (config.output_dir / "index.html").write_text(html)
 
 
@@ -32,18 +37,16 @@ def copy_alpine() -> None:
 def main() -> None:
     """Build the static form page."""
     sections = load_sections(config.form_dir / "sections.yaml")
-    risks = load_risks(config.form_dir / "risks.yaml")
-    controls = load_controls(config.form_dir / "controls.yaml")
     properties = load_properties(config.form_dir / "properties.yaml")
     validate_property_dag(properties)
     questions = all_questions(sections)
+    validate_question_properties(questions, properties)
     ensure_output_dir()
-    write_html(sections, risks, controls)
+    write_html(sections, properties)
     copy_css()
     copy_alpine()
     print(
         f"Built form with {len(sections)} sections, {len(questions)} questions,"
-        f" {len(risks)} risks, {len(controls)} controls"
         f" and {len(properties)} properties"
         f" in {config.output_dir.resolve()}/"
     )

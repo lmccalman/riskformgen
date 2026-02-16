@@ -5,119 +5,22 @@ from collections.abc import Sequence
 from dataclasses import dataclass, field
 
 # ---------------------------------------------------------------------------
-# Visibility conditions
-# ---------------------------------------------------------------------------
-
-
-@dataclass(frozen=True)
-class Equals:
-    """True when a question's answer equals a specific value."""
-
-    question_id: str
-    value: str
-
-    def to_js(self) -> str:
-        return f"answers[{json.dumps(self.question_id)}] === {json.dumps(self.value)}"
-
-
-@dataclass(frozen=True)
-class Contains:
-    """True when a multi-select answer includes a specific value."""
-
-    question_id: str
-    value: str
-
-    def to_js(self) -> str:
-        qid = json.dumps(self.question_id)
-        val = json.dumps(self.value)
-        return f"(answers[{qid}] || []).includes({val})"
-
-
-@dataclass(frozen=True)
-class All:
-    """True when all child conditions are true (logical AND)."""
-
-    conditions: tuple[Condition, ...]
-
-    def to_js(self) -> str:
-        return " && ".join(f"({c.to_js()})" for c in self.conditions)
-
-
-@dataclass(frozen=True)
-class Any:
-    """True when any child condition is true (logical OR)."""
-
-    conditions: tuple[Condition, ...]
-
-    def to_js(self) -> str:
-        return " || ".join(f"({c.to_js()})" for c in self.conditions)
-
-
-@dataclass(frozen=True)
-class Not:
-    """Negation of a condition."""
-
-    condition: Condition
-
-    def to_js(self) -> str:
-        return f"!({self.condition.to_js()})"
-
-
-Condition = Equals | Contains | All | Any | Not
-
-
-# ---------------------------------------------------------------------------
 # Questions
 # ---------------------------------------------------------------------------
 
 
 @dataclass(frozen=True)
-class YesNoQuestion:
-    """A yes/no radio-button question."""
+class BinaryQuestion:
+    """A yes/no question that enables/disables a set of properties."""
 
     id: str
     text: str
+    properties: tuple[str, ...]
     guidance: str | None = None
-    visible_when: Condition | None = None
-    type: str = field(default="yes_no", init=False)
+    type: str = field(default="binary", init=False)
 
 
-@dataclass(frozen=True)
-class FreeTextQuestion:
-    """A free-text textarea question."""
-
-    id: str
-    text: str
-    guidance: str | None = None
-    visible_when: Condition | None = None
-    type: str = field(default="free_text", init=False)
-
-
-@dataclass(frozen=True)
-class MultipleChoiceQuestion:
-    """A single-select radio-button question with arbitrary options."""
-
-    id: str
-    text: str
-    options: tuple[str, ...]
-    guidance: str | None = None
-    visible_when: Condition | None = None
-    type: str = field(default="multiple_choice", init=False)
-
-
-@dataclass(frozen=True)
-class MultipleSelectQuestion:
-    """A multi-select checkbox question with arbitrary options."""
-
-    id: str
-    text: str
-    options: tuple[str, ...]
-    guidance: str | None = None
-    visible_when: Condition | None = None
-    type: str = field(default="multiple_select", init=False)
-
-
-Question = YesNoQuestion | FreeTextQuestion | MultipleChoiceQuestion | MultipleSelectQuestion
+Question = BinaryQuestion
 
 
 # ---------------------------------------------------------------------------
@@ -132,7 +35,6 @@ class SubSection:
     title: str
     description: str
     questions: tuple[Question, ...]
-    visible_when: Condition | None = None
 
 
 @dataclass(frozen=True)
@@ -326,3 +228,4 @@ class Property:
     id: str
     description: str
     parents: tuple[str, ...] = ()
+    activation: str = "all"  # "all" or "any"

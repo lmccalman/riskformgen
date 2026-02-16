@@ -9,27 +9,18 @@ from typing import Any
 import yaml
 
 from models import (
-    All,
     AnyYesRule,
+    BinaryQuestion,
     ChoiceMapRule,
-    Contains,
     ContainsAnyRule,
     Control,
     ControlEffect,
     CountYesRule,
-    Equals,
-    FreeTextQuestion,
-    MultipleChoiceQuestion,
-    MultipleSelectQuestion,
-    Not,
     Property,
+    Question,
     Risk,
     Section,
     SubSection,
-    YesNoQuestion,
-)
-from models import (
-    Any as AnyCondition,
 )
 
 # Type aliases for readability
@@ -48,60 +39,21 @@ def _ensure_str(value: object) -> str:
 
 
 # ---------------------------------------------------------------------------
-# Conditions
-# ---------------------------------------------------------------------------
-
-
-def parse_condition(data: YamlDict) -> Equals | Contains | All | AnyCondition | Not:
-    """Parse a single-key condition dict into a Condition dataclass."""
-    if len(data) != 1:
-        raise ValueError(f"Condition must have exactly one key, got: {list(data.keys())}")
-
-    key, value = next(iter(data.items()))
-
-    match key:
-        case "equals":
-            d = value
-            return Equals(question_id=d["question_id"], value=_ensure_str(d["value"]))
-        case "contains":
-            d = value
-            return Contains(question_id=d["question_id"], value=_ensure_str(d["value"]))
-        case "not":
-            return Not(condition=parse_condition(value))
-        case "any":
-            return AnyCondition(conditions=tuple(parse_condition(c) for c in value))
-        case "all":
-            return All(conditions=tuple(parse_condition(c) for c in value))
-        case _:
-            raise ValueError(f"Unknown condition type: {key!r}")
-
-
-# ---------------------------------------------------------------------------
 # Questions
 # ---------------------------------------------------------------------------
 
 
-def parse_question(data: YamlDict):
-    """Parse a question dict into a Question dataclass, dispatching on 'type'."""
+def parse_question(data: YamlDict) -> Question:
+    """Parse a question dict into a BinaryQuestion dataclass."""
     qtype = data["type"]
-    common = {
-        "id": data["id"],
-        "text": data["text"],
-        "guidance": data.get("guidance"),
-        "visible_when": parse_condition(data["visible_when"]) if "visible_when" in data else None,
-    }
-
-    match qtype:
-        case "yes_no":
-            return YesNoQuestion(**common)
-        case "free_text":
-            return FreeTextQuestion(**common)
-        case "multiple_choice":
-            return MultipleChoiceQuestion(**common, options=tuple(data["options"]))
-        case "multiple_select":
-            return MultipleSelectQuestion(**common, options=tuple(data["options"]))
-        case _:
-            raise ValueError(f"Unknown question type: {qtype!r}")
+    if qtype != "binary":
+        raise ValueError(f"Unknown question type: {qtype!r}")
+    return BinaryQuestion(
+        id=data["id"],
+        text=data["text"],
+        properties=tuple(data.get("properties", [])),
+        guidance=data.get("guidance"),
+    )
 
 
 # ---------------------------------------------------------------------------
@@ -115,7 +67,6 @@ def parse_subsection(data: YamlDict) -> SubSection:
         title=data["title"],
         description=data["description"],
         questions=tuple(parse_question(q) for q in data["questions"]),
-        visible_when=parse_condition(data["visible_when"]) if "visible_when" in data else None,
     )
 
 
@@ -242,6 +193,7 @@ def parse_property(data: YamlDict) -> Property:
         id=data["id"],
         description=data["description"],
         parents=tuple(data.get("parents", [])),
+        activation=data.get("activation", "all"),
     )
 
 
@@ -290,3 +242,29 @@ def validate_property_dag(properties: list[Property]) -> None:
 
     if visited != len(ids):
         raise ValueError("Property DAG contains a cycle")
+
+
+def validate_question_properties(
+    questions: list[BinaryQuestion], properties: list[Property]
+) -> None:
+    """Validate question→property references: all exist, each set by at most one question."""
+    prop_ids = {p.id for p in properties}
+    errors: list[str] = []
+
+    # Check all referenced properties exist
+    for q in questions:
+        for pid in q.properties:
+            if pid not in prop_ids:
+                errors.append(f"Question {q.id!r} references unknown property {pid!r}")
+
+    # Check each property is set by at most one question
+    setters: dict[str, str] = {}
+    for q in questions:
+        for pid in q.properties:
+            if pid in setters:
+                errors.append(f"Property {pid!r} is set by both {setters[pid]!r} and {q.id!r}")
+            else:
+                setters[pid] = q.id
+
+    if errors:
+        raise ValueError("Invalid question→property references:\n  " + "\n  ".join(errors))

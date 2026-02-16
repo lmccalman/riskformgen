@@ -6,52 +6,40 @@ import pytest
 
 from models import (
     AnyYesRule,
+    BinaryQuestion,
     ChoiceMapRule,
     ContainsAnyRule,
     Control,
     ControlEffect,
     CountYesRule,
-    FreeTextQuestion,
-    MultipleChoiceQuestion,
-    MultipleSelectQuestion,
+    Property,
     Risk,
     Section,
     SubSection,
-    YesNoQuestion,
 )
 
 
 @pytest.fixture
-def yes_no_q():
-    return YesNoQuestion(id="q_yn", text="Is it risky?")
+def binary_q():
+    return BinaryQuestion(id="q_bin", text="Is it risky?", properties=("prop_a",))
 
 
 @pytest.fixture
-def choice_q():
-    return MultipleChoiceQuestion(id="q_mc", text="Pick one", options=("alpha", "beta", "gamma"))
+def binary_q2():
+    return BinaryQuestion(id="q_bin2", text="Is it dangerous?", properties=("prop_b",))
 
 
 @pytest.fixture
-def multi_select_q():
-    return MultipleSelectQuestion(id="q_ms", text="Pick many", options=("x", "y", "z"))
+def sample_questions(binary_q, binary_q2):
+    return [binary_q, binary_q2]
 
 
 @pytest.fixture
-def free_text_q():
-    return FreeTextQuestion(id="q_ft", text="Describe the risk")
-
-
-@pytest.fixture
-def sample_questions(yes_no_q, choice_q, multi_select_q, free_text_q):
-    return [yes_no_q, choice_q, multi_select_q, free_text_q]
-
-
-@pytest.fixture
-def sample_subsection(yes_no_q, choice_q):
+def sample_subsection(binary_q, binary_q2):
     return SubSection(
         title="Basics",
         description="Basic questions",
-        questions=(yes_no_q, choice_q),
+        questions=(binary_q, binary_q2),
     )
 
 
@@ -71,15 +59,23 @@ def sample_sections(sample_section):
 
 
 @pytest.fixture
+def sample_properties():
+    return [
+        Property(id="prop_a", description="Property A"),
+        Property(id="prop_b", description="Property B", parents=("prop_a",)),
+    ]
+
+
+@pytest.fixture
 def sample_risk():
     return Risk(
         id="r1",
         name="Data Breach",
         description="Risk of data leakage",
         rules=(
-            AnyYesRule(question_ids=("q_yn",), likelihood="likely"),
+            AnyYesRule(question_ids=("q_bin",), likelihood="likely"),
             CountYesRule(
-                question_ids=("q_yn", "q_yn2"),
+                question_ids=("q_bin", "q_bin2"),
                 threshold=2,
                 consequence="major",
             ),
@@ -107,7 +103,7 @@ def sample_control():
     return Control(
         id="ctrl1",
         name="Encryption enabled",
-        question_id="q_yn",
+        question_id="q_bin",
         present_value="yes",
         effects=(ControlEffect(risk_id="r1", reduces_likelihood=True),),
     )

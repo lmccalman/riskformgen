@@ -7,17 +7,14 @@ import json
 import pytest
 
 from models import (
-    All,
-    Any,
     AnyYesRule,
+    BinaryQuestion,
     ChoiceMapRule,
-    Contains,
     ContainsAnyRule,
     Control,
     ControlEffect,
     CountYesRule,
-    Equals,
-    Not,
+    Property,
     Section,
     _js_ids,
     _js_result,
@@ -25,102 +22,50 @@ from models import (
 )
 
 # ---------------------------------------------------------------------------
-# Visibility conditions — to_js()
+# BinaryQuestion
 # ---------------------------------------------------------------------------
 
 
-class TestEquals:
+class TestBinaryQuestion:
     def test_basic(self):
-        c = Equals(question_id="q1", value="yes")
-        assert c.to_js() == 'answers["q1"] === "yes"'
+        q = BinaryQuestion(id="q1", text="Is it?", properties=("p1", "p2"))
+        assert q.id == "q1"
+        assert q.type == "binary"
+        assert q.properties == ("p1", "p2")
+        assert q.guidance is None
 
-    def test_special_chars_in_value(self):
-        c = Equals(question_id="q1", value='it\'s a "test"')
-        js = c.to_js()
-        # json.dumps escapes quotes properly
-        assert '"it\'s a \\"test\\""' in js
+    def test_with_guidance(self):
+        q = BinaryQuestion(id="q1", text="Is it?", properties=("p1",), guidance="Help text")
+        assert q.guidance == "Help text"
 
+    def test_empty_properties(self):
+        q = BinaryQuestion(id="q1", text="Is it?", properties=())
+        assert q.properties == ()
 
-class TestContains:
-    def test_basic(self):
-        c = Contains(question_id="q1", value="opt_a")
-        js = c.to_js()
-        assert ".includes(" in js
-        assert "|| []" in js  # null guard
-
-    def test_output_is_valid_shape(self):
-        c = Contains(question_id="q1", value="x")
-        js = c.to_js()
-        assert js == '(answers["q1"] || []).includes("x")'
+    def test_frozen(self):
+        q = BinaryQuestion(id="q1", text="Is it?", properties=("p1",))
+        with pytest.raises(AttributeError):
+            q.id = "q2"  # type: ignore[misc]
 
 
-class TestAll:
-    def test_joins_with_and(self):
-        c = All(
-            conditions=(
-                Equals(question_id="a", value="1"),
-                Equals(question_id="b", value="2"),
-            )
-        )
-        js = c.to_js()
-        assert "&&" in js
-        assert "(answers" in js
-
-    def test_single_condition(self):
-        c = All(conditions=(Equals(question_id="a", value="1"),))
-        js = c.to_js()
-        # Single condition — no && needed, just wrapped in parens
-        assert "&&" not in js
-        assert "(answers" in js
+# ---------------------------------------------------------------------------
+# Property
+# ---------------------------------------------------------------------------
 
 
-class TestAny:
-    def test_joins_with_or(self):
-        c = Any(
-            conditions=(
-                Equals(question_id="a", value="1"),
-                Equals(question_id="b", value="2"),
-            )
-        )
-        js = c.to_js()
-        assert "||" in js
+class TestProperty:
+    def test_root_property(self):
+        p = Property(id="p1", description="Root")
+        assert p.parents == ()
+        assert p.activation == "all"
 
-    def test_single_condition(self):
-        c = Any(conditions=(Equals(question_id="a", value="1"),))
-        js = c.to_js()
-        assert "||" not in js
+    def test_with_parents(self):
+        p = Property(id="p2", description="Child", parents=("p1",))
+        assert p.parents == ("p1",)
 
-
-class TestNot:
-    def test_negation(self):
-        c = Not(condition=Equals(question_id="q1", value="yes"))
-        js = c.to_js()
-        assert js.startswith("!(")
-        assert js.endswith(")")
-
-    def test_double_negation(self):
-        inner = Equals(question_id="q1", value="yes")
-        c = Not(condition=Not(condition=inner))
-        js = c.to_js()
-        assert js.startswith("!(!(")
-
-
-class TestNestedConditions:
-    def test_any_containing_all(self):
-        c = Any(
-            conditions=(
-                All(
-                    conditions=(
-                        Equals(question_id="a", value="1"),
-                        Equals(question_id="b", value="2"),
-                    )
-                ),
-                Equals(question_id="c", value="3"),
-            )
-        )
-        js = c.to_js()
-        assert "||" in js
-        assert "&&" in js
+    def test_any_activation(self):
+        p = Property(id="p2", description="Any", parents=("p1",), activation="any")
+        assert p.activation == "any"
 
 
 # ---------------------------------------------------------------------------
@@ -291,7 +236,7 @@ class TestControlPresenceJs:
 class TestAllQuestions:
     def test_flattens(self, sample_sections):
         qs = all_questions(sample_sections)
-        assert len(qs) == 2  # yes_no_q + choice_q from sample_subsection
+        assert len(qs) == 2  # binary_q + binary_q2 from sample_subsection
 
     def test_empty_sections(self):
         assert all_questions([]) == []

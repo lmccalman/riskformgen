@@ -18,7 +18,7 @@
           activeTab: $persist('{{ sections[0].id }}'),
           answers: $persist({
             {% for q in questions %}
-            '{{ q.id }}': {% if q.type == 'multiple_select' %}[]{% else %}''{% endif %}{% if not loop.last %},{% endif %}
+            '{{ q.id }}': ''{% if not loop.last %},{% endif %}
             {% endfor %}
           }),
           assessed_risks: $persist({
@@ -46,7 +46,6 @@
             {% endfor %}
           }),
           _questionIds: [{% for q in questions %}'{{ q.id }}'{% if not loop.last %}, {% endif %}{% endfor %}],
-          _arrayQuestionIds: [{% for q in questions %}{% if q.type == 'multiple_select' %}'{{ q.id }}', {% endif %}{% endfor %}],
           _riskIds: [{% for risk in risks %}'{{ risk.id }}'{% if not loop.last %}, {% endif %}{% endfor %}],
           _likelihoods: {{ likelihoods_js }},
           _consequences: {{ consequences_js }},
@@ -110,25 +109,22 @@
             reader.readAsText(file);
           },
           importAnswers(event) {
-            const arrayIds = new Set(this._arrayQuestionIds);
             this._importJson(event, {
               format: 'riskformgen-answers',
               fileIdsKey: 'question_ids',
               currentIds: this._questionIds,
               label: 'answers',
               count: (data, ids) => {
-                let loaded = 0, skippedType = 0;
+                let loaded = 0;
                 for (const id of ids) {
                   if (!(id in data.answers)) continue;
-                  if (arrayIds.has(id) !== Array.isArray(data.answers[id])) { skippedType++; continue; }
                   loaded++;
                 }
-                return {loaded, skippedType};
+                return {loaded};
               },
               apply: (data, ids) => {
                 for (const id of ids) {
                   if (!(id in data.answers)) continue;
-                  if (arrayIds.has(id) !== Array.isArray(data.answers[id])) continue;
                   this.answers[id] = data.answers[id];
                 }
               },
@@ -185,6 +181,11 @@
               },
             });
           },
+          {% for prop in property_getters %}
+          get prop_{{ prop.id }}() {
+            {{ prop.js_body }}
+          },
+          {% endfor %}
           {% for ctrl in control_getters %}
           get ctrl_{{ ctrl.id }}() { return {{ ctrl.js }}; },
           {% endfor %}
@@ -248,6 +249,14 @@
         <div x-show="activeTab === 'debug'" class="debug-panel stack-md">
           <h3 class="title is-5">Current Answers</h3>
           <pre x-text="JSON.stringify(answers, null, 2)"></pre>
+          {% if property_getters %}
+          <h3 class="title is-5">Property States</h3>
+          <pre x-text="JSON.stringify({
+            {% for prop in property_getters %}
+            '{{ prop.id }}': prop_{{ prop.id }}{% if not loop.last %},{% endif %}
+            {% endfor %}
+          }, null, 2)"></pre>
+          {% endif %}
           {% if risks %}
           <h3 class="title is-5">Risk Levels</h3>
           <pre x-text="JSON.stringify({

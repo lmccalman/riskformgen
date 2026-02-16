@@ -5,26 +5,17 @@ from __future__ import annotations
 import pytest
 
 from models import (
-    All,
-    Any,
     AnyYesRule,
+    BinaryQuestion,
     ChoiceMapRule,
-    Contains,
     ContainsAnyRule,
     Control,
     ControlEffect,
     CountYesRule,
-    Equals,
-    FreeTextQuestion,
-    MultipleChoiceQuestion,
-    MultipleSelectQuestion,
-    Not,
     Property,
-    YesNoQuestion,
 )
 from parse import (
     _ensure_str,
-    parse_condition,
     parse_control,
     parse_control_effect,
     parse_property,
@@ -34,6 +25,7 @@ from parse import (
     parse_section,
     parse_subsection,
     validate_property_dag,
+    validate_question_properties,
 )
 
 # ---------------------------------------------------------------------------
@@ -61,149 +53,44 @@ class TestEnsureStr:
 
 
 # ---------------------------------------------------------------------------
-# parse_condition
-# ---------------------------------------------------------------------------
-
-
-class TestParseCondition:
-    def test_equals(self):
-        c = parse_condition({"equals": {"question_id": "q1", "value": "yes"}})
-        assert isinstance(c, Equals)
-        assert c.question_id == "q1"
-        assert c.value == "yes"
-
-    def test_equals_bool_value(self):
-        c = parse_condition({"equals": {"question_id": "q1", "value": True}})
-        assert isinstance(c, Equals)
-        assert c.value == "yes"
-
-    def test_contains(self):
-        c = parse_condition({"contains": {"question_id": "q1", "value": "opt"}})
-        assert isinstance(c, Contains)
-
-    def test_not(self):
-        c = parse_condition({"not": {"equals": {"question_id": "q1", "value": "no"}}})
-        assert isinstance(c, Not)
-        assert isinstance(c.condition, Equals)
-
-    def test_any(self):
-        c = parse_condition(
-            {
-                "any": [
-                    {"equals": {"question_id": "a", "value": "1"}},
-                    {"equals": {"question_id": "b", "value": "2"}},
-                ]
-            }
-        )
-        assert isinstance(c, Any)
-        assert len(c.conditions) == 2
-
-    def test_all(self):
-        c = parse_condition(
-            {
-                "all": [
-                    {"equals": {"question_id": "a", "value": "1"}},
-                    {"equals": {"question_id": "b", "value": "2"}},
-                ]
-            }
-        )
-        assert isinstance(c, All)
-        assert len(c.conditions) == 2
-
-    def test_nested_any_containing_all(self):
-        c = parse_condition(
-            {
-                "any": [
-                    {
-                        "all": [
-                            {"equals": {"question_id": "a", "value": "1"}},
-                            {"equals": {"question_id": "b", "value": "2"}},
-                        ]
-                    },
-                    {"equals": {"question_id": "c", "value": "3"}},
-                ]
-            }
-        )
-        assert isinstance(c, Any)
-        assert isinstance(c.conditions[0], All)
-
-    def test_empty_dict_raises(self):
-        with pytest.raises(ValueError, match="exactly one key"):
-            parse_condition({})
-
-    def test_multiple_keys_raises(self):
-        with pytest.raises(ValueError, match="exactly one key"):
-            parse_condition({"equals": {}, "not": {}})
-
-    def test_unknown_key_raises(self):
-        with pytest.raises(ValueError, match="Unknown condition"):
-            parse_condition({"xor": {}})
-
-
-# ---------------------------------------------------------------------------
 # parse_question
 # ---------------------------------------------------------------------------
 
 
 class TestParseQuestion:
-    def test_yes_no(self):
-        q = parse_question({"type": "yes_no", "id": "q1", "text": "Risky?"})
-        assert isinstance(q, YesNoQuestion)
+    def test_binary(self):
+        q = parse_question(
+            {"type": "binary", "id": "q1", "text": "Risky?", "properties": ["p1", "p2"]}
+        )
+        assert isinstance(q, BinaryQuestion)
         assert q.id == "q1"
+        assert q.properties == ("p1", "p2")
 
-    def test_free_text(self):
-        q = parse_question({"type": "free_text", "id": "q2", "text": "Describe"})
-        assert isinstance(q, FreeTextQuestion)
-
-    def test_multiple_choice(self):
-        q = parse_question(
-            {
-                "type": "multiple_choice",
-                "id": "q3",
-                "text": "Pick",
-                "options": ["a", "b"],
-            }
-        )
-        assert isinstance(q, MultipleChoiceQuestion)
-        assert q.options == ("a", "b")
-
-    def test_multiple_select(self):
-        q = parse_question(
-            {
-                "type": "multiple_select",
-                "id": "q4",
-                "text": "Pick many",
-                "options": ["x", "y"],
-            }
-        )
-        assert isinstance(q, MultipleSelectQuestion)
+    def test_binary_no_properties(self):
+        q = parse_question({"type": "binary", "id": "q1", "text": "Q"})
+        assert isinstance(q, BinaryQuestion)
+        assert q.properties == ()
 
     def test_guidance(self):
         q = parse_question(
             {
-                "type": "yes_no",
+                "type": "binary",
                 "id": "q1",
                 "text": "Q",
+                "properties": ["p1"],
                 "guidance": "Some help text",
             }
         )
         assert q.guidance == "Some help text"
 
-    def test_visible_when(self):
-        q = parse_question(
-            {
-                "type": "yes_no",
-                "id": "q1",
-                "text": "Q",
-                "visible_when": {"equals": {"question_id": "q0", "value": "yes"}},
-            }
-        )
-        assert q.visible_when is not None
-        assert isinstance(q.visible_when, Equals)
-
     def test_unknown_type_raises(self):
         with pytest.raises(ValueError, match="Unknown question type"):
             parse_question({"type": "slider", "id": "q1", "text": "Q"})
+
+    def test_old_types_raise(self):
+        for old_type in ["yes_no", "free_text", "multiple_choice", "multiple_select"]:
+            with pytest.raises(ValueError, match="Unknown question type"):
+                parse_question({"type": old_type, "id": "q1", "text": "Q"})
 
 
 # ---------------------------------------------------------------------------
@@ -289,26 +176,12 @@ class TestParseSubsection:
                 "title": "Basics",
                 "description": "Basic stuff",
                 "questions": [
-                    {"type": "yes_no", "id": "q1", "text": "Q1"},
+                    {"type": "binary", "id": "q1", "text": "Q1", "properties": ["p1"]},
                 ],
             }
         )
         assert sub.title == "Basics"
         assert len(sub.questions) == 1
-        assert sub.visible_when is None
-
-    def test_with_visible_when(self):
-        sub = parse_subsection(
-            {
-                "title": "Conditional",
-                "description": "Shows conditionally",
-                "questions": [
-                    {"type": "yes_no", "id": "q1", "text": "Q1"},
-                ],
-                "visible_when": {"equals": {"question_id": "q0", "value": "yes"}},
-            }
-        )
-        assert sub.visible_when is not None
 
 
 class TestParseSection:
@@ -323,8 +196,8 @@ class TestParseSection:
                         "title": "Sub A",
                         "description": "Sub A desc",
                         "questions": [
-                            {"type": "yes_no", "id": "q1", "text": "Q1"},
-                            {"type": "free_text", "id": "q2", "text": "Q2"},
+                            {"type": "binary", "id": "q1", "text": "Q1", "properties": ["p1"]},
+                            {"type": "binary", "id": "q2", "text": "Q2"},
                         ],
                     }
                 ],
@@ -415,7 +288,7 @@ class TestParseControl:
 
 
 # ---------------------------------------------------------------------------
-# parse_property / validate_property_dag
+# parse_property / validate_property_dag / validate_question_properties
 # ---------------------------------------------------------------------------
 
 
@@ -427,11 +300,23 @@ class TestParseProperty:
         assert isinstance(p, Property)
         assert p.id == "handles_pii"
         assert p.parents == ("handles_data",)
+        assert p.activation == "all"
 
     def test_without_parents(self):
         p = parse_property({"id": "handles_data", "description": "Handles data"})
         assert isinstance(p, Property)
         assert p.parents == ()
+
+    def test_any_activation(self):
+        p = parse_property(
+            {
+                "id": "flexible",
+                "description": "Flexible",
+                "parents": ["a", "b"],
+                "activation": "any",
+            }
+        )
+        assert p.activation == "any"
 
 
 class TestValidatePropertyDag:
@@ -472,3 +357,40 @@ class TestValidatePropertyDag:
         ]
         with pytest.raises(ValueError, match="cycle"):
             validate_property_dag(props)
+
+
+class TestValidateQuestionProperties:
+    def test_valid(self):
+        props = [Property(id="p1", description="P1")]
+        questions = [BinaryQuestion(id="q1", text="Q", properties=("p1",))]
+        validate_question_properties(questions, props)  # should not raise
+
+    def test_unknown_property_raises(self):
+        props = [Property(id="p1", description="P1")]
+        questions = [BinaryQuestion(id="q1", text="Q", properties=("p_missing",))]
+        with pytest.raises(ValueError, match="unknown property 'p_missing'"):
+            validate_question_properties(questions, props)
+
+    def test_duplicate_setter_raises(self):
+        props = [Property(id="p1", description="P1")]
+        questions = [
+            BinaryQuestion(id="q1", text="Q1", properties=("p1",)),
+            BinaryQuestion(id="q2", text="Q2", properties=("p1",)),
+        ]
+        with pytest.raises(ValueError, match="set by both"):
+            validate_question_properties(questions, props)
+
+    def test_no_setter_is_fine(self):
+        props = [Property(id="p1", description="P1")]
+        questions: list[BinaryQuestion] = []
+        validate_question_properties(questions, props)  # should not raise
+
+    def test_multiple_errors_reported(self):
+        props = [Property(id="p1", description="P1")]
+        questions = [
+            BinaryQuestion(id="q1", text="Q1", properties=("p_bad1",)),
+            BinaryQuestion(id="q2", text="Q2", properties=("p_bad2",)),
+        ]
+        with pytest.raises(ValueError, match="p_bad1") as exc_info:
+            validate_question_properties(questions, props)
+        assert "p_bad2" in str(exc_info.value)
