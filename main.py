@@ -2,7 +2,7 @@ import shutil
 
 import config
 from models import Control, Risk, Section, all_questions
-from parse import load_controls, load_risks, load_sections
+from parse import load_controls, load_properties, load_risks, load_sections, validate_property_dag
 from render import render_form
 
 
@@ -34,6 +34,8 @@ def main() -> None:
     sections = load_sections(config.form_dir / "sections.yaml")
     risks = load_risks(config.form_dir / "risks.yaml")
     controls = load_controls(config.form_dir / "controls.yaml")
+    properties = load_properties(config.form_dir / "properties.yaml")
+    validate_property_dag(properties)
     questions = all_questions(sections)
     ensure_output_dir()
     write_html(sections, risks, controls)
@@ -41,7 +43,8 @@ def main() -> None:
     copy_alpine()
     print(
         f"Built form with {len(sections)} sections, {len(questions)} questions,"
-        f" {len(risks)} risks and {len(controls)} controls"
+        f" {len(risks)} risks, {len(controls)} controls"
+        f" and {len(properties)} properties"
         f" in {config.output_dir.resolve()}/"
     )
 

@@ -19,6 +19,7 @@ from models import (
     MultipleChoiceQuestion,
     MultipleSelectQuestion,
     Not,
+    Property,
     YesNoQuestion,
 )
 from parse import (
@@ -26,11 +27,13 @@ from parse import (
     parse_condition,
     parse_control,
     parse_control_effect,
+    parse_property,
     parse_question,
     parse_risk,
     parse_rule,
     parse_section,
     parse_subsection,
+    validate_property_dag,
 )
 
 # ---------------------------------------------------------------------------
@@ -409,3 +412,63 @@ class TestParseControl:
         assert isinstance(ctrl, Control)
         assert ctrl.present_value == "yes"  # _ensure_str applied
         assert len(ctrl.effects) == 1
+
+
+# ---------------------------------------------------------------------------
+# parse_property / validate_property_dag
+# ---------------------------------------------------------------------------
+
+
+class TestParseProperty:
+    def test_with_parents(self):
+        p = parse_property(
+            {"id": "handles_pii", "description": "Handles PII", "parents": ["handles_data"]}
+        )
+        assert isinstance(p, Property)
+        assert p.id == "handles_pii"
+        assert p.parents == ("handles_data",)
+
+    def test_without_parents(self):
+        p = parse_property({"id": "handles_data", "description": "Handles data"})
+        assert isinstance(p, Property)
+        assert p.parents == ()
+
+
+class TestValidatePropertyDag:
+    def test_valid_dag(self):
+        props = [
+            Property(id="root", description="Root"),
+            Property(id="child", description="Child", parents=("root",)),
+            Property(id="grandchild", description="Grandchild", parents=("child",)),
+        ]
+        validate_property_dag(props)  # should not raise
+
+    def test_duplicate_id_raises(self):
+        props = [
+            Property(id="a", description="First"),
+            Property(id="a", description="Second"),
+        ]
+        with pytest.raises(ValueError, match="Duplicate property ID"):
+            validate_property_dag(props)
+
+    def test_unknown_parent_raises(self):
+        props = [
+            Property(id="child", description="Child", parents=("missing",)),
+        ]
+        with pytest.raises(ValueError, match="unknown parent"):
+            validate_property_dag(props)
+
+    def test_cycle_raises(self):
+        props = [
+            Property(id="a", description="A", parents=("b",)),
+            Property(id="b", description="B", parents=("a",)),
+        ]
+        with pytest.raises(ValueError, match="cycle"):
+            validate_property_dag(props)
+
+    def test_self_cycle_raises(self):
+        props = [
+            Property(id="a", description="A", parents=("a",)),
+        ]
+        with pytest.raises(ValueError, match="cycle"):
+            validate_property_dag(props)

@@ -312,3 +312,17 @@ class Control:
             f" ? this.answers[{qid}].includes({val})"
             f" : this.answers[{qid}] === {val}"
         )
+
+
+# ---------------------------------------------------------------------------
+# Properties
+# ---------------------------------------------------------------------------
+
+
+@dataclass(frozen=True)
+class Property:
+    """A boolean property node in a DAG. Parents must hold when this property does."""
+
+    id: str
+    description: str
+    parents: tuple[str, ...] = ()

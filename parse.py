@@ -22,6 +22,7 @@ from models import (
     MultipleChoiceQuestion,
     MultipleSelectQuestion,
     Not,
+    Property,
     Risk,
     Section,
     SubSection,
@@ -228,3 +229,64 @@ def load_controls(path: Path) -> list[Control]:
     """Load controls from a YAML file."""
     data = yaml.safe_load(path.read_text())
     return [parse_control(c) for c in data]
+
+
+# ---------------------------------------------------------------------------
+# Properties
+# ---------------------------------------------------------------------------
+
+
+def parse_property(data: YamlDict) -> Property:
+    """Parse a property dict into a Property dataclass."""
+    return Property(
+        id=data["id"],
+        description=data["description"],
+        parents=tuple(data.get("parents", [])),
+    )
+
+
+def load_properties(path: Path) -> list[Property]:
+    """Load properties from a YAML file."""
+    data = yaml.safe_load(path.read_text())
+    return [parse_property(p) for p in data]
+
+
+def validate_property_dag(properties: list[Property]) -> None:
+    """Validate properties form a valid DAG: no duplicate IDs, all parents exist, no cycles."""
+    ids = [p.id for p in properties]
+
+    # Check for duplicate IDs
+    seen: set[str] = set()
+    for pid in ids:
+        if pid in seen:
+            raise ValueError(f"Duplicate property ID: {pid!r}")
+        seen.add(pid)
+
+    # Check all parent references resolve
+    id_set = set(ids)
+    for p in properties:
+        for parent in p.parents:
+            if parent not in id_set:
+                raise ValueError(f"Property {p.id!r} references unknown parent {parent!r}")
+
+    # Cycle detection via Kahn's algorithm (topological sort)
+    # Edges point child→parent, so in-degree counts how many children point to a node
+    in_degree: dict[str, int] = {pid: 0 for pid in ids}
+    children: dict[str, list[str]] = {pid: [] for pid in ids}
+    for p in properties:
+        for parent in p.parents:
+            in_degree[p.id] += 1
+            children[parent].append(p.id)
+
+    queue = [pid for pid, deg in in_degree.items() if deg == 0]
+    visited = 0
+    while queue:
+        node = queue.pop()
+        visited += 1
+        for child in children[node]:
+            in_degree[child] -= 1
+            if in_degree[child] == 0:
+                queue.append(child)
+
+    if visited != len(ids):
+        raise ValueError("Property DAG contains a cycle")
