@@ -5,27 +5,28 @@ from __future__ import annotations
 import pytest
 
 from models import (
-    AnyYesRule,
     BinaryQuestion,
-    ChoiceMapRule,
-    ContainsAnyRule,
+    ConditionMapping,
     Control,
     ControlEffect,
-    CountYesRule,
     Property,
+    Risk,
 )
 from parse import (
     _ensure_str,
+    parse_condition_mapping,
     parse_control,
     parse_control_effect,
     parse_property,
     parse_question,
     parse_risk,
-    parse_rule,
     parse_section,
     parse_subsection,
+    validate_control_properties,
+    validate_control_risk_ids,
     validate_property_dag,
     validate_question_properties,
+    validate_risk_properties,
 )
 
 # ---------------------------------------------------------------------------
@@ -94,74 +95,72 @@ class TestParseQuestion:
 
 
 # ---------------------------------------------------------------------------
-# parse_rule
+# parse_condition_mapping / parse_risk
 # ---------------------------------------------------------------------------
 
 
-class TestParseRule:
-    def test_any_yes(self):
-        r = parse_rule(
+class TestParseConditionMapping:
+    def test_basic(self):
+        cond = parse_condition_mapping(
             {
-                "type": "any_yes",
-                "question_ids": ["q1", "q2"],
+                "properties": ["p1", "p2"],
+                "mode": "any",
                 "likelihood": "likely",
-            }
-        )
-        assert isinstance(r, AnyYesRule)
-        assert r.question_ids == ("q1", "q2")
-        assert r.likelihood == "likely"
-        assert r.consequence is None
-
-    def test_count_yes(self):
-        r = parse_rule(
-            {
-                "type": "count_yes",
-                "question_ids": ["q1"],
-                "threshold": 1,
                 "consequence": "major",
             }
         )
-        assert isinstance(r, CountYesRule)
-        assert r.threshold == 1
+        assert isinstance(cond, ConditionMapping)
+        assert cond.properties == ("p1", "p2")
+        assert cond.mode == "any"
+        assert cond.likelihood == "likely"
+        assert cond.consequence == "major"
 
-    def test_choice_map(self):
-        r = parse_rule(
+    def test_mode_defaults_to_all(self):
+        cond = parse_condition_mapping(
+            {"properties": ["p1"], "likelihood": "rare", "consequence": "minor"}
+        )
+        assert cond.mode == "all"
+
+
+class TestParseRisk:
+    def test_happy_path(self):
+        r = parse_risk(
             {
-                "type": "choice_map",
-                "question_id": "q1",
-                "mapping": {"a": {"likelihood": "rare"}},
+                "id": "r1",
+                "description": "Data breach risk",
+                "conditions": [
+                    {
+                        "properties": ["p1"],
+                        "mode": "all",
+                        "likelihood": "likely",
+                        "consequence": "major",
+                    }
+                ],
             }
         )
-        assert isinstance(r, ChoiceMapRule)
+        assert isinstance(r, Risk)
+        assert r.id == "r1"
+        assert r.description == "Data breach risk"
+        assert len(r.conditions) == 1
 
-    def test_contains_any(self):
-        r = parse_rule(
+    def test_multiple_conditions(self):
+        r = parse_risk(
             {
-                "type": "contains_any",
-                "question_id": "q1",
-                "values": ["a", "b"],
-                "likelihood": "possible",
+                "id": "r1",
+                "description": "D",
+                "conditions": [
+                    {"properties": ["p1"], "likelihood": "likely", "consequence": "major"},
+                    {
+                        "properties": ["p2", "p3"],
+                        "mode": "any",
+                        "likelihood": "rare",
+                        "consequence": "minor",
+                    },
+                ],
             }
         )
-        assert isinstance(r, ContainsAnyRule)
-        assert r.values == ("a", "b")
-
-    def test_contains_any_bool_values(self):
-        """YAML parses bare `true`/`false` as bools — _ensure_str should fix."""
-        r = parse_rule(
-            {
-                "type": "contains_any",
-                "question_id": "q1",
-                "values": [True, False],
-                "likelihood": "possible",
-            }
-        )
-        assert isinstance(r, ContainsAnyRule)
-        assert r.values == ("yes", "no")
-
-    def test_unknown_type_raises(self):
-        with pytest.raises(ValueError, match="Unknown rule type"):
-            parse_rule({"type": "magic", "question_id": "q1"})
+        assert len(r.conditions) == 2
+        assert r.conditions[1].mode == "any"
 
 
 # ---------------------------------------------------------------------------
@@ -209,41 +208,8 @@ class TestParseSection:
 
 
 # ---------------------------------------------------------------------------
-# parse_risk / parse_control
+# parse_control
 # ---------------------------------------------------------------------------
-
-
-class TestParseRisk:
-    def test_happy_path(self):
-        r = parse_risk(
-            {
-                "id": "r1",
-                "name": "Breach",
-                "description": "Data breach risk",
-                "rules": [
-                    {"type": "any_yes", "question_ids": ["q1"], "likelihood": "likely"},
-                ],
-            }
-        )
-        assert r.id == "r1"
-        assert r.default_likelihood == "rare"  # default
-        assert r.default_consequence == "minor"  # default
-
-    def test_custom_defaults(self):
-        r = parse_risk(
-            {
-                "id": "r1",
-                "name": "R",
-                "description": "D",
-                "rules": [
-                    {"type": "any_yes", "question_ids": ["q1"], "consequence": "major"},
-                ],
-                "default_likelihood": "possible",
-                "default_consequence": "major",
-            }
-        )
-        assert r.default_likelihood == "possible"
-        assert r.default_consequence == "major"
 
 
 class TestParseControlEffect:
@@ -274,16 +240,16 @@ class TestParseControl:
         ctrl = parse_control(
             {
                 "id": "c1",
-                "name": "Encryption",
-                "question_id": "q1",
-                "present_value": True,
+                "description": "Encryption enabled",
+                "property": "encrypted",
                 "effects": [
                     {"risk_id": "r1", "reduces_likelihood": True},
                 ],
             }
         )
         assert isinstance(ctrl, Control)
-        assert ctrl.present_value == "yes"  # _ensure_str applied
+        assert ctrl.description == "Encryption enabled"
+        assert ctrl.property == "encrypted"
         assert len(ctrl.effects) == 1
 
 
@@ -394,3 +360,170 @@ class TestValidateQuestionProperties:
         with pytest.raises(ValueError, match="p_bad1") as exc_info:
             validate_question_properties(questions, props)
         assert "p_bad2" in str(exc_info.value)
+
+
+# ---------------------------------------------------------------------------
+# validate_risk_properties
+# ---------------------------------------------------------------------------
+
+
+class TestValidateRiskProperties:
+    def test_valid(self):
+        props = [Property(id="p1", description="P1")]
+        risks = [
+            Risk(
+                id="r1",
+                description="D",
+                conditions=(
+                    ConditionMapping(
+                        properties=("p1",), mode="all", likelihood="rare", consequence="minor"
+                    ),
+                ),
+            )
+        ]
+        validate_risk_properties(risks, props)  # should not raise
+
+    def test_unknown_property_raises(self):
+        props = [Property(id="p1", description="P1")]
+        risks = [
+            Risk(
+                id="r1",
+                description="D",
+                conditions=(
+                    ConditionMapping(
+                        properties=("p_missing",),
+                        mode="all",
+                        likelihood="rare",
+                        consequence="minor",
+                    ),
+                ),
+            )
+        ]
+        with pytest.raises(ValueError, match="unknown property 'p_missing'"):
+            validate_risk_properties(risks, props)
+
+    def test_multiple_errors_reported(self):
+        props = [Property(id="p1", description="P1")]
+        risks = [
+            Risk(
+                id="r1",
+                description="D",
+                conditions=(
+                    ConditionMapping(
+                        properties=("bad1",), mode="all", likelihood="rare", consequence="minor"
+                    ),
+                    ConditionMapping(
+                        properties=("bad2",), mode="all", likelihood="rare", consequence="minor"
+                    ),
+                ),
+            )
+        ]
+        with pytest.raises(ValueError, match="bad1") as exc_info:
+            validate_risk_properties(risks, props)
+        assert "bad2" in str(exc_info.value)
+
+
+# ---------------------------------------------------------------------------
+# validate_control_properties / validate_control_risk_ids
+# ---------------------------------------------------------------------------
+
+
+class TestValidateControlProperties:
+    def test_valid(self):
+        props = [Property(id="p1", description="P1")]
+        controls = [
+            Control(
+                id="c1",
+                description="C",
+                property="p1",
+                effects=(ControlEffect(risk_id="r1", reduces_likelihood=True),),
+            )
+        ]
+        validate_control_properties(controls, props)  # should not raise
+
+    def test_unknown_property_raises(self):
+        props = [Property(id="p1", description="P1")]
+        controls = [
+            Control(
+                id="c1",
+                description="C",
+                property="p_missing",
+                effects=(ControlEffect(risk_id="r1", reduces_likelihood=True),),
+            )
+        ]
+        with pytest.raises(ValueError, match="unknown property 'p_missing'"):
+            validate_control_properties(controls, props)
+
+    def test_multiple_errors_reported(self):
+        props = [Property(id="p1", description="P1")]
+        controls = [
+            Control(
+                id="c1",
+                description="C1",
+                property="bad1",
+                effects=(ControlEffect(risk_id="r1", reduces_likelihood=True),),
+            ),
+            Control(
+                id="c2",
+                description="C2",
+                property="bad2",
+                effects=(ControlEffect(risk_id="r1", reduces_likelihood=True),),
+            ),
+        ]
+        with pytest.raises(ValueError, match="bad1") as exc_info:
+            validate_control_properties(controls, props)
+        assert "bad2" in str(exc_info.value)
+
+    def test_empty_controls_pass(self):
+        props = [Property(id="p1", description="P1")]
+        validate_control_properties([], props)  # should not raise
+
+
+class TestValidateControlRiskIds:
+    def test_valid(self):
+        risks = [
+            Risk(
+                id="r1",
+                description="D",
+                conditions=(
+                    ConditionMapping(
+                        properties=("p1",), mode="all", likelihood="rare", consequence="minor"
+                    ),
+                ),
+            )
+        ]
+        controls = [
+            Control(
+                id="c1",
+                description="C",
+                property="p1",
+                effects=(ControlEffect(risk_id="r1", reduces_likelihood=True),),
+            )
+        ]
+        validate_control_risk_ids(controls, risks)  # should not raise
+
+    def test_unknown_risk_raises(self):
+        risks = [
+            Risk(
+                id="r1",
+                description="D",
+                conditions=(
+                    ConditionMapping(
+                        properties=("p1",), mode="all", likelihood="rare", consequence="minor"
+                    ),
+                ),
+            )
+        ]
+        controls = [
+            Control(
+                id="c1",
+                description="C",
+                property="p1",
+                effects=(ControlEffect(risk_id="r_missing", reduces_likelihood=True),),
+            )
+        ]
+        with pytest.raises(ValueError, match="unknown risk 'r_missing'"):
+            validate_control_risk_ids(controls, risks)
+
+    def test_empty_controls_pass(self):
+        validate_control_risk_ids([], [])  # should not raise

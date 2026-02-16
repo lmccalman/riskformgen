@@ -9,13 +9,10 @@ from typing import Any
 import yaml
 
 from models import (
-    AnyYesRule,
     BinaryQuestion,
-    ChoiceMapRule,
-    ContainsAnyRule,
+    ConditionMapping,
     Control,
     ControlEffect,
-    CountYesRule,
     Property,
     Question,
     Risk,
@@ -81,57 +78,27 @@ def parse_section(data: YamlDict) -> Section:
 
 
 # ---------------------------------------------------------------------------
-# Risk rules
+# Risks
 # ---------------------------------------------------------------------------
 
 
-def parse_rule(data: YamlDict) -> AnyYesRule | CountYesRule | ChoiceMapRule | ContainsAnyRule:
-    """Parse a rule dict into a RiskRule dataclass, dispatching on 'type'."""
-    rtype = data["type"]
-
-    match rtype:
-        case "any_yes":
-            return AnyYesRule(
-                question_ids=tuple(data["question_ids"]),
-                likelihood=data.get("likelihood"),
-                consequence=data.get("consequence"),
-            )
-        case "count_yes":
-            return CountYesRule(
-                question_ids=tuple(data["question_ids"]),
-                threshold=data["threshold"],
-                likelihood=data.get("likelihood"),
-                consequence=data.get("consequence"),
-            )
-        case "choice_map":
-            return ChoiceMapRule(
-                question_id=data["question_id"],
-                mapping=data["mapping"],
-            )
-        case "contains_any":
-            return ContainsAnyRule(
-                question_id=data["question_id"],
-                values=tuple(_ensure_str(v) for v in data["values"]),
-                likelihood=data.get("likelihood"),
-                consequence=data.get("consequence"),
-            )
-        case _:
-            raise ValueError(f"Unknown rule type: {rtype!r}")
+def parse_condition_mapping(data: YamlDict) -> ConditionMapping:
+    """Parse a condition mapping dict into a ConditionMapping dataclass."""
+    return ConditionMapping(
+        properties=tuple(data["properties"]),
+        mode=data.get("mode", "all"),
+        likelihood=data["likelihood"],
+        consequence=data["consequence"],
+    )
 
 
 def parse_risk(data: YamlDict) -> Risk:
     """Parse a risk dict into a Risk dataclass."""
-    kwargs: dict[str, Any] = {
-        "id": data["id"],
-        "name": data["name"],
-        "description": data["description"],
-        "rules": tuple(parse_rule(r) for r in data["rules"]),
-    }
-    if "default_likelihood" in data:
-        kwargs["default_likelihood"] = data["default_likelihood"]
-    if "default_consequence" in data:
-        kwargs["default_consequence"] = data["default_consequence"]
-    return Risk(**kwargs)
+    return Risk(
+        id=data["id"],
+        description=data["description"],
+        conditions=tuple(parse_condition_mapping(c) for c in data["conditions"]),
+    )
 
 
 # ---------------------------------------------------------------------------
@@ -152,9 +119,8 @@ def parse_control(data: YamlDict) -> Control:
     """Parse a control dict into a Control dataclass."""
     return Control(
         id=data["id"],
-        name=data["name"],
-        question_id=data["question_id"],
-        present_value=_ensure_str(data["present_value"]),
+        description=data["description"],
+        property=data["property"],
         effects=tuple(parse_control_effect(e) for e in data["effects"]),
     )
 
@@ -268,3 +234,43 @@ def validate_question_properties(
 
     if errors:
         raise ValueError("Invalid question→property references:\n  " + "\n  ".join(errors))
+
+
+def validate_risk_properties(risks: list[Risk], properties: list[Property]) -> None:
+    """Validate all property references in risk conditions exist."""
+    prop_ids = {p.id for p in properties}
+    errors: list[str] = []
+    for risk in risks:
+        for cond in risk.conditions:
+            for pid in cond.properties:
+                if pid not in prop_ids:
+                    errors.append(
+                        f"Risk {risk.id!r} condition references unknown property {pid!r}"
+                    )
+    if errors:
+        raise ValueError("Invalid risk→property references:\n  " + "\n  ".join(errors))
+
+
+def validate_control_properties(controls: list[Control], properties: list[Property]) -> None:
+    """Validate all control→property references exist."""
+    prop_ids = {p.id for p in properties}
+    errors: list[str] = []
+    for ctrl in controls:
+        if ctrl.property not in prop_ids:
+            errors.append(f"Control {ctrl.id!r} references unknown property {ctrl.property!r}")
+    if errors:
+        raise ValueError("Invalid control→property references:\n  " + "\n  ".join(errors))
+
+
+def validate_control_risk_ids(controls: list[Control], risks: list[Risk]) -> None:
+    """Validate all control effect→risk references exist."""
+    risk_ids = {r.id for r in risks}
+    errors: list[str] = []
+    for ctrl in controls:
+        for effect in ctrl.effects:
+            if effect.risk_id not in risk_ids:
+                errors.append(
+                    f"Control {ctrl.id!r} effect references unknown risk {effect.risk_id!r}"
+                )
+    if errors:
+        raise ValueError("Invalid control→risk references:\n  " + "\n  ".join(errors))

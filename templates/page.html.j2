@@ -196,10 +196,9 @@
               ({{ js }}),
               {% endfor %}
             ].filter(r => r !== null);
-            const likelihood = this._worst(results, 'likelihood', this._likelihoods)
-              || '{{ risk.default_likelihood }}';
-            const consequence = this._worst(results, 'consequence', this._consequences)
-              || '{{ risk.default_consequence }}';
+            if (results.length === 0) return {likelihood: 'n/a', consequence: 'n/a', level: 'not_applicable'};
+            const likelihood = this._worst(results, 'likelihood', this._likelihoods);
+            const consequence = this._worst(results, 'consequence', this._consequences);
             return {
               likelihood, consequence,
               level: (this._risk_matrix[likelihood] || {})[consequence] || 'not_applicable'

@@ -57,122 +57,34 @@ def all_questions(sections: Sequence[Section]) -> list[Question]:
 # ---------------------------------------------------------------------------
 
 
-def _js_ids(ids: tuple[str, ...]) -> str:
-    """Format a tuple of IDs as a JS array literal."""
-    return json.dumps(list(ids))
-
-
-def _js_result(likelihood: str | None, consequence: str | None) -> str:
+def _js_result(likelihood: str, consequence: str) -> str:
     """Build a JS object literal string for a {likelihood, consequence} result."""
-    lk = json.dumps(likelihood) if likelihood is not None else "null"
-    cq = json.dumps(consequence) if consequence is not None else "null"
-    return f"{{likelihood: {lk}, consequence: {cq}}}"
+    return f"{{likelihood: {json.dumps(likelihood)}, consequence: {json.dumps(consequence)}}}"
 
 
 @dataclass(frozen=True)
-class AnyYesRule:
-    """Returns {likelihood, consequence} if any of the given yes/no questions are 'yes'."""
+class ConditionMapping:
+    """Maps a set of properties to a {likelihood, consequence} result."""
 
-    question_ids: tuple[str, ...]
-    likelihood: str | None = None
-    consequence: str | None = None
-
-    def __post_init__(self) -> None:
-        if self.likelihood is None and self.consequence is None:
-            raise ValueError("AnyYesRule requires at least one of likelihood or consequence")
+    properties: tuple[str, ...]
+    mode: str  # "any" or "all"
+    likelihood: str
+    consequence: str
 
     def to_js(self) -> str:
-        ids = _js_ids(self.question_ids)
+        props = ", ".join(f"this.prop_{pid}" for pid in self.properties)
+        check = "some" if self.mode == "any" else "every"
         result = _js_result(self.likelihood, self.consequence)
-        return f"{ids}.some(id => this.answers[id] === 'yes') ? {result} : null"
-
-    def referenced_question_ids(self) -> tuple[str, ...]:
-        return self.question_ids
-
-
-@dataclass(frozen=True)
-class CountYesRule:
-    """Returns {likelihood, consequence} if at least *threshold* yes/no questions are 'yes'."""
-
-    question_ids: tuple[str, ...]
-    threshold: int
-    likelihood: str | None = None
-    consequence: str | None = None
-
-    def __post_init__(self) -> None:
-        if self.likelihood is None and self.consequence is None:
-            raise ValueError("CountYesRule requires at least one of likelihood or consequence")
-
-    def to_js(self) -> str:
-        ids = _js_ids(self.question_ids)
-        result = _js_result(self.likelihood, self.consequence)
-        return (
-            f"{ids}.filter(id => this.answers[id] === 'yes').length >= {self.threshold}"
-            f" ? {result} : null"
-        )
-
-    def referenced_question_ids(self) -> tuple[str, ...]:
-        return self.question_ids
-
-
-@dataclass(frozen=True)
-class ChoiceMapRule:
-    """Maps a multiple-choice answer to {likelihood, consequence} via a lookup dict."""
-
-    question_id: str
-    mapping: dict[str, dict[str, str]]
-
-    def to_js(self) -> str:
-        # Normalise each entry so both keys are always present (missing → null)
-        normalised = {
-            answer: {
-                "likelihood": dims.get("likelihood"),
-                "consequence": dims.get("consequence"),
-            }
-            for answer, dims in self.mapping.items()
-        }
-        return f"{json.dumps(normalised)}[this.answers[{json.dumps(self.question_id)}]] || null"
-
-    def referenced_question_ids(self) -> tuple[str, ...]:
-        return (self.question_id,)
-
-
-@dataclass(frozen=True)
-class ContainsAnyRule:
-    """Returns {likelihood, consequence} if a multi-select answer contains any of *values*."""
-
-    question_id: str
-    values: tuple[str, ...]
-    likelihood: str | None = None
-    consequence: str | None = None
-
-    def __post_init__(self) -> None:
-        if self.likelihood is None and self.consequence is None:
-            raise ValueError("ContainsAnyRule requires at least one of likelihood or consequence")
-
-    def to_js(self) -> str:
-        vals = json.dumps(list(self.values))
-        qid = json.dumps(self.question_id)
-        result = _js_result(self.likelihood, self.consequence)
-        return f"{vals}.some(v => (this.answers[{qid}] || []).includes(v)) ? {result} : null"
-
-    def referenced_question_ids(self) -> tuple[str, ...]:
-        return (self.question_id,)
-
-
-RiskRule = AnyYesRule | CountYesRule | ChoiceMapRule | ContainsAnyRule
+        return f"[{props}].{check}(p => p === true) ? {result} : null"
 
 
 @dataclass(frozen=True)
 class Risk:
-    """A named risk whose level is derived from rules applied to form answers."""
+    """A risk whose level is derived from property-based conditions."""
 
     id: str
-    name: str
     description: str
-    rules: tuple[RiskRule, ...]
-    default_likelihood: str = "rare"
-    default_consequence: str = "minor"
+    conditions: tuple[ConditionMapping, ...]
 
 
 # ---------------------------------------------------------------------------
@@ -197,23 +109,12 @@ class ControlEffect:
 
 @dataclass(frozen=True)
 class Control:
-    """A safeguard whose presence is determined by a question answer."""
+    """A safeguard whose presence is determined by a property."""
 
     id: str
-    name: str
-    question_id: str
-    present_value: str
+    description: str
+    property: str
     effects: tuple[ControlEffect, ...]
-
-    def presence_js(self) -> str:
-        """JS expression evaluating to true/false for control presence."""
-        qid = json.dumps(self.question_id)
-        val = json.dumps(self.present_value)
-        return (
-            f"Array.isArray(this.answers[{qid}])"
-            f" ? this.answers[{qid}].includes({val})"
-            f" : this.answers[{qid}] === {val}"
-        )
 
 
 # ---------------------------------------------------------------------------

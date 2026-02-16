@@ -5,8 +5,8 @@ from __future__ import annotations
 import pytest
 
 from models import (
-    AnyYesRule,
     BinaryQuestion,
+    ConditionMapping,
     Control,
     ControlEffect,
     Property,
@@ -23,7 +23,6 @@ from render import (
     prepare_risks,
     prepare_sections,
     render_form,
-    validate_question_ids,
 )
 
 # ---------------------------------------------------------------------------
@@ -209,50 +208,41 @@ class TestPrepareSections:
 
 class TestPrepareRisks:
     def test_output_structure(self):
-        q = BinaryQuestion(id="q1", text="Risky?", properties=())
         risk = Risk(
             id="r1",
-            name="R",
             description="D",
-            rules=(AnyYesRule(question_ids=("q1",), likelihood="likely"),),
+            conditions=(
+                ConditionMapping(
+                    properties=("p1",), mode="all", likelihood="likely", consequence="major"
+                ),
+            ),
         )
-        result = prepare_risks([risk], [q])
+        result = prepare_risks([risk])
         assert len(result) == 1
         r = result[0]
         assert r["id"] == "r1"
+        assert r["description"] == "D"
         assert "rules_js" in r
         assert len(r["rules_js"]) == 1
-        assert "questions" in r
-        assert r["questions"][0]["id"] == "q1"
-        assert r["questions"][0]["text"] == "Risky?"
 
-    def test_question_ids_deduplicated(self):
-        q = BinaryQuestion(id="q1", text="Q", properties=())
+    def test_multiple_conditions(self):
         risk = Risk(
             id="r1",
-            name="R",
             description="D",
-            rules=(
-                AnyYesRule(question_ids=("q1",), likelihood="likely"),
-                AnyYesRule(question_ids=("q1",), consequence="major"),
+            conditions=(
+                ConditionMapping(
+                    properties=("p1",), mode="all", likelihood="likely", consequence="major"
+                ),
+                ConditionMapping(
+                    properties=("p2",), mode="any", likelihood="rare", consequence="minor"
+                ),
             ),
         )
-        result = prepare_risks([risk], [q])
-        assert len(result[0]["questions"]) == 1
+        result = prepare_risks([risk])
+        assert len(result[0]["rules_js"]) == 2
 
-    def test_defaults_passed_through(self):
-        q = BinaryQuestion(id="q1", text="Q", properties=())
-        risk = Risk(
-            id="r1",
-            name="R",
-            description="D",
-            rules=(AnyYesRule(question_ids=("q1",), likelihood="likely"),),
-            default_likelihood="possible",
-            default_consequence="major",
-        )
-        result = prepare_risks([risk], [q])
-        assert result[0]["default_likelihood"] == "possible"
-        assert result[0]["default_consequence"] == "major"
+    def test_empty(self):
+        assert prepare_risks([]) == []
 
 
 # ---------------------------------------------------------------------------
@@ -262,14 +252,14 @@ class TestPrepareRisks:
 
 class TestPrepareControls:
     def test_control_getters(self, sample_control):
-        risk_dicts = [{"id": "r1", "name": "R"}]
+        risk_dicts = [{"id": "r1", "description": "R"}]
         getters = prepare_controls([sample_control], risk_dicts)
         assert len(getters) == 1
         assert getters[0]["id"] == "ctrl1"
         assert "js" in getters[0]
 
     def test_effects_grouped_by_risk(self, sample_control):
-        risk_dicts: list[dict] = [{"id": "r1", "name": "R"}]
+        risk_dicts: list[dict] = [{"id": "r1", "description": "R"}]
         prepare_controls([sample_control], risk_dicts)
         assert len(risk_dicts[0]["controls"]) == 1
         assert risk_dicts[0]["controls"][0]["id"] == "ctrl1"
@@ -278,18 +268,17 @@ class TestPrepareControls:
     def test_missing_risk_skipped(self):
         ctrl = Control(
             id="c1",
-            name="C",
-            question_id="q1",
-            present_value="yes",
+            description="C",
+            property="p1",
             effects=(ControlEffect(risk_id="nonexistent", reduces_likelihood=True),),
         )
-        risk_dicts = [{"id": "r1", "name": "R"}]
+        risk_dicts = [{"id": "r1", "description": "R"}]
         getters = prepare_controls([ctrl], risk_dicts)
         assert len(getters) == 1
         assert risk_dicts[0]["controls"] == []
 
     def test_empty_controls(self):
-        risk_dicts = [{"id": "r1", "name": "R"}]
+        risk_dicts = [{"id": "r1", "description": "R"}]
         getters = prepare_controls([], risk_dicts)
         assert getters == []
         assert risk_dicts[0]["controls"] == []
@@ -320,16 +309,39 @@ class TestRenderForm:
         assert "prop_prop_a" in html
         assert "prop_prop_b" in html
 
-    def test_with_controls(self, sample_sections, sample_control, sample_properties):
-        q = all_questions(sample_sections)
+    def test_with_risks(self, sample_sections, sample_properties):
         risk = Risk(
             id="r1",
-            name="R",
+            description="Test risk",
+            conditions=(
+                ConditionMapping(
+                    properties=("prop_a",),
+                    mode="all",
+                    likelihood="likely",
+                    consequence="major",
+                ),
+            ),
+        )
+        html = render_form(sample_sections, [risk], properties=sample_properties)
+        assert "r1" in html
+        assert "Test risk" in html
+
+    def test_with_controls(self, sample_sections, sample_control, sample_properties):
+        risk = Risk(
+            id="r1",
             description="D",
-            rules=(AnyYesRule(question_ids=(q[0].id,), likelihood="likely"),),
+            conditions=(
+                ConditionMapping(
+                    properties=("prop_a",),
+                    mode="all",
+                    likelihood="likely",
+                    consequence="major",
+                ),
+            ),
         )
         html = render_form(sample_sections, [risk], [sample_control], sample_properties)
         assert "Encryption enabled" in html
+        assert "this.prop_prop_a === true" in html
 
 
 # ---------------------------------------------------------------------------
@@ -392,69 +404,3 @@ class TestRenderFormSaveLoad:
     def test_hidden_file_inputs_present(self, binary_html):
         assert 'type="file"' in binary_html
         assert 'accept=".json"' in binary_html
-
-
-# ---------------------------------------------------------------------------
-# validate_question_ids
-# ---------------------------------------------------------------------------
-
-
-class TestValidateQuestionIds:
-    def test_valid_ids_pass(self):
-        q = BinaryQuestion(id="q1", text="Q", properties=())
-        risk = Risk(
-            id="r1",
-            name="R",
-            description="D",
-            rules=(AnyYesRule(question_ids=("q1",), likelihood="likely"),),
-        )
-        ctrl = Control(
-            id="c1",
-            name="C",
-            question_id="q1",
-            present_value="yes",
-            effects=(ControlEffect(risk_id="r1", reduces_likelihood=True),),
-        )
-        validate_question_ids([q], [risk], [ctrl])  # should not raise
-
-    def test_invalid_risk_rule_question_id(self):
-        q = BinaryQuestion(id="q1", text="Q", properties=())
-        risk = Risk(
-            id="r1",
-            name="R",
-            description="D",
-            rules=(AnyYesRule(question_ids=("q_typo",), likelihood="likely"),),
-        )
-        with pytest.raises(ValueError, match="unknown question 'q_typo'"):
-            validate_question_ids([q], [risk], [])
-
-    def test_invalid_control_question_id(self):
-        q = BinaryQuestion(id="q1", text="Q", properties=())
-        ctrl = Control(
-            id="c1",
-            name="C",
-            question_id="q_typo",
-            present_value="yes",
-            effects=(ControlEffect(risk_id="r1", reduces_likelihood=True),),
-        )
-        with pytest.raises(ValueError, match="unknown question 'q_typo'"):
-            validate_question_ids([q], [], [ctrl])
-
-    def test_multiple_errors_reported(self):
-        q = BinaryQuestion(id="q1", text="Q", properties=())
-        risk = Risk(
-            id="r1",
-            name="R",
-            description="D",
-            rules=(AnyYesRule(question_ids=("bad1",), likelihood="likely"),),
-        )
-        ctrl = Control(
-            id="c1",
-            name="C",
-            question_id="bad2",
-            present_value="yes",
-            effects=(ControlEffect(risk_id="r1", reduces_likelihood=True),),
-        )
-        with pytest.raises(ValueError, match="bad1") as exc_info:
-            validate_question_ids([q], [risk], [ctrl])
-        assert "bad2" in str(exc_info.value)

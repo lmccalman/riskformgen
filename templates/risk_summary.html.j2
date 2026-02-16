@@ -1,7 +1,7 @@
 <div class="card mb-4">
   {# ── Header ── #}
   <header class="card-header">
-    <p class="card-header-title">{{ risk.name }}</p>
+    <p class="card-header-title">{{ risk.id | replace("_", " ") | title }}</p>
   </header>
 
   <div class="card-content">
@@ -54,7 +54,7 @@
           ></span>
           <span
             :class="ctrl_{{ ctrl.id }} ? '' : 'answer-missing'"
-            >{{ ctrl.name }}</span>
+            >{{ ctrl.description }}</span>
           <span class="control-effect">
             {% if ctrl.reduces_likelihood and ctrl.reduces_consequence %}↓ Likelihood &amp; Consequence
             {% elif ctrl.reduces_likelihood %}↓ Likelihood
@@ -79,7 +79,7 @@
               <input type="checkbox"
                 x-model="mandated_controls['{{ risk.id }}']['{{ ctrl.id }}']"
               />
-              {{ ctrl.name }}
+              {{ ctrl.description }}
             </label>
             <div x-show="mandated_controls['{{ risk.id }}']['{{ ctrl.id }}']" x-cloak>
               <textarea
@@ -132,22 +132,5 @@
       </div>
     </div>
 
-    {# ── Linked answers ── #}
-    {% if risk.questions %}
-    <hr />
-    <ul class="stack-sm">
-      {% for q in risk.questions %}
-      <li class="linked-answer">
-        <span>{{ q.text }}</span>
-        <span
-          :class="_formatAnswer(answers['{{ q.id }}']) === 'Not answered'
-            ? 'answer-missing'
-            : ''"
-          x-text="_formatAnswer(answers['{{ q.id }}'])"
-        ></span>
-      </li>
-      {% endfor %}
-    </ul>
-    {% endif %}
   </div>
 </div>

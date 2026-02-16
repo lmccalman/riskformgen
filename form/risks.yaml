@@ -1,98 +1,64 @@
-# risks.yaml — Risk definitions assessed from form answers.
+# risks.yaml — Risk definitions derived from properties.
 #
-# Each risk is evaluated on two dimensions: likelihood and consequence.
-# The overall risk level is looked up from the matrix in config.py.
+# Each risk has conditions that reference properties (boolean getters).
+# When a condition fires, it contributes a {likelihood, consequence} pair.
+# When multiple conditions fire, worst-case-wins per dimension independently.
+# When no conditions fire, the risk level is "not_applicable".
 #
-# Likelihood scale (ascending): rare, unlikely, possible, likely, almost_certain
-# Consequence scale (ascending): minor, medium, major
-#
-# Rule types:
-#   any_yes      — fires if any listed yes/no question is "yes"
-#   count_yes    — fires if >= threshold yes/no questions are "yes"
-#   choice_map   — maps a multiple-choice answer to {likelihood, consequence}
-#   contains_any — fires if a multi-select answer includes any listed value
-#
-# Rules can set likelihood, consequence, or both. When multiple rules fire,
-# worst-case-wins per dimension independently.
-#
-# Optional defaults (fallback when no rules fire):
-#   default_likelihood  — defaults to "rare" if omitted
-#   default_consequence — defaults to "minor" if omitted
+# Condition fields:
+#   properties   — list of property IDs to check
+#   mode         — "any" (at least one true) or "all" (all true); defaults to "all"
+#   likelihood   — likelihood scale value
+#   consequence  — consequence scale value
 
 - id: sedentary_risk
-  name: Sedentary Lifestyle
-  description: Risk of an overly sedentary lifestyle based on activity preferences.
-  default_likelihood: likely          # Higher default — assume sedentary unless proven otherwise
-  default_consequence: medium
-  rules:
-    - type: any_yes                   # Fires if any listed question is answered "yes"
-      question_ids: [likes_swimming]
-      likelihood: unlikely            # Sets only likelihood; consequence unaffected
-    - type: contains_any              # Fires if multi-select includes any listed value
-      question_id: active_hobbies
-      values: [Swimming, Cycling, Running]
+  description: Risk of an overly sedentary lifestyle based on activity patterns.
+  conditions:
+    - properties: [indoor_sedentary]
+      mode: all
+      likelihood: likely
+      consequence: medium
+    - properties: [physically_active]
+      mode: all
+      likelihood: unlikely
       consequence: minor
-    - type: choice_map                # Maps each answer to a {likelihood, consequence} pair
-      question_id: exercise_frequency
-      mapping:
-        Daily: { likelihood: rare, consequence: minor }
-        A few times a week: { likelihood: unlikely }              # Consequence omitted — unaffected
-        Weekly: { likelihood: possible, consequence: medium }
-        Rarely: { likelihood: likely, consequence: major }
-        Never: { likelihood: almost_certain, consequence: major }
-    - type: count_yes                 # Fires if >= threshold questions are "yes"
-      question_ids: [likes_swimming, enjoys_coding]
-      threshold: 2
-      likelihood: possible
-
-- id: seasonal_mood_risk
-  name: Seasonal Mood Impact
-  description: Potential mood impact based on seasonal preference.
-  # No defaults specified — uses rare/minor fallback
-  rules:
-    - type: choice_map
-      question_id: favourite_season
-      mapping:
-        Spring: { likelihood: unlikely, consequence: minor }
-        Summer: { likelihood: rare, consequence: minor }
-        Autumn: { likelihood: possible, consequence: medium }
-        Winter: { likelihood: likely, consequence: major }
+    - properties: [exercises_frequently]
+      mode: all
+      likelihood: rare
+      consequence: minor
 
 - id: burnout_risk
-  name: Burnout
-  description: Risk of burnout from an indoor-heavy lifestyle.
-  rules:
-    - type: any_yes
-      question_ids: [enjoys_coding]
+  description: Risk of burnout from an indoor-heavy, solitary lifestyle.
+  conditions:
+    - properties: [indoor_sedentary]
+      mode: all
       likelihood: possible
-      consequence: medium             # Sets both dimensions
-    - type: contains_any
-      question_id: indoor_hobbies
-      values: [Reading, Gaming]
-      likelihood: likely
-    - type: contains_any
-      question_id: active_hobbies
-      values: [Swimming, Cycling, Hiking]
+      consequence: medium
+    - properties: [outdoors_oriented]
+      mode: all
       likelihood: unlikely
       consequence: minor
-    - type: any_yes
-      question_ids: [outdoor_access]
-      consequence: minor              # Sets only consequence
+    - properties: [socially_connected]
+      mode: all
+      likelihood: unlikely
+      consequence: minor
 
 - id: isolation_risk
-  name: Social Isolation
-  description: Risk of social isolation based on socialising habits.
-  default_likelihood: likely
-  default_consequence: major
-  rules:
-    - type: choice_map
-      question_id: social_frequency
-      mapping:
-        Daily: { likelihood: rare, consequence: minor }
-        A few times a week: { likelihood: unlikely, consequence: minor }
-        Weekly: { likelihood: possible, consequence: medium }
-        Rarely: { likelihood: likely, consequence: major }
-    - type: contains_any
-      question_id: group_activities
-      values: [Team sports, Volunteering, Social dining]
+  description: Risk of social isolation based on social connections.
+  conditions:
+    - properties: [socially_connected]
+      mode: all
       likelihood: unlikely
+      consequence: minor
+    - properties: [group_participant]
+      mode: all
+      likelihood: rare
+      consequence: minor
+    - properties: [indoor_sedentary]
+      mode: all
+      likelihood: likely
+      consequence: major
+    - properties: [team_sport_player]
+      mode: all
+      likelihood: rare
+      consequence: minor

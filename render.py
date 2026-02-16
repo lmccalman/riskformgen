@@ -194,26 +194,16 @@ def prepare_sections(
 # ---------------------------------------------------------------------------
 
 
-def prepare_risks(risks: list[Risk], questions: list[Question]) -> list[dict]:
+def prepare_risks(risks: list[Risk]) -> list[dict]:
     """Convert Risk dataclasses to template-ready dicts with compiled JS expressions."""
-    q_text = {q.id: q.text for q in questions}
-    result = []
-    for risk in risks:
-        ids = list(
-            dict.fromkeys(qid for rule in risk.rules for qid in rule.referenced_question_ids())
-        )
-        result.append(
-            {
-                "id": risk.id,
-                "name": risk.name,
-                "description": risk.description,
-                "default_likelihood": risk.default_likelihood,
-                "default_consequence": risk.default_consequence,
-                "rules_js": [rule.to_js() for rule in risk.rules],
-                "questions": [{"id": qid, "text": q_text[qid]} for qid in ids],
-            }
-        )
-    return result
+    return [
+        {
+            "id": risk.id,
+            "description": risk.description,
+            "rules_js": [cond.to_js() for cond in risk.conditions],
+        }
+        for risk in risks
+    ]
 
 
 def prepare_controls(
@@ -221,7 +211,9 @@ def prepare_controls(
     risk_dicts: list[dict],
 ) -> list[dict]:
     """Build control getters and attach per-risk control lists to risk dicts."""
-    control_getters = [{"id": ctrl.id, "js": ctrl.presence_js()} for ctrl in controls]
+    control_getters = [
+        {"id": ctrl.id, "js": f"this.prop_{ctrl.property} === true"} for ctrl in controls
+    ]
 
     # Index risk dicts by id for fast lookup
     risk_by_id = {r["id"]: r for r in risk_dicts}
@@ -236,31 +228,13 @@ def prepare_controls(
                 risk_by_id[effect.risk_id]["controls"].append(
                     {
                         "id": ctrl.id,
-                        "name": ctrl.name,
+                        "description": ctrl.description,
                         "reduces_likelihood": effect.reduces_likelihood,
                         "reduces_consequence": effect.reduces_consequence,
                     }
                 )
 
     return control_getters
-
-
-def validate_question_ids(
-    questions: list[Question], risks: list[Risk], controls: list[Control]
-) -> None:
-    """Raise ValueError if any risk rule or control references a nonexistent question ID."""
-    valid_ids = {q.id for q in questions}
-    errors: list[str] = []
-    for risk in risks:
-        for rule in risk.rules:
-            for qid in rule.referenced_question_ids():
-                if qid not in valid_ids:
-                    errors.append(f"Risk '{risk.id}' references unknown question '{qid}'")
-    for ctrl in controls:
-        if ctrl.question_id not in valid_ids:
-            errors.append(f"Control '{ctrl.id}' references unknown question '{ctrl.question_id}'")
-    if errors:
-        raise ValueError("Invalid question ID references:\n  " + "\n  ".join(errors))
 
 
 # ---------------------------------------------------------------------------
@@ -278,14 +252,12 @@ def render_form(
     env = create_environment()
     template = env.get_template("page.html.j2")
     questions = all_questions(sections)
-    validate_question_ids(questions, risks, controls or [])
-
     property_getters, question_visibility = prepare_properties(properties or [], questions)
     section_dicts = prepare_sections(sections, question_visibility)
     question_dicts = [
         q for sec in section_dicts for sub in sec["subsections"] for q in sub["questions"]
     ]
-    risk_dicts = prepare_risks(risks, questions)
+    risk_dicts = prepare_risks(risks)
     control_getters = prepare_controls(controls or [], risk_dicts)
     return template.render(
         sections=section_dicts,

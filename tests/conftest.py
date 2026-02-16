@@ -5,13 +5,10 @@ from __future__ import annotations
 import pytest
 
 from models import (
-    AnyYesRule,
     BinaryQuestion,
-    ChoiceMapRule,
-    ContainsAnyRule,
+    ConditionMapping,
     Control,
     ControlEffect,
-    CountYesRule,
     Property,
     Risk,
     Section,
@@ -70,31 +67,21 @@ def sample_properties():
 def sample_risk():
     return Risk(
         id="r1",
-        name="Data Breach",
         description="Risk of data leakage",
-        rules=(
-            AnyYesRule(question_ids=("q_bin",), likelihood="likely"),
-            CountYesRule(
-                question_ids=("q_bin", "q_bin2"),
-                threshold=2,
+        conditions=(
+            ConditionMapping(
+                properties=("prop_a",),
+                mode="all",
+                likelihood="likely",
                 consequence="major",
             ),
-            ChoiceMapRule(
-                question_id="q_mc",
-                mapping={
-                    "alpha": {"likelihood": "rare"},
-                    "beta": {"likelihood": "likely", "consequence": "major"},
-                },
-            ),
-            ContainsAnyRule(
-                question_id="q_ms",
-                values=("x", "y"),
+            ConditionMapping(
+                properties=("prop_a", "prop_b"),
+                mode="any",
                 likelihood="possible",
                 consequence="medium",
             ),
         ),
-        default_likelihood="rare",
-        default_consequence="minor",
     )
 
 
@@ -102,8 +89,7 @@ def sample_risk():
 def sample_control():
     return Control(
         id="ctrl1",
-        name="Encryption enabled",
-        question_id="q_bin",
-        present_value="yes",
+        description="Encryption enabled",
+        property="prop_a",
         effects=(ControlEffect(risk_id="r1", reduces_likelihood=True),),
     )
