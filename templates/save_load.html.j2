@@ -11,4 +11,7 @@
     @change="{{ import_fn }}($event)"
     hidden
   />
+  {% if clear_fn is defined and clear_fn %}
+  <button type="button" class="button is-danger is-small is-outlined" @click="{{ clear_fn }}()">Clear all</button>
+  {% endif %}
 </div>
