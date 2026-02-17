@@ -76,8 +76,8 @@ def _compile_question_visibility(
     """Compile a JS expression for whether a question should be visible.
 
     A question is visible when at least one of its target properties is reachable —
-    meaning the property's parents satisfy the activation mode (all true / any true).
-    Root properties (no parents) are always reachable.
+    meaning the property's parents haven't ruled it out (none false for "all" mode,
+    not all false for "any" mode). Root properties (no parents) are always reachable.
     """
     if not q.properties:
         return "true"
@@ -89,10 +89,10 @@ def _compile_question_visibility(
             # Root property — always reachable
             parts.append("true")
         elif prop.activation == "all":
-            checks = " && ".join(f"this.prop_{parent} === true" for parent in prop.parents)
+            checks = " && ".join(f"prop_{parent} !== false" for parent in prop.parents)
             parts.append(f"({checks})")
         else:  # "any"
-            checks = " || ".join(f"this.prop_{parent} === true" for parent in prop.parents)
+            checks = " || ".join(f"prop_{parent} !== false" for parent in prop.parents)
             parts.append(f"({checks})")
 
     # If any target property is always reachable, the question is always visible
