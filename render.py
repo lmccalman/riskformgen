@@ -3,6 +3,7 @@ import json
 from jinja2 import Environment, FileSystemLoader, select_autoescape
 
 import config
+from graph import GraphLayout, compute_layout
 from models import (
     BinaryQuestion,
     Control,
@@ -238,6 +239,93 @@ def prepare_controls(
 
 
 # ---------------------------------------------------------------------------
+# Graph
+# ---------------------------------------------------------------------------
+
+
+def _build_connections(
+    properties: list[Property],
+    risks: list[Risk],
+    controls: list[Control],
+) -> dict[str, list[str]]:
+    """Build human-readable connection descriptions for each node."""
+    conns: dict[str, list[str]] = {}
+
+    prop_desc = {p.id: p.description for p in properties}
+    risk_desc = {r.id: r.description for r in risks}
+
+    # Property connections
+    for p in properties:
+        entries: list[str] = []
+        for parent_id in p.parents:
+            entries.append(f"Parent: {prop_desc.get(parent_id, parent_id)}")
+        conns[p.id] = entries
+
+    # Risk connections (which properties feed in)
+    for r in risks:
+        entries = []
+        seen: set[str] = set()
+        for cond in r.conditions:
+            for pid in cond.properties:
+                if pid not in seen:
+                    entries.append(f"Condition: {prop_desc.get(pid, pid)}")
+                    seen.add(pid)
+        conns[r.id] = entries
+
+    # Control connections
+    for c in controls:
+        entries = [f"Property: {prop_desc.get(c.property, c.property)}"]
+        for effect in c.effects:
+            entries.append(f"Affects: {risk_desc.get(effect.risk_id, effect.risk_id)}")
+        conns[c.id] = entries
+
+    return conns
+
+
+def prepare_graph(
+    properties: list[Property],
+    risks: list[Risk],
+    controls: list[Control],
+) -> dict:
+    """Compute graph layout and build template-ready dict."""
+    layout: GraphLayout = compute_layout(properties, risks, controls)
+    connections = _build_connections(properties, risks, controls)
+
+    nodes = [
+        {
+            "id": n.id,
+            "label": n.label,
+            "description": n.description,
+            "kind": n.kind,
+            "x": n.x,
+            "y": n.y,
+            "width": n.width,
+            "height": n.height,
+            "connections": connections.get(n.id, []),
+        }
+        for n in layout.nodes
+    ]
+
+    edges = [
+        {
+            "source_id": e.source_id,
+            "target_id": e.target_id,
+            "kind": e.kind,
+            "path": e.path,
+        }
+        for e in layout.edges
+    ]
+
+    return {
+        "nodes": nodes,
+        "edges": edges,
+        "viewbox": layout.viewbox,
+        "width": layout.width,
+        "height": layout.height,
+    }
+
+
+# ---------------------------------------------------------------------------
 # Top-level render
 # ---------------------------------------------------------------------------
 
@@ -259,12 +347,14 @@ def render_form(
     ]
     risk_dicts = prepare_risks(risks)
     control_getters = prepare_controls(controls or [], risk_dicts)
+    graph = prepare_graph(properties or [], risks, controls or [])
     return template.render(
         sections=section_dicts,
         questions=question_dicts,
         risks=risk_dicts,
         control_getters=control_getters,
         property_getters=property_getters,
+        graph=graph,
         likelihoods_js=json.dumps(list(config.LIKELIHOODS)),
         consequences_js=json.dumps(list(config.CONSEQUENCES)),
         risk_levels=list(config.RISK_LEVELS),

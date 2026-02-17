@@ -1,5 +1,10 @@
 # riskformgen
 
+> **Note:** This README describes an earlier version of the project. The codebase
+> has since moved to a property-based architecture (property DAG, binary
+> questions, graph visualisation). It will be updated once features stabilise.
+> For current guidance, see `CLAUDE.md`.
+
 A static-page generator for interactive risk assessment forms. Define your
 questions, risks, and controls in YAML, then build a self-contained HTML page
 that runs entirely in the browser — no server required.

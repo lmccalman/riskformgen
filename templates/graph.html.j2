@@ -1,0 +1,122 @@
+{# DAG visualisation — SVG with Alpine.js reactive colouring and panzoom #}
+<div class="graph-container">
+  <svg
+    xmlns="http://www.w3.org/2000/svg"
+    viewBox="{{ graph.viewbox }}"
+    class="graph-svg"
+    x-ref="graphSvg"
+  >
+    <defs>
+      <marker
+        id="arrow-active"
+        viewBox="0 0 10 6"
+        refX="10" refY="3"
+        markerWidth="8" markerHeight="6"
+        orient="auto-start-reverse"
+      >
+        <path d="M 0 0 L 10 3 L 0 6 z" fill="#888" />
+      </marker>
+      <marker
+        id="arrow-inactive"
+        viewBox="0 0 10 6"
+        refX="10" refY="3"
+        markerWidth="8" markerHeight="6"
+        orient="auto-start-reverse"
+      >
+        <path d="M 0 0 L 10 3 L 0 6 z" fill="#ccc" />
+      </marker>
+    </defs>
+
+    <g x-ref="graphGroup">
+      {# ── Edges ── #}
+      {% for edge in graph.edges %}
+      <path
+        d="{{ edge.path }}"
+        fill="none"
+        stroke-width="1.5"
+        marker-end="url(#arrow-active)"
+        {% if edge.kind == "parent" or edge.kind == "condition" or edge.kind == "control_in" %}
+        :class="prop_{{ edge.source_id }} === true ? 'graph-edge-active' : 'graph-edge-inactive'"
+        :marker-end="prop_{{ edge.source_id }} === true ? 'url(#arrow-active)' : 'url(#arrow-inactive)'"
+        {% elif edge.kind == "control_out" %}
+        :class="ctrl_{{ edge.source_id }} === true ? 'graph-edge-active' : 'graph-edge-inactive'"
+        :marker-end="ctrl_{{ edge.source_id }} === true ? 'url(#arrow-active)' : 'url(#arrow-inactive)'"
+        {% endif %}
+      />
+      {% endfor %}
+
+      {# ── Nodes ── #}
+      {% for node in graph.nodes %}
+      <g
+        class="graph-node"
+        @click="selectedNode = '{{ node.id }}'; showNodeModal = true"
+        style="cursor: pointer"
+      >
+        <rect
+          x="{{ node.x - node.width / 2 }}"
+          y="{{ node.y - node.height / 2 }}"
+          width="{{ node.width }}"
+          height="{{ node.height }}"
+          rx="6"
+          {% if node.kind == "property" %}
+          :class="prop_{{ node.id }} === true ? 'graph-fill-true' : prop_{{ node.id }} === false ? 'graph-fill-false' : 'graph-fill-null'"
+          {% elif node.kind == "risk" %}
+          :class="'graph-fill-risk-' + {{ node.id }}.level"
+          {% elif node.kind == "control" %}
+          :class="ctrl_{{ node.id }} === true ? 'graph-fill-ctrl-active' : 'graph-fill-ctrl-inactive'"
+          {% endif %}
+        />
+        <text
+          x="{{ node.x }}"
+          y="{{ node.y + 1 }}"
+          text-anchor="middle"
+          dominant-baseline="middle"
+          class="graph-label"
+        >{{ node.label }}</text>
+      </g>
+      {% endfor %}
+    </g>
+  </svg>
+</div>
+
+{# ── Node detail modal ── #}
+<div class="modal" :class="showNodeModal && 'is-active'">
+  <div class="modal-background" @click="showNodeModal = false"></div>
+  <div class="modal-card" style="max-width: 500px">
+    <header class="modal-card-head">
+      <p class="modal-card-title" x-text="selectedNode.replace(/_/g, ' ').replace(/\b\w/g, c => c.toUpperCase())"></p>
+      <button class="delete" aria-label="close" @click="showNodeModal = false"></button>
+    </header>
+    <section class="modal-card-body">
+      {% for node in graph.nodes %}
+      <template x-if="selectedNode === '{{ node.id }}'">
+        <div>
+          <p class="mb-3">
+            <span class="badge badge-{{ 'blue' if node.kind == 'property' else 'purple' if node.kind == 'control' else 'red' }}">
+              {{ node.kind }}
+            </span>
+          </p>
+          <p class="mb-3">{{ node.description }}</p>
+          <p class="mb-2"><strong>Current state:</strong>
+            {% if node.kind == "property" %}
+            <span x-text="prop_{{ node.id }} === true ? 'True' : prop_{{ node.id }} === false ? 'False' : 'Unknown'"></span>
+            {% elif node.kind == "risk" %}
+            <span x-text="{{ node.id }}.level.replace(/_/g, ' ')"></span>
+            {% elif node.kind == "control" %}
+            <span x-text="ctrl_{{ node.id }} === true ? 'Active' : 'Inactive'"></span>
+            {% endif %}
+          </p>
+          {% if node.connections %}
+          <p class="mb-2"><strong>Connections:</strong></p>
+          <ul class="ml-4">
+            {% for conn in node.connections %}
+            <li>{{ conn }}</li>
+            {% endfor %}
+          </ul>
+          {% endif %}
+        </div>
+      </template>
+      {% endfor %}
+    </section>
+  </div>
+</div>

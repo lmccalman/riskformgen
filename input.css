@@ -178,6 +178,122 @@
   border-top: 1px solid #dbdbdb;
 }
 
+/* ── Graph tab accent ── */
+.tab-graph a {
+  color: #3273dc !important;
+}
+
+.tab-graph.is-active a {
+  color: #3273dc !important;
+  border-bottom-color: #3273dc !important;
+}
+
+/* ── Graph container ── */
+.graph-container {
+  border: 1px solid #dbdbdb;
+  border-radius: 6px;
+  background: #fafafa;
+  min-height: 400px;
+  overflow: hidden;
+}
+
+.graph-svg {
+  width: 100%;
+  height: 500px;
+  display: block;
+}
+
+/* ── Graph node fills ── */
+.graph-fill-true {
+  fill: hsl(140 50% 85%);
+  stroke: hsl(140 50% 55%);
+  stroke-width: 1.5;
+  transition: fill 0.3s, stroke 0.3s;
+}
+
+.graph-fill-false {
+  fill: hsl(0 0% 92%);
+  stroke: hsl(0 0% 75%);
+  stroke-width: 1.5;
+  transition: fill 0.3s, stroke 0.3s;
+}
+
+.graph-fill-null {
+  fill: hsl(40 80% 88%);
+  stroke: hsl(40 60% 65%);
+  stroke-width: 1.5;
+  transition: fill 0.3s, stroke 0.3s;
+}
+
+.graph-fill-risk-not_applicable {
+  fill: hsl(0 0% 92%);
+  stroke: hsl(0 0% 75%);
+  stroke-width: 1.5;
+  transition: fill 0.3s, stroke 0.3s;
+}
+
+.graph-fill-risk-low {
+  fill: hsl(140 50% 85%);
+  stroke: hsl(140 50% 55%);
+  stroke-width: 1.5;
+  transition: fill 0.3s, stroke 0.3s;
+}
+
+.graph-fill-risk-medium {
+  fill: hsl(40 80% 88%);
+  stroke: hsl(40 60% 55%);
+  stroke-width: 1.5;
+  transition: fill 0.3s, stroke 0.3s;
+}
+
+.graph-fill-risk-high {
+  fill: hsl(0 65% 90%);
+  stroke: hsl(0 60% 55%);
+  stroke-width: 1.5;
+  transition: fill 0.3s, stroke 0.3s;
+}
+
+.graph-fill-ctrl-active {
+  fill: hsl(210 80% 90%);
+  stroke: hsl(210 70% 55%);
+  stroke-width: 1.5;
+  transition: fill 0.3s, stroke 0.3s;
+}
+
+.graph-fill-ctrl-inactive {
+  fill: hsl(0 0% 92%);
+  stroke: hsl(0 0% 75%);
+  stroke-width: 1.5;
+  transition: fill 0.3s, stroke 0.3s;
+}
+
+/* ── Graph node hover ── */
+.graph-node:hover rect {
+  stroke-width: 2.5;
+  filter: brightness(0.95);
+}
+
+/* ── Graph labels ── */
+.graph-label {
+  font-family: system-ui, sans-serif;
+  font-size: 11px;
+  fill: #363636;
+  pointer-events: none;
+  user-select: none;
+}
+
+/* ── Graph edges ── */
+.graph-edge-active {
+  stroke: #888;
+  transition: stroke 0.3s, stroke-dasharray 0.3s;
+}
+
+.graph-edge-inactive {
+  stroke: #ccc;
+  stroke-dasharray: 4 3;
+  transition: stroke 0.3s, stroke-dasharray 0.3s;
+}
+
 /* ── Debug panel ── */
 .debug-panel pre {
   background: #363636;
