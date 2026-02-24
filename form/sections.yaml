@@ -28,6 +28,11 @@
           text: Do you spend meaningful time outdoors?
           properties: [outdoors_oriented]
           guidance: "Regular walks, gardening, outdoor sports, or simply spending time in nature."
+        - type: detail
+          id: outdoor_context_detail
+          detail_id: outdoor_context
+          text: Describe your outdoor activities.
+          guidance: "What kinds of outdoor activities do you typically do, and how often?"
 
 - id: social
   title: Social
@@ -45,6 +50,11 @@
           text: Do you participate in organised group activities?
           properties: [group_participant]
           guidance: "Clubs, classes, volunteering, team sports, or other structured group activities."
+        - type: detail
+          id: social_context_detail
+          detail_id: social_context
+          text: Describe your social connections and activities.
+          guidance: "How often do you interact socially, and what kinds of groups or activities are you involved in?"
 
     - title: Team Sports
       description: Your involvement in competitive team activities.

@@ -1,4 +1,5 @@
 import json
+from collections.abc import Sequence
 
 from jinja2 import Environment, FileSystemLoader, select_autoescape
 
@@ -7,6 +8,8 @@ from graph import GraphLayout, compute_layout
 from models import (
     BinaryQuestion,
     Control,
+    Detail,
+    DetailQuestion,
     Property,
     Question,
     Risk,
@@ -70,7 +73,7 @@ def _compile_property_getter(
 
 
 def _compile_question_visibility(
-    q: BinaryQuestion,
+    q: Question,
     prop_by_id: dict[str, Property],
 ) -> str:
     """Compile a JS expression for whether a question should be visible.
@@ -101,9 +104,16 @@ def _compile_question_visibility(
     return " || ".join(parts)
 
 
+def _detail_show_js(props: list[str]) -> str:
+    """JS expression: true when any of the detail's properties is active (true)."""
+    if not props:
+        return "false"
+    return " || ".join(f"prop_{pid} === true" for pid in props)
+
+
 def prepare_properties(
     properties: list[Property],
-    questions: list[BinaryQuestion],
+    questions: Sequence[Question],
 ) -> tuple[list[dict[str, str]], dict[str, str]]:
     """Compile property getters and question visibility expressions.
 
@@ -111,11 +121,12 @@ def prepare_properties(
         property_getters: list of {id, js_body} for the template
         question_visibility: dict of {question_id: visibility_js_expression}
     """
-    # Build question→property mapping
+    # Only BinaryQuestions set property state; DetailQuestions use properties for visibility only
     question_for_prop: dict[str, BinaryQuestion] = {}
     for q in questions:
-        for pid in q.properties:
-            question_for_prop[pid] = q
+        if isinstance(q, BinaryQuestion):
+            for pid in q.properties:
+                question_for_prop[pid] = q
 
     prop_by_id = {p.id: p for p in properties}
 
@@ -143,6 +154,8 @@ def _prepare_question(q: Question, visibility_js: str) -> dict:
         "properties": list(q.properties),
         "guidance": q.guidance,
     }
+    if isinstance(q, DetailQuestion):
+        d["detail_id"] = q.detail_id
     if visibility_js != "true":
         d["visibility_js"] = visibility_js
     return d
@@ -191,20 +204,39 @@ def prepare_sections(
 
 
 # ---------------------------------------------------------------------------
-# Risks and controls (unchanged — will break without risk/control YAML, that's OK)
+# Risks and controls
 # ---------------------------------------------------------------------------
 
 
-def prepare_risks(risks: list[Risk]) -> list[dict]:
+def prepare_risks(risks: list[Risk], details: list[Detail] | None = None) -> list[dict]:
     """Convert Risk dataclasses to template-ready dicts with compiled JS expressions."""
-    return [
-        {
-            "id": risk.id,
-            "description": risk.description,
-            "rules_js": [cond.to_js() for cond in risk.conditions],
-        }
-        for risk in risks
-    ]
+    _details = details or []
+
+    result = []
+    for risk in risks:
+        # Collect all property IDs referenced by this risk's conditions
+        risk_prop_ids = {pid for cond in risk.conditions for pid in cond.properties}
+
+        relevant_details = [
+            {
+                "id": d.id,
+                "description": d.description,
+                "show_js": _detail_show_js(list(d.properties)),
+            }
+            for d in _details
+            if risk_prop_ids & set(d.properties)
+        ]
+
+        result.append(
+            {
+                "id": risk.id,
+                "description": risk.description,
+                "rules_js": [cond.to_js() for cond in risk.conditions],
+                "relevant_details": relevant_details,
+            }
+        )
+
+    return result
 
 
 def prepare_controls(
@@ -335,8 +367,9 @@ def render_form(
     risks: list[Risk],
     controls: list[Control] | None = None,
     properties: list[Property] | None = None,
+    details: list[Detail] | None = None,
 ) -> str:
-    """Render the form page HTML from sections, risks, and properties."""
+    """Render the form page HTML from sections, risks, properties, and details."""
     env = create_environment()
     template = env.get_template("page.html.j2")
     questions = all_questions(sections)
@@ -345,9 +378,10 @@ def render_form(
     question_dicts = [
         q for sec in section_dicts for sub in sec["subsections"] for q in sub["questions"]
     ]
-    risk_dicts = prepare_risks(risks)
+    risk_dicts = prepare_risks(risks, details)
     control_getters = prepare_controls(controls or [], risk_dicts)
     graph = prepare_graph(properties or [], risks, controls or [])
+    detail_ids = [d.id for d in (details or [])]
     return template.render(
         sections=section_dicts,
         questions=question_dicts,
@@ -355,6 +389,7 @@ def render_form(
         control_getters=control_getters,
         property_getters=property_getters,
         graph=graph,
+        detail_ids=detail_ids,
         likelihoods_js=json.dumps(list(config.LIKELIHOODS)),
         consequences_js=json.dumps(list(config.CONSEQUENCES)),
         risk_levels=list(config.RISK_LEVELS),

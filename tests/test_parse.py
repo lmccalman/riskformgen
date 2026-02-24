@@ -9,6 +9,8 @@ from models import (
     ConditionMapping,
     Control,
     ControlEffect,
+    Detail,
+    DetailQuestion,
     Property,
     Risk,
 )
@@ -17,6 +19,7 @@ from parse import (
     parse_condition_mapping,
     parse_control,
     parse_control_effect,
+    parse_detail,
     parse_property,
     parse_question,
     parse_risk,
@@ -24,6 +27,8 @@ from parse import (
     parse_subsection,
     validate_control_properties,
     validate_control_risk_ids,
+    validate_detail_properties,
+    validate_detail_questions,
     validate_property_dag,
     validate_question_properties,
     validate_risk_properties,
@@ -58,6 +63,19 @@ class TestEnsureStr:
 # ---------------------------------------------------------------------------
 
 
+class TestParseDetail:
+    def test_basic(self):
+        d = parse_detail({"id": "det1", "description": "Outdoor context", "properties": ["p1"]})
+        assert isinstance(d, Detail)
+        assert d.id == "det1"
+        assert d.description == "Outdoor context"
+        assert d.properties == ("p1",)
+
+    def test_no_properties(self):
+        d = parse_detail({"id": "det1", "description": "No props"})
+        assert d.properties == ()
+
+
 class TestParseQuestion:
     def test_binary(self):
         q = parse_question(
@@ -83,6 +101,42 @@ class TestParseQuestion:
             }
         )
         assert q.guidance == "Some help text"
+
+    def test_detail_type(self):
+        det = Detail(id="det1", description="Context", properties=("p1",))
+        q = parse_question(
+            {"type": "detail", "id": "q_det", "text": "Describe", "detail_id": "det1"},
+            details_by_id={"det1": det},
+        )
+        assert isinstance(q, DetailQuestion)
+        assert q.detail_id == "det1"
+        assert q.properties == ("p1",)
+
+    def test_detail_guidance(self):
+        det = Detail(id="det1", description="Context", properties=("p1",))
+        q = parse_question(
+            {
+                "type": "detail",
+                "id": "q_det",
+                "text": "Describe",
+                "detail_id": "det1",
+                "guidance": "Help text",
+            },
+            details_by_id={"det1": det},
+        )
+        assert isinstance(q, DetailQuestion)
+        assert q.guidance == "Help text"
+
+    def test_detail_unknown_detail_raises(self):
+        with pytest.raises(ValueError, match="unknown detail"):
+            parse_question(
+                {"type": "detail", "id": "q_det", "text": "D", "detail_id": "missing"},
+                details_by_id={},
+            )
+
+    def test_detail_no_details_by_id_raises(self):
+        with pytest.raises(ValueError, match="unknown detail"):
+            parse_question({"type": "detail", "id": "q_det", "text": "D", "detail_id": "det1"})
 
     def test_unknown_type_raises(self):
         with pytest.raises(ValueError, match="Unknown question type"):
@@ -348,7 +402,7 @@ class TestValidateQuestionProperties:
 
     def test_no_setter_is_fine(self):
         props = [Property(id="p1", description="P1")]
-        questions: list[BinaryQuestion] = []
+        questions = []
         validate_question_properties(questions, props)  # should not raise
 
     def test_multiple_errors_reported(self):
@@ -360,6 +414,56 @@ class TestValidateQuestionProperties:
         with pytest.raises(ValueError, match="p_bad1") as exc_info:
             validate_question_properties(questions, props)
         assert "p_bad2" in str(exc_info.value)
+
+    def test_detail_question_does_not_trigger_setter_conflict(self):
+        """DetailQuestions sharing a property with BinaryQuestions should not conflict."""
+        props = [Property(id="p1", description="P1")]
+        questions = [
+            BinaryQuestion(id="q1", text="Q1", properties=("p1",)),
+            DetailQuestion(id="q_det", text="Describe", detail_id="det1", properties=("p1",)),
+        ]
+        validate_question_properties(questions, props)  # should not raise
+
+    def test_detail_question_unknown_property_raises(self):
+        props = [Property(id="p1", description="P1")]
+        questions = [
+            DetailQuestion(id="q_det", text="D", detail_id="det1", properties=("p_missing",)),
+        ]
+        with pytest.raises(ValueError, match="unknown property 'p_missing'"):
+            validate_question_properties(questions, props)
+
+
+class TestValidateDetailProperties:
+    def test_valid(self):
+        props = [Property(id="p1", description="P1")]
+        details = [Detail(id="det1", description="D", properties=("p1",))]
+        validate_detail_properties(details, props)  # should not raise
+
+    def test_unknown_property_raises(self):
+        props = [Property(id="p1", description="P1")]
+        details = [Detail(id="det1", description="D", properties=("p_missing",))]
+        with pytest.raises(ValueError, match="p_missing"):
+            validate_detail_properties(details, props)
+
+    def test_empty_details_pass(self):
+        props = [Property(id="p1", description="P1")]
+        validate_detail_properties([], props)  # should not raise
+
+
+class TestValidateDetailQuestions:
+    def test_valid(self):
+        details = [Detail(id="det1", description="D", properties=("p1",))]
+        questions = [DetailQuestion(id="q_det", text="D", detail_id="det1", properties=("p1",))]
+        validate_detail_questions(questions, details)  # should not raise
+
+    def test_unknown_detail_raises(self):
+        questions = [DetailQuestion(id="q_det", text="D", detail_id="missing", properties=())]
+        with pytest.raises(ValueError, match="missing"):
+            validate_detail_questions(questions, [])
+
+    def test_binary_questions_ignored(self):
+        questions = [BinaryQuestion(id="q1", text="Q", properties=("p1",))]
+        validate_detail_questions(questions, [])  # should not raise
 
 
 # ---------------------------------------------------------------------------

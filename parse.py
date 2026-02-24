@@ -3,6 +3,7 @@
 
 from __future__ import annotations
 
+from collections.abc import Sequence
 from pathlib import Path
 from typing import Any
 
@@ -13,6 +14,8 @@ from models import (
     ConditionMapping,
     Control,
     ControlEffect,
+    Detail,
+    DetailQuestion,
     Property,
     Question,
     Risk,
@@ -36,21 +39,58 @@ def _ensure_str(value: object) -> str:
 
 
 # ---------------------------------------------------------------------------
+# Details
+# ---------------------------------------------------------------------------
+
+
+def parse_detail(data: YamlDict) -> Detail:
+    """Parse a detail dict into a Detail dataclass."""
+    return Detail(
+        id=data["id"],
+        description=data["description"],
+        properties=tuple(data.get("properties", [])),
+    )
+
+
+def load_details(path: Path) -> list[Detail]:
+    """Load details from a YAML file."""
+    data = yaml.safe_load(path.read_text())
+    return [parse_detail(d) for d in data]
+
+
+# ---------------------------------------------------------------------------
 # Questions
 # ---------------------------------------------------------------------------
 
 
-def parse_question(data: YamlDict) -> Question:
-    """Parse a question dict into a BinaryQuestion dataclass."""
+def parse_question(data: YamlDict, details_by_id: dict[str, Detail] | None = None) -> Question:
+    """Parse a question dict into a typed Question dataclass."""
     qtype = data["type"]
-    if qtype != "binary":
-        raise ValueError(f"Unknown question type: {qtype!r}")
-    return BinaryQuestion(
-        id=data["id"],
-        text=data["text"],
-        properties=tuple(data.get("properties", [])),
-        guidance=data.get("guidance"),
-    )
+    match qtype:
+        case "binary":
+            return BinaryQuestion(
+                id=data["id"],
+                text=data["text"],
+                properties=tuple(data.get("properties", [])),
+                guidance=data.get("guidance"),
+            )
+        case "detail":
+            did = data["detail_id"]
+            resolved = details_by_id or {}
+            if did not in resolved:
+                raise ValueError(
+                    f"DetailQuestion {data['id']!r} references unknown detail {did!r}"
+                )
+            detail = resolved[did]
+            return DetailQuestion(
+                id=data["id"],
+                text=data["text"],
+                detail_id=did,
+                properties=detail.properties,
+                guidance=data.get("guidance"),
+            )
+        case _:
+            raise ValueError(f"Unknown question type: {qtype!r}")
 
 
 # ---------------------------------------------------------------------------
@@ -58,22 +98,22 @@ def parse_question(data: YamlDict) -> Question:
 # ---------------------------------------------------------------------------
 
 
-def parse_subsection(data: YamlDict) -> SubSection:
+def parse_subsection(data: YamlDict, details_by_id: dict[str, Detail] | None = None) -> SubSection:
     """Parse a sub-section dict into a SubSection dataclass."""
     return SubSection(
         title=data["title"],
         description=data["description"],
-        questions=tuple(parse_question(q) for q in data["questions"]),
+        questions=tuple(parse_question(q, details_by_id) for q in data["questions"]),
     )
 
 
-def parse_section(data: YamlDict) -> Section:
+def parse_section(data: YamlDict, details_by_id: dict[str, Detail] | None = None) -> Section:
     """Parse a section dict into a Section dataclass."""
     return Section(
         id=data["id"],
         title=data["title"],
         description=data["description"],
-        subsections=tuple(parse_subsection(s) for s in data["subsections"]),
+        subsections=tuple(parse_subsection(s, details_by_id) for s in data["subsections"]),
     )
 
 
@@ -130,10 +170,10 @@ def parse_control(data: YamlDict) -> Control:
 # ---------------------------------------------------------------------------
 
 
-def load_sections(path: Path) -> list[Section]:
+def load_sections(path: Path, details_by_id: dict[str, Detail] | None = None) -> list[Section]:
     """Load sections from a YAML file."""
     data = yaml.safe_load(path.read_text())
-    return [parse_section(s) for s in data]
+    return [parse_section(s, details_by_id) for s in data]
 
 
 def load_risks(path: Path) -> list[Risk]:
@@ -211,21 +251,23 @@ def validate_property_dag(properties: list[Property]) -> None:
 
 
 def validate_question_properties(
-    questions: list[BinaryQuestion], properties: list[Property]
+    questions: Sequence[Question], properties: list[Property]
 ) -> None:
-    """Validate question→property references: all exist, each set by at most one question."""
+    """Validate question→property references: all exist, each set by at most one BinaryQuestion."""
     prop_ids = {p.id for p in properties}
     errors: list[str] = []
 
-    # Check all referenced properties exist
+    # Check all referenced properties exist (both question types)
     for q in questions:
         for pid in q.properties:
             if pid not in prop_ids:
                 errors.append(f"Question {q.id!r} references unknown property {pid!r}")
 
-    # Check each property is set by at most one question
+    # Exclusive-setter check — BinaryQuestion only (DetailQuestion uses properties for visibility)
     setters: dict[str, str] = {}
     for q in questions:
+        if not isinstance(q, BinaryQuestion):
+            continue
         for pid in q.properties:
             if pid in setters:
                 errors.append(f"Property {pid!r} is set by both {setters[pid]!r} and {q.id!r}")
@@ -274,3 +316,26 @@ def validate_control_risk_ids(controls: list[Control], risks: list[Risk]) -> Non
                 )
     if errors:
         raise ValueError("Invalid control→risk references:\n  " + "\n  ".join(errors))
+
+
+def validate_detail_properties(details: list[Detail], properties: list[Property]) -> None:
+    """Validate all property IDs referenced by details exist."""
+    prop_ids = {p.id for p in properties}
+    errors: list[str] = []
+    for detail in details:
+        for pid in detail.properties:
+            if pid not in prop_ids:
+                errors.append(f"Detail {detail.id!r} references unknown property {pid!r}")
+    if errors:
+        raise ValueError("Invalid detail→property references:\n  " + "\n  ".join(errors))
+
+
+def validate_detail_questions(questions: Sequence[Question], details: list[Detail]) -> None:
+    """Validate all detail_ids referenced by DetailQuestions exist."""
+    detail_ids = {d.id for d in details}
+    errors: list[str] = []
+    for q in questions:
+        if isinstance(q, DetailQuestion) and q.detail_id not in detail_ids:
+            errors.append(f"DetailQuestion {q.id!r} references unknown detail {q.detail_id!r}")
+    if errors:
+        raise ValueError("Invalid DetailQuestion→detail references:\n  " + "\n  ".join(errors))

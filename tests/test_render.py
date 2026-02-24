@@ -9,6 +9,7 @@ from models import (
     ConditionMapping,
     Control,
     ControlEffect,
+    Detail,
     Property,
     Risk,
     Section,
@@ -18,6 +19,7 @@ from models import (
 from render import (
     _compile_property_getter,
     _compile_question_visibility,
+    _detail_show_js,
     prepare_controls,
     prepare_properties,
     prepare_risks,
@@ -206,6 +208,21 @@ class TestPrepareSections:
 # ---------------------------------------------------------------------------
 
 
+class TestDetailShowJs:
+    def test_single_property(self):
+        js = _detail_show_js(["p1"])
+        assert js == "prop_p1 === true"
+
+    def test_multiple_properties(self):
+        js = _detail_show_js(["p1", "p2"])
+        assert "prop_p1 === true" in js
+        assert "prop_p2 === true" in js
+        assert "||" in js
+
+    def test_no_properties(self):
+        assert _detail_show_js([]) == "false"
+
+
 class TestPrepareRisks:
     def test_output_structure(self):
         risk = Risk(
@@ -224,6 +241,7 @@ class TestPrepareRisks:
         assert r["description"] == "D"
         assert "rules_js" in r
         assert len(r["rules_js"]) == 1
+        assert r["relevant_details"] == []
 
     def test_multiple_conditions(self):
         risk = Risk(
@@ -240,6 +258,38 @@ class TestPrepareRisks:
         )
         result = prepare_risks([risk])
         assert len(result[0]["rules_js"]) == 2
+
+    def test_relevant_detail_included(self):
+        risk = Risk(
+            id="r1",
+            description="D",
+            conditions=(
+                ConditionMapping(
+                    properties=("p1",), mode="all", likelihood="likely", consequence="major"
+                ),
+            ),
+        )
+        det = Detail(id="det1", description="Outdoor context", properties=("p1",))
+        result = prepare_risks([risk], details=[det])
+        assert len(result[0]["relevant_details"]) == 1
+        rd = result[0]["relevant_details"][0]
+        assert rd["id"] == "det1"
+        assert rd["description"] == "Outdoor context"
+        assert "prop_p1 === true" in rd["show_js"]
+
+    def test_irrelevant_detail_excluded(self):
+        risk = Risk(
+            id="r1",
+            description="D",
+            conditions=(
+                ConditionMapping(
+                    properties=("p1",), mode="all", likelihood="likely", consequence="major"
+                ),
+            ),
+        )
+        det = Detail(id="det2", description="Unrelated", properties=("p_other",))
+        result = prepare_risks([risk], details=[det])
+        assert result[0]["relevant_details"] == []
 
     def test_empty(self):
         assert prepare_risks([]) == []
@@ -342,6 +392,13 @@ class TestRenderForm:
         html = render_form(sample_sections, [risk], [sample_control], sample_properties)
         assert "Encryption enabled" in html
         assert "this.prop_prop_a === true" in html
+
+    def test_with_details(self, sample_sections, sample_properties, sample_detail):
+        html = render_form(
+            sample_sections, [], properties=sample_properties, details=[sample_detail]
+        )
+        assert "details:" in html
+        assert "det1" in html
 
 
 # ---------------------------------------------------------------------------

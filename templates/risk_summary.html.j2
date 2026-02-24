@@ -96,6 +96,24 @@
     </div>
     {% endif %}
 
+    {# ── Context (detail text relevant to this risk) ── #}
+    {% if risk.relevant_details %}
+    <div>
+      <span class="dim-label">Context</span>
+      <div class="stack-sm">
+        {% for detail in risk.relevant_details %}
+        <div
+          x-show="({{ detail.show_js }}) && details['{{ detail.id }}']"
+          x-cloak
+        >
+          <p class="has-text-weight-semibold is-size-7">{{ detail.description }}</p>
+          <p class="linked-answer" x-text="details['{{ detail.id }}']"></p>
+        </div>
+        {% endfor %}
+      </div>
+    </div>
+    {% endif %}
+
     {# ── Assessed risk (user-selected) ── #}
     <div>
       <span class="dim-label">Assessed Risk</span>

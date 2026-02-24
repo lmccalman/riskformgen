@@ -6,17 +6,24 @@ import config
 from models import all_questions
 from parse import (
     load_controls,
+    load_details,
     load_properties,
     load_risks,
     load_sections,
     validate_control_properties,
     validate_control_risk_ids,
+    validate_detail_properties,
+    validate_detail_questions,
     validate_property_dag,
     validate_question_properties,
     validate_risk_properties,
 )
 
-SECTIONS = load_sections(config.form_dir / "sections.yaml")
+_details_path = config.form_dir / "details.yaml"
+DETAILS = load_details(_details_path) if _details_path.exists() else []
+DETAILS_BY_ID = {d.id: d for d in DETAILS}
+
+SECTIONS = load_sections(config.form_dir / "sections.yaml", DETAILS_BY_ID)
 PROPERTIES = load_properties(config.form_dir / "properties.yaml")
 RISKS = load_risks(config.form_dir / "risks.yaml")
 CONTROLS = load_controls(config.form_dir / "controls.yaml")
@@ -44,9 +51,10 @@ class TestSections:
         dupes = [x for x in ids if ids.count(x) > 1]
         assert len(ids) == len(set(ids)), f"Duplicate question IDs: {dupes}"
 
-    def test_all_questions_are_binary(self):
+    def test_question_types_are_known(self):
+        known_types = {"binary", "detail"}
         for q in QUESTIONS:
-            assert q.type == "binary", f"Question {q.id!r} has type {q.type!r}, expected 'binary'"
+            assert q.type in known_types, f"Question {q.id!r} has unknown type {q.type!r}"
 
 
 # ---------------------------------------------------------------------------
@@ -127,4 +135,28 @@ class TestControls:
             for effect in ctrl.effects:
                 assert effect.risk_id in RISK_IDS, (
                     f"Control {ctrl.id!r} references unknown risk {effect.risk_id!r}"
+                )
+
+
+# ---------------------------------------------------------------------------
+# Details
+# ---------------------------------------------------------------------------
+
+
+class TestDetails:
+    def test_detail_ids_unique(self):
+        ids = [d.id for d in DETAILS]
+        assert len(ids) == len(set(ids)), f"Duplicate detail IDs: {ids}"
+
+    def test_detail_properties_valid(self):
+        validate_detail_properties(DETAILS, PROPERTIES)  # should not raise
+
+    def test_detail_questions_valid(self):
+        validate_detail_questions(QUESTIONS, DETAILS)  # should not raise
+
+    def test_all_detail_property_refs_exist(self):
+        for detail in DETAILS:
+            for pid in detail.properties:
+                assert pid in PROPERTY_IDS, (
+                    f"Detail {detail.id!r} references unknown property {pid!r}"
                 )

@@ -9,6 +9,8 @@ from models import (
     ConditionMapping,
     Control,
     ControlEffect,
+    Detail,
+    DetailQuestion,
     Property,
     Risk,
     Section,
@@ -92,4 +94,23 @@ def sample_control():
         description="Encryption enabled",
         property="prop_a",
         effects=(ControlEffect(risk_id="r1", reduces_likelihood=True),),
+    )
+
+
+@pytest.fixture
+def sample_detail():
+    return Detail(
+        id="det1",
+        description="Outdoor context",
+        properties=("prop_a",),
+    )
+
+
+@pytest.fixture
+def detail_question(sample_detail):
+    return DetailQuestion(
+        id="q_det",
+        text="Describe the outdoor activities.",
+        detail_id=sample_detail.id,
+        properties=sample_detail.properties,
     )

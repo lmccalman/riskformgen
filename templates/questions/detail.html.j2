@@ -1,0 +1,14 @@
+<div class="field">
+  <label class="label">{{ question.text }}</label>
+  {% if question.guidance %}
+  <p class="help"><em>{{ question.guidance }}</em></p>
+  {% endif %}
+  <div class="control">
+    <textarea
+      class="textarea"
+      x-model="details['{{ question.detail_id }}']"
+      rows="3"
+      placeholder="Provide details here…"
+    ></textarea>
+  </div>
+</div>

@@ -20,7 +20,23 @@ class BinaryQuestion:
     type: str = field(default="binary", init=False)
 
 
-Question = BinaryQuestion
+@dataclass(frozen=True)
+class DetailQuestion:
+    """A free-text question that stores user input against a Detail.
+
+    Properties are copied from the referenced Detail at parse time so the
+    existing visibility compilation system works without modification.
+    """
+
+    id: str
+    text: str
+    detail_id: str
+    properties: tuple[str, ...]  # copied from Detail.properties at parse time
+    guidance: str | None = None
+    type: str = field(default="detail", init=False)
+
+
+Question = BinaryQuestion | DetailQuestion
 
 
 # ---------------------------------------------------------------------------
@@ -115,6 +131,21 @@ class Control:
     description: str
     property: str
     effects: tuple[ControlEffect, ...]
+
+
+# ---------------------------------------------------------------------------
+# Details
+# ---------------------------------------------------------------------------
+
+
+@dataclass(frozen=True)
+class Detail:
+    """A contextual topic whose free-text value is displayed in risk cards
+    when its associated properties are active."""
+
+    id: str
+    description: str
+    properties: tuple[str, ...]
 
 
 # ---------------------------------------------------------------------------

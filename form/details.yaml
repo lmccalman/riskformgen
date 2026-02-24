@@ -1,0 +1,13 @@
+# details.yaml — Contextual topics displayed in risk cards.
+#
+# Each detail is linked to one or more properties. When any linked property
+# is active, the detail's free-text value appears in the Context section of
+# relevant risk cards.
+
+- id: outdoor_context
+  description: Outdoor activity context
+  properties: [outdoors_oriented]
+
+- id: social_context
+  description: Social engagement context
+  properties: [socially_connected, group_participant]
