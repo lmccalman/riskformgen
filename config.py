@@ -6,7 +6,6 @@ templates_dir = project_root / "templates"
 assets_dir = project_root / "assets"
 alpine_src = assets_dir / "alpine3.15.8.min.js"
 persist_src = assets_dir / "alpine-persist.min.js"
-panzoom_src = assets_dir / "panzoom.min.js"
 bulma_src = assets_dir / "bulma.min.css"
 form_dir = project_root / "form"
 

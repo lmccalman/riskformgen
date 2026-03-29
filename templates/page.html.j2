@@ -8,7 +8,6 @@
     <link rel="stylesheet" href="input.css" />
     <script defer src="alpine-persist.min.js"></script>
     <script defer src="alpine3.15.8.min.js"></script>
-    <script src="panzoom.min.js"></script>
   </head>
   <body>
     <main class="container">
@@ -227,21 +226,6 @@
               },
             });
           },
-          selectedNode: '',
-          showNodeModal: false,
-          _panzoomInstance: null,
-          _initPanzoom() {
-            if (this._panzoomInstance) return;
-            const el = this.$refs.graphGroup;
-            if (el && typeof panzoom !== 'undefined') {
-              this._panzoomInstance = panzoom(el, {
-                smoothScroll: false,
-                zoomSpeed: 0.065,
-                minZoom: 0.3,
-                maxZoom: 3,
-              });
-            }
-          },
           {% for prop in property_getters %}
           get prop_{{ prop.id }}() {
             {{ prop.js_body }}
@@ -276,11 +260,6 @@
               <a @click="activeTab = '{{ section.id }}'">{{ section.title }}</a>
             </li>
             {% endfor %}
-            {% if graph.nodes %}
-            <li class="tab-graph" :class="activeTab === 'graph' && 'is-active'">
-              <a @click="activeTab = 'graph'">Graph</a>
-            </li>
-            {% endif %}
             <li class="tab-spacer"></li>
             <li class="tab-risk" :class="activeTab === 'risks' && 'is-active'">
               <a @click="activeTab = 'risks'">Risk Analysis</a>
@@ -309,13 +288,6 @@
           {% include "save_load.html.j2" %}
           {% endwith %}
         </div>
-
-        {# ── Graph tab ── #}
-        {% if graph.nodes %}
-        <div x-show="activeTab === 'graph'" x-init="$watch('activeTab', val => { if (val === 'graph') $nextTick(() => _initPanzoom()) })">
-          {% include "graph.html.j2" %}
-        </div>
-        {% endif %}
 
         {# ── Debug tab ── #}
         <div x-show="activeTab === 'debug'" class="debug-panel stack-md">

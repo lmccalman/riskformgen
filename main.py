@@ -50,11 +50,6 @@ def copy_alpine() -> None:
     shutil.copy2(config.alpine_src, config.output_dir / config.alpine_src.name)
 
 
-def copy_panzoom() -> None:
-    """Copy the panzoom library into the output directory."""
-    shutil.copy2(config.panzoom_src, config.output_dir / config.panzoom_src.name)
-
-
 def main() -> None:
     """Build the static form page."""
     details_path = config.form_dir / "details.yaml"
@@ -79,7 +74,6 @@ def main() -> None:
     write_html(sections, risks, controls, properties, details)
     copy_css()
     copy_alpine()
-    copy_panzoom()
     print(
         f"Built form with {len(sections)} sections, {len(questions)} questions,"
         f" {len(properties)} properties, {len(risks)} risks,"
