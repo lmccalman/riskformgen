@@ -1,9 +1,63 @@
-/* Custom styles — supplements Bulma CSS */
+/* ── Friendly Forest Ent Theme ── */
+/* Supplements Bulma CSS with warm, organic styling */
+
+/* ── Design tokens ── */
+:root {
+  --ent-bg:             #FAF6F0;
+  --ent-bg-card:        #FFFDF8;
+  --ent-bark:           #5C3D2E;
+  --ent-bark-light:     #8B6F5E;
+  --ent-bark-border:    #D4C4B0;
+  --ent-canopy:         #2D5F3A;
+  --ent-canopy-light:   #4A8C5C;
+  --ent-moss:           #7BAE7F;
+  --ent-sunlight:       #D4A843;
+  --ent-sunlight-pale:  #F5E6C4;
+  --ent-shadow:         rgba(92, 61, 46, 0.08);
+  --ent-shadow-hover:   rgba(92, 61, 46, 0.15);
+
+  /* Risk badges — naturalistic semantic colours */
+  --ent-risk-green-bg:  #DFF0D8;
+  --ent-risk-green-fg:  #2D5F3A;
+  --ent-risk-amber-bg:  #F5E6C4;
+  --ent-risk-amber-fg:  #8B6914;
+  --ent-risk-red-bg:    #F0D4D0;
+  --ent-risk-red-fg:    #8B3A2E;
+  --ent-risk-gray-bg:   #E8E0D8;
+  --ent-risk-gray-fg:   #6B5F55;
+
+  /* Dimension badges (likelihood / consequence) */
+  --ent-badge-sage-bg:  #D8E8D0;
+  --ent-badge-sage-fg:  #3A5C42;
+  --ent-badge-tan-bg:   #E0D8C8;
+  --ent-badge-tan-fg:   #5C4A3A;
+}
+
+/* ── Global ── */
+body {
+  font-family: 'Source Sans 3', -apple-system, BlinkMacSystemFont, sans-serif;
+  color: var(--ent-bark);
+  background: var(--ent-bg);
+  line-height: 1.7;
+}
+
+.title, .subtitle, h1, h2, h3, h4, h5, h6,
+.label {
+  font-family: 'Lora', Georgia, serif !important;
+  color: var(--ent-canopy) !important;
+}
+
+.subtitle.is-6,
+p.has-text-grey {
+  color: var(--ent-bark-light) !important;
+}
 
 /* ── Layout ── */
 .container {
   max-width: 42rem !important;
   padding: 0 1rem;
+  padding-top: 2.5rem;
+  padding-bottom: 3rem;
 }
 
 /* ── Alpine.js cloak ── */
@@ -11,23 +65,145 @@
   display: none !important;
 }
 
-/* ── Tab tweaks ── */
+/* ── Tab navigation ── */
 .tab-spacer {
   flex-grow: 1;
 }
 
+.tabs.is-boxed {
+  margin-bottom: 2rem;
+}
+
+.tabs.is-boxed ul {
+  border-bottom-color: var(--ent-bark-border);
+}
+
+.tabs.is-boxed li a {
+  font-family: 'Lora', Georgia, serif;
+  color: var(--ent-bark-light);
+  border-color: transparent;
+  border-radius: 8px 8px 0 0;
+  padding: 0.75em 1.25em;
+  transition: color 0.2s, background-color 0.2s, border-color 0.2s;
+}
+
+.tabs.is-boxed li a:hover {
+  background-color: var(--ent-sunlight-pale);
+  color: var(--ent-canopy);
+  border-color: var(--ent-bark-border);
+  border-bottom-color: transparent;
+}
+
+.tabs.is-boxed li.is-active a {
+  background-color: var(--ent-bg-card);
+  color: var(--ent-canopy);
+  border-color: var(--ent-bark-border);
+  border-bottom-color: var(--ent-bg-card);
+  font-weight: 600;
+}
+
 .tab-risk a {
-  color: #f14668 !important;
+  color: var(--ent-risk-red-fg) !important;
 }
 
 .tab-risk.is-active a {
-  color: #f14668 !important;
-  border-bottom-color: #f14668 !important;
+  color: var(--ent-risk-red-fg) !important;
+  border-bottom-color: var(--ent-bg-card) !important;
+}
+
+.tab-debug a {
+  color: var(--ent-bark-light) !important;
 }
 
 .tab-debug.is-active a {
-  color: #7a7a7a !important;
-  border-bottom-color: #7a7a7a !important;
+  color: var(--ent-bark-light) !important;
+  border-bottom-color: var(--ent-bg-card) !important;
+}
+
+/* ── Cards (risk summaries) ── */
+.card {
+  background: var(--ent-bg-card);
+  border: 1px solid var(--ent-bark-border);
+  border-radius: 12px;
+  box-shadow: 0 2px 8px var(--ent-shadow);
+  overflow: hidden;
+}
+
+.card-header {
+  background: linear-gradient(135deg, var(--ent-canopy), #3A7A4E);
+  box-shadow: none;
+  border-bottom: none;
+}
+
+.card-header-title {
+  font-family: 'Lora', Georgia, serif !important;
+  color: #FFFDF8 !important;
+  font-weight: 600;
+  padding: 1rem 1.5rem;
+}
+
+.card-content {
+  padding: 2rem;
+}
+
+/* Risk card internal layout — clear vertical rhythm */
+.risk-card-body > .subtitle {
+  margin-bottom: 0.25rem;
+}
+
+.risk-card-section {
+  padding-top: 1.25rem;
+  margin-top: 1.25rem;
+  border-top: 1px solid var(--ent-bark-border);
+}
+
+.risk-card-section:first-of-type {
+  border-top: none;
+  margin-top: 0.75rem;
+  padding-top: 0;
+}
+
+.risk-card-section .dim-label {
+  margin-bottom: 0.5rem;
+}
+
+/* ── Boxes (subsections) ── */
+.box {
+  background: var(--ent-bg-card);
+  border: 1px solid var(--ent-bark-border);
+  border-radius: 12px;
+  box-shadow: 0 2px 8px var(--ent-shadow);
+  padding: 2rem;
+}
+
+/* Question dividers within subsection boxes —
+   questions may be .field or wrapped in a bare div (visibility).
+   Target every question-level child after the first one. */
+.box.stack-md > :nth-child(n+3) {
+  margin-bottom: 0;
+  padding-bottom: 0.25rem;
+}
+
+.box.stack-md > :nth-child(n+4) {
+  margin-top: 0 !important;
+  padding-top: 1.5rem;
+  border-top: 1px solid var(--ent-bark-border);
+}
+
+/* Tighten the subtitle-to-first-question gap */
+.box > .subtitle {
+  margin-bottom: 0.25rem;
+}
+
+/* ── Form labels and guidance ── */
+.label {
+  font-weight: 600;
+  font-size: 0.95rem;
+  color: var(--ent-bark) !important;
+}
+
+.help {
+  color: var(--ent-bark-light);
 }
 
 /* ── Badge / pill ── */
@@ -35,57 +211,63 @@
   display: inline-flex;
   align-items: center;
   border-radius: 9999px;
-  padding: 0.125rem 0.625rem;
-  font-size: 0.75rem;
-  font-weight: 500;
+  padding: 0.2rem 0.75rem;
+  font-size: 0.8rem;
+  font-weight: 600;
+  letter-spacing: 0.02em;
   line-height: 1.5;
 }
 
 .badge-blue {
-  background: hsl(210 90% 92%);
-  color: hsl(210 70% 35%);
+  background: var(--ent-badge-sage-bg);
+  color: var(--ent-badge-sage-fg);
 }
 
 .badge-purple {
-  background: hsl(270 80% 92%);
-  color: hsl(270 60% 35%);
+  background: var(--ent-badge-tan-bg);
+  color: var(--ent-badge-tan-fg);
 }
 
 .badge-gray {
-  background: hsl(0 0% 92%);
-  color: hsl(0 0% 40%);
+  background: var(--ent-risk-gray-bg);
+  color: var(--ent-risk-gray-fg);
 }
 
 .badge-green {
-  background: hsl(140 60% 90%);
-  color: hsl(140 50% 30%);
+  background: var(--ent-risk-green-bg);
+  color: var(--ent-risk-green-fg);
 }
 
 .badge-amber {
-  background: hsl(40 90% 88%);
-  color: hsl(30 70% 35%);
+  background: var(--ent-risk-amber-bg);
+  color: var(--ent-risk-amber-fg);
 }
 
 .badge-red {
-  background: hsl(0 70% 92%);
-  color: hsl(0 60% 38%);
+  background: var(--ent-risk-red-bg);
+  color: var(--ent-risk-red-fg);
 }
 
 /* ── Risk grid (likelihood / consequence / level) ── */
 .risk-grid {
   display: grid;
   grid-template-columns: repeat(3, 1fr);
-  gap: 1rem;
+  gap: 1.25rem;
+}
+
+.risk-grid .dim-label {
+  margin-bottom: 0.35rem;
 }
 
 /* ── Dimension labels ── */
 .dim-label {
   display: block;
-  font-size: 0.75rem;
+  font-family: 'Lora', Georgia, serif;
+  font-size: 0.7rem;
   font-weight: 500;
   text-transform: uppercase;
-  letter-spacing: 0.05em;
-  color: #7a7a7a;
+  letter-spacing: 0.08em;
+  color: var(--ent-bark-light);
   margin-bottom: 0.25rem;
 }
 
@@ -110,19 +292,19 @@
 }
 
 .control-icon-active {
-  background: hsl(140 60% 90%);
-  color: hsl(140 50% 30%);
+  background: var(--ent-risk-green-bg);
+  color: var(--ent-risk-green-fg);
 }
 
 .control-icon-inactive {
-  background: hsl(0 0% 92%);
-  color: hsl(0 0% 60%);
+  background: var(--ent-risk-gray-bg);
+  color: var(--ent-risk-gray-fg);
 }
 
 .control-effect {
   margin-left: auto;
   font-size: 0.75rem;
-  color: #7a7a7a;
+  color: var(--ent-bark-light);
 }
 
 /* ── Linked answers ── */
@@ -136,19 +318,61 @@
 
 .answer-missing {
   font-style: italic;
-  color: #7a7a7a;
+  color: var(--ent-bark-light);
 }
 
-/* ── Spacing stacks (replaces Tailwind space-y-*) ── */
-.stack-lg > * + * { margin-top: 2rem; }
-.stack-md > * + * { margin-top: 1rem; }
+/* ── Spacing stacks ── */
+.stack-lg > * + * { margin-top: 2.5rem; }
+.stack-md > * + * { margin-top: 1.25rem; }
 .stack-sm > * + * { margin-top: 0.25rem; }
 
-/* ── Options layout ── */
+/* ── Radio buttons (pill style) ── */
 .options-row {
   display: flex;
-  gap: 1.5rem;
+  gap: 1rem;
   margin-top: 1rem;
+}
+
+.options-row .radio {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.5rem 1.25rem;
+  border: 2px solid var(--ent-bark-border);
+  border-radius: 24px;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  font-weight: 500;
+  color: var(--ent-bark);
+  background: transparent;
+  user-select: none;
+}
+
+.options-row .radio input[type="radio"] {
+  position: absolute;
+  opacity: 0;
+  width: 0;
+  height: 0;
+}
+
+.options-row .radio:hover {
+  border-color: var(--ent-moss);
+  background: var(--ent-sunlight-pale);
+}
+
+/* Selected state via :has() */
+.options-row .radio:has(input:checked) {
+  border-color: var(--ent-canopy);
+  background: var(--ent-canopy);
+  color: #FFFDF8;
+}
+
+/* Fallback for browsers without :has() — Alpine.js adds this class */
+.options-row .radio.radio-selected {
+  border-color: var(--ent-canopy);
+  background: var(--ent-canopy);
+  color: #FFFDF8;
 }
 
 .options-col {
@@ -156,6 +380,52 @@
   flex-direction: column;
   gap: 0.75rem;
   margin-top: 1rem;
+}
+
+/* ── Textareas ── */
+.textarea {
+  font-family: 'Source Sans 3', sans-serif;
+  background: var(--ent-bg);
+  border: 1.5px solid var(--ent-bark-border);
+  border-radius: 8px;
+  color: var(--ent-bark);
+  padding: 0.875rem 1rem;
+  transition: border-color 0.2s, box-shadow 0.2s;
+}
+
+.textarea:focus {
+  border-color: var(--ent-moss);
+  box-shadow: 0 0 0 3px rgba(123, 174, 127, 0.2);
+}
+
+.textarea::placeholder {
+  color: var(--ent-bark-light);
+  opacity: 0.6;
+}
+
+/* ── Select dropdowns ── */
+.select select {
+  font-family: 'Source Sans 3', sans-serif;
+  background: var(--ent-bg);
+  border-color: var(--ent-bark-border);
+  border-radius: 8px;
+  color: var(--ent-bark);
+}
+
+.select select:focus {
+  border-color: var(--ent-moss);
+  box-shadow: 0 0 0 3px rgba(123, 174, 127, 0.2);
+}
+
+/* ── Checkboxes ── */
+.checkbox input[type="checkbox"] {
+  accent-color: var(--ent-canopy);
+  width: 1.1em;
+  height: 1.1em;
+}
+
+.checkbox {
+  color: var(--ent-bark);
 }
 
 /* ── Assessed risk row ── */
@@ -169,19 +439,145 @@
   width: auto;
 }
 
+/* ── Buttons ── */
+.button.is-primary {
+  background-color: var(--ent-canopy) !important;
+  border-color: var(--ent-canopy) !important;
+  color: #FFFDF8 !important;
+  font-family: 'Source Sans 3', sans-serif;
+  font-weight: 600;
+  border-radius: 8px;
+  transition: all 0.2s;
+}
+
+.button.is-primary:hover {
+  background-color: var(--ent-canopy-light) !important;
+  border-color: var(--ent-canopy-light) !important;
+}
+
+.button.is-light {
+  background-color: var(--ent-bg-card);
+  border: 1.5px solid var(--ent-bark-border);
+  color: var(--ent-bark);
+  border-radius: 8px;
+  font-weight: 500;
+  transition: all 0.2s;
+}
+
+.button.is-light:hover {
+  background-color: var(--ent-sunlight-pale);
+  border-color: var(--ent-bark-light);
+}
+
+.button.is-danger.is-outlined {
+  color: var(--ent-risk-red-fg);
+  border-color: var(--ent-risk-red-fg);
+  border-radius: 8px;
+  background: transparent;
+}
+
+.button.is-danger.is-outlined:hover {
+  background-color: var(--ent-risk-red-bg);
+  color: var(--ent-risk-red-fg);
+}
+
 /* ── Save/load bar ── */
 .save-load-bar {
   display: flex;
   gap: 0.5rem;
   justify-content: flex-end;
-  padding-top: 1rem;
-  border-top: 1px solid #dbdbdb;
+  padding-top: 1.5rem;
+  margin-top: 1rem;
+  border-top: 1px solid var(--ent-bark-border);
 }
 
 /* ── Debug panel ── */
 .debug-panel pre {
-  background: #363636;
-  color: #00d1b2;
-  padding: 1.25rem;
-  border-radius: 4px;
+  background: #2D2A24;
+  color: var(--ent-moss);
+  padding: 1.5rem;
+  border-radius: 8px;
+  border: 1px solid var(--ent-bark-border);
+  font-size: 0.85rem;
+}
+
+.debug-panel .title {
+  color: var(--ent-bark) !important;
+}
+
+/* ── Dark Forest Mode ── */
+/* Night under the canopy — reassign tokens, everything follows */
+@media (prefers-color-scheme: dark) {
+  :root {
+    --ent-bg:             #1A1F1A;
+    --ent-bg-card:        #232A23;
+    --ent-bark:           #D4C9BC;
+    --ent-bark-light:     #9C8E7E;
+    --ent-bark-border:    #4A5A4A;
+    --ent-canopy:         #7BAE7F;
+    --ent-canopy-light:   #5E9462;
+    --ent-moss:           #5E9462;
+    --ent-sunlight:       #D4A843;
+    --ent-sunlight-pale:  rgba(212, 168, 67, 0.12);
+    --ent-shadow:         rgba(0, 0, 0, 0.25);
+    --ent-shadow-hover:   rgba(0, 0, 0, 0.4);
+
+    --ent-risk-green-bg:  rgba(123, 174, 127, 0.15);
+    --ent-risk-green-fg:  #8FBF8F;
+    --ent-risk-amber-bg:  rgba(212, 168, 67, 0.15);
+    --ent-risk-amber-fg:  #D4A843;
+    --ent-risk-red-bg:    rgba(180, 80, 70, 0.15);
+    --ent-risk-red-fg:    #C87070;
+    --ent-risk-gray-bg:   rgba(156, 142, 126, 0.15);
+    --ent-risk-gray-fg:   #9C8E7E;
+
+    --ent-badge-sage-bg:  rgba(123, 174, 127, 0.15);
+    --ent-badge-sage-fg:  #8FBF8F;
+    --ent-badge-tan-bg:   rgba(156, 142, 126, 0.15);
+    --ent-badge-tan-fg:   #BCA890;
+  }
+
+  /* Card header gradient — deeper forest at night */
+  .card-header {
+    background: linear-gradient(135deg, #1E3A24, #2A5035);
+  }
+
+  /* Card header title stays bright */
+  .card-header-title {
+    color: #D4C9BC !important;
+  }
+
+  /* Selected radio pills — brighter in dark mode for contrast */
+  .options-row .radio:has(input:checked),
+  .options-row .radio.radio-selected {
+    background: var(--ent-canopy-light);
+    border-color: var(--ent-canopy-light);
+    color: #1A1F1A;
+  }
+
+  .options-row .radio:hover {
+    background: var(--ent-sunlight-pale);
+    border-color: var(--ent-moss);
+  }
+
+  /* Debug panel — already dark, just tweak slightly */
+  .debug-panel pre {
+    background: #151A15;
+    border-color: var(--ent-bark-border);
+  }
+
+  /* Bulma overrides that don't use our tokens */
+  .button.is-primary {
+    color: #1A1F1A !important;
+  }
+
+  .button.is-primary:hover {
+    color: #1A1F1A !important;
+  }
+
+  /* Focus rings — slightly more visible in dark */
+  .textarea:focus,
+  .select select:focus {
+    box-shadow: 0 0 0 3px rgba(94, 148, 98, 0.3);
+  }
 }

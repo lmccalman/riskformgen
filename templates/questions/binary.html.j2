@@ -4,7 +4,7 @@
   <p class="help"><em>{{ question.guidance }}</em></p>
   {% endif %}
   <div class="control options-row">
-    <label class="radio">
+    <label class="radio" :class="answers.{{ question.id }} === 'yes' && 'radio-selected'">
       <input
         type="radio"
         name="{{ question.id }}"
@@ -13,7 +13,7 @@
       />
       Yes
     </label>
-    <label class="radio">
+    <label class="radio" :class="answers.{{ question.id }} === 'no' && 'radio-selected'">
       <input
         type="radio"
         name="{{ question.id }}"

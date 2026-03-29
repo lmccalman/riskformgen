@@ -4,43 +4,45 @@
     <p class="card-header-title">{{ risk.id | replace("_", " ") | title }}</p>
   </header>
 
-  <div class="card-content">
+  <div class="card-content risk-card-body">
     <p class="subtitle is-6 has-text-grey">{{ risk.description }}</p>
 
     {# ── Modelled risk: likelihood × consequence → level ── #}
-    <div class="risk-grid">
-      {# Likelihood #}
-      <div>
-        <span class="dim-label">Likelihood</span>
-        <span
-          class="badge badge-blue"
-          x-text="{{ risk.id }}.likelihood.replace(/_/g, ' ')"
-        ></span>
-      </div>
+    <div class="risk-card-section">
+      <div class="risk-grid">
+        {# Likelihood #}
+        <div>
+          <span class="dim-label">Likelihood</span>
+          <span
+            class="badge badge-blue"
+            x-text="{{ risk.id }}.likelihood.replace(/_/g, ' ')"
+          ></span>
+        </div>
 
-      {# Consequence #}
-      <div>
-        <span class="dim-label">Consequence</span>
-        <span
-          class="badge badge-purple"
-          x-text="{{ risk.id }}.consequence.replace(/_/g, ' ')"
-        ></span>
-      </div>
+        {# Consequence #}
+        <div>
+          <span class="dim-label">Consequence</span>
+          <span
+            class="badge badge-purple"
+            x-text="{{ risk.id }}.consequence.replace(/_/g, ' ')"
+          ></span>
+        </div>
 
-      {# Modelled risk level (colour-coded) #}
-      <div>
-        <span class="dim-label">Modelled Risk</span>
-        <span
-          class="badge"
-          :class="'badge-' + ({ {% for level, colour in risk_level_colours.items() %}'{{ level }}': '{{ colour }}'{% if not loop.last %}, {% endif %}{% endfor %} }[{{ risk.id }}.level] || 'gray')"
-          x-text="{{ risk.id }}.level.replace(/_/g, ' ')"
-        ></span>
+        {# Modelled risk level (colour-coded) #}
+        <div>
+          <span class="dim-label">Modelled Risk</span>
+          <span
+            class="badge"
+            :class="'badge-' + ({ {% for level, colour in risk_level_colours.items() %}'{{ level }}': '{{ colour }}'{% if not loop.last %}, {% endif %}{% endfor %} }[{{ risk.id }}.level] || 'gray')"
+            x-text="{{ risk.id }}.level.replace(/_/g, ' ')"
+          ></span>
+        </div>
       </div>
     </div>
 
     {# ── Controls ── #}
     {% if risk.controls %}
-    <div>
+    <div class="risk-card-section">
       <span class="dim-label">Controls</span>
       <div class="stack-sm">
         {% for ctrl in risk.controls %}
@@ -69,7 +71,7 @@
 
     {# ── Mandate Controls ── #}
     {% if risk.controls %}
-    <div>
+    <div class="risk-card-section">
       <span class="dim-label">Mandate Controls</span>
       <div class="stack-sm">
         {% for ctrl in risk.controls %}
@@ -98,7 +100,7 @@
 
     {# ── Context (detail text relevant to this risk) ── #}
     {% if risk.relevant_details %}
-    <div>
+    <div class="risk-card-section">
       <span class="dim-label">Context</span>
       <div class="stack-sm">
         {% for detail in risk.relevant_details %}
@@ -115,7 +117,7 @@
     {% endif %}
 
     {# ── Assessed risk (user-selected) ── #}
-    <div>
+    <div class="risk-card-section">
       <span class="dim-label">Assessed Risk</span>
       <div class="assessed-row">
         <div class="select is-small">
@@ -137,9 +139,9 @@
     </div>
 
     {# ── Justification ── #}
-    <div class="field">
-      <label class="label dim-label" for="justification_{{ risk.id }}">Justification</label>
-      <div class="control">
+    <div class="risk-card-section">
+      <label class="dim-label" for="justification_{{ risk.id }}">Justification</label>
+      <div>
         <textarea
           class="textarea"
           id="justification_{{ risk.id }}"
