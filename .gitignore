@@ -209,5 +209,9 @@ __marimo__/
 # Generated output
 output/
 
+# Editor frontend
+editor/frontend/node_modules/
+editor/frontend/dist/
+
 #claude plans
 plans/

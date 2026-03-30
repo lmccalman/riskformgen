@@ -1,64 +1,59 @@
-# risks.yaml — Risk definitions derived from properties.
-#
-# Each risk has conditions that reference properties (boolean getters).
-# When a condition fires, it contributes a {likelihood, consequence} pair.
-# When multiple conditions fire, worst-case-wins per dimension independently.
-# When no conditions fire, the risk level is "not_applicable".
-#
-# Condition fields:
-#   properties   — list of property IDs to check
-#   mode         — "any" (at least one true) or "all" (all true); defaults to "all"
-#   likelihood   — likelihood scale value
-#   consequence  — consequence scale value
-
 - id: sedentary_risk
   description: Risk of an overly sedentary lifestyle based on activity patterns.
   conditions:
-    - properties: [indoor_sedentary]
-      mode: all
-      likelihood: likely
-      consequence: medium
-    - properties: [physically_active]
-      mode: all
-      likelihood: unlikely
-      consequence: minor
-    - properties: [exercises_frequently]
-      mode: all
-      likelihood: rare
-      consequence: minor
-
+  - properties:
+    - indoor_sedentary
+    mode: all
+    likelihood: likely
+    consequence: medium
+  - properties:
+    - physically_active
+    mode: all
+    likelihood: unlikely
+    consequence: minor
+  - properties:
+    - exercises_frequently
+    mode: all
+    likelihood: rare
+    consequence: minor
 - id: burnout_risk
   description: Risk of burnout from an indoor-heavy, solitary lifestyle.
   conditions:
-    - properties: [indoor_sedentary]
-      mode: all
-      likelihood: possible
-      consequence: medium
-    - properties: [outdoors_oriented]
-      mode: all
-      likelihood: unlikely
-      consequence: minor
-    - properties: [socially_connected]
-      mode: all
-      likelihood: unlikely
-      consequence: minor
-
+  - properties:
+    - indoor_sedentary
+    mode: all
+    likelihood: possible
+    consequence: medium
+  - properties:
+    - outdoors_oriented
+    mode: all
+    likelihood: unlikely
+    consequence: minor
+  - properties:
+    - socially_connected
+    mode: all
+    likelihood: unlikely
+    consequence: minor
 - id: isolation_risk
   description: Risk of social isolation based on social connections.
   conditions:
-    - properties: [socially_connected]
-      mode: all
-      likelihood: unlikely
-      consequence: minor
-    - properties: [group_participant]
-      mode: all
-      likelihood: rare
-      consequence: minor
-    - properties: [indoor_sedentary]
-      mode: all
-      likelihood: likely
-      consequence: major
-    - properties: [team_sport_player]
-      mode: all
-      likelihood: rare
-      consequence: minor
+  - properties:
+    - socially_connected
+    mode: all
+    likelihood: unlikely
+    consequence: minor
+  - properties:
+    - group_participant
+    mode: all
+    likelihood: rare
+    consequence: minor
+  - properties:
+    - indoor_sedentary
+    mode: all
+    likelihood: likely
+    consequence: major
+  - properties:
+    - team_sport_player
+    mode: all
+    likelihood: rare
+    consequence: minor

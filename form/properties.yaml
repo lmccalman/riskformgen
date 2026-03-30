@@ -1,33 +1,32 @@
-# properties.yaml — Boolean properties forming a DAG.
-#
-# A property that holds implies its parents also hold (subject to activation mode).
-# Edges point child → parent.
-#
-# activation (default "all"):
-#   all — property is active when ALL parents are active
-#   any — property is active when ANY parent is active
-
 - id: physically_active
   description: The person engages in regular physical activity.
-
+  parents: []
+  activation: all
 - id: exercises_frequently
   description: The person exercises at least a few times per week.
-  parents: [physically_active]
-
+  parents:
+  - physically_active
+  activation: all
 - id: outdoors_oriented
   description: The person spends meaningful time outdoors.
-
+  parents: []
+  activation: all
 - id: socially_connected
   description: The person has regular social interaction.
-
+  parents: []
+  activation: all
 - id: group_participant
   description: The person participates in organised group activities.
-  parents: [socially_connected]
-
+  parents:
+  - socially_connected
+  activation: all
 - id: team_sport_player
   description: The person plays team sports.
-  parents: [group_participant, physically_active]
+  parents:
+  - group_participant
+  - physically_active
   activation: any
-
 - id: indoor_sedentary
   description: The person's leisure time is predominantly indoor and sedentary.
+  parents: []
+  activation: all

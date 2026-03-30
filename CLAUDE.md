@@ -18,11 +18,18 @@ uv run ruff format --check .
 # Type check
 uv run basedpyright
 
+# Type check editor frontend
+cd editor/frontend && npx tsc --noEmit
+
 # Serve locally at http://localhost:8000
 python -m http.server -d output
 
 # Add a dependency
 uv add <package>
+
+# Run the spec editor (two terminals)
+cd /path/to/riskformgen && uv run python run_editor.py   # Backend on :8000
+cd editor/frontend && npm run dev                          # Frontend on :5173
 ```
 
 **After any code change, run all four checks before considering work complete:**
@@ -150,3 +157,24 @@ The Jinja2 environment uses `autoescape=True`. When rendering JS expressions ins
 ### Output
 
 All generated files go to `output/` (gitignored): `index.html`, `bulma.min.css`, `input.css`, `alpine3.15.8.min.js`, `alpine-persist.min.js`, `panzoom.min.js`.
+
+### Spec Editor
+
+The spec editor (`editor/`) is a separate GUI tool for creating and editing the YAML specification files. It is a React + TypeScript frontend backed by a FastAPI Python backend.
+
+| Directory | Purpose |
+|---|---|
+| `editor/backend/` | FastAPI API: reads/writes YAML, runs validation via `parse.py`, triggers rebuilds via `main.py` |
+| `editor/frontend/` | React + TypeScript + Vite app with shadcn/ui and @xyflow/react for DAG visualisation |
+| `run_editor.py` | Entry point — starts the uvicorn backend on port 8000 |
+
+**API endpoints** (all under `/api`):
+- `GET /spec` — load entire spec as JSON
+- `PUT /spec` — validate then write YAML (rejects if invalid)
+- `POST /validate` — validate without writing (used for real-time feedback)
+- `POST /rebuild` — rebuild the static site
+
+**Key design decisions**:
+- All domain validation stays in Python — the backend wraps the existing `parse.py` validators. No client-side validation logic duplication.
+- The entire spec is sent/received as a single JSON payload (bulk API) since cross-file references make per-entity validation meaningless.
+- The DAG page uses `@xyflow/react` with `dagre` for auto-layout. It is read-only; clicking a node navigates to its edit form.

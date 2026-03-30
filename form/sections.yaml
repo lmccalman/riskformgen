@@ -1,78 +1,81 @@
-# sections.yaml — Form structure: sections (tabs) > subsections > questions.
-#
-# All questions are binary (yes/no). Each question enables/disables
-# one or more properties. Visibility is driven by the property DAG.
-
 - id: personal
   title: Personal
-  description: "Tell us a bit about yourself \u2014 who you are and what makes you tick."
+  description: Tell us a bit about yourself — who you are and what makes you tick.
   subsections:
-    - title: Activity Level
-      description: Your general relationship with physical activity.
-      questions:
-        - type: binary
-          id: is_active
-          text: Do you engage in regular physical activity?
-          properties: [physically_active]
-          guidance: "This includes structured exercise, walking, cycling, or any regular movement."
-        - type: binary
-          id: exercises_often
-          text: Do you exercise at least a few times per week?
-          properties: [exercises_frequently]
-
-    - title: Outdoor Life
-      description: Your connection with the outdoors.
-      questions:
-        - type: binary
-          id: spends_time_outdoors
-          text: Do you spend meaningful time outdoors?
-          properties: [outdoors_oriented]
-          guidance: "Regular walks, gardening, outdoor sports, or simply spending time in nature."
-        - type: detail
-          id: outdoor_context_detail
-          detail_id: outdoor_context
-          text: Describe your outdoor activities.
-          guidance: "What kinds of outdoor activities do you typically do, and how often?"
-
+  - title: Activity Level
+    description: Your general relationship with physical activity.
+    questions:
+    - type: binary
+      id: is_active
+      text: Do you engage in regular physical activity?
+      properties:
+      - physically_active
+      guidance: This includes structured exercise, walking, cycling, or any regular
+        movement.
+    - type: binary
+      id: exercises_often
+      text: Do you exercise at least a few times per week?
+      properties:
+      - exercises_frequently
+  - title: Outdoor Life
+    description: Your connection with the outdoors.
+    questions:
+    - type: binary
+      id: spends_time_outdoors
+      text: Do you spend meaningful time outdoors?
+      properties:
+      - outdoors_oriented
+      guidance: Regular walks, gardening, outdoor sports, or simply spending time
+        in nature.
+    - type: detail
+      id: outdoor_context_detail
+      text: Describe your outdoor activities.
+      detail_id: outdoor_context
+      guidance: What kinds of outdoor activities do you typically do, and how often?
 - id: social
   title: Social
-  description: "How you connect and interact with the people around you."
+  description: How you connect and interact with the people around you.
   subsections:
-    - title: Social Connections
-      description: Your social life and group involvement.
-      questions:
-        - type: binary
-          id: is_social
-          text: Do you have regular social interaction?
-          properties: [socially_connected]
-        - type: binary
-          id: joins_groups
-          text: Do you participate in organised group activities?
-          properties: [group_participant]
-          guidance: "Clubs, classes, volunteering, team sports, or other structured group activities."
-        - type: detail
-          id: social_context_detail
-          detail_id: social_context
-          text: Describe your social connections and activities.
-          guidance: "How often do you interact socially, and what kinds of groups or activities are you involved in?"
-
-    - title: Team Sports
-      description: Your involvement in competitive team activities.
-      questions:
-        - type: binary
-          id: plays_team_sports
-          text: Do you play team sports?
-          properties: [team_sport_player]
-
+  - title: Social Connections
+    description: Your social life and group involvement.
+    questions:
+    - type: binary
+      id: is_social
+      text: Do you have regular social interaction?
+      properties:
+      - socially_connected
+    - type: binary
+      id: joins_groups
+      text: Do you participate in organised group activities?
+      properties:
+      - group_participant
+      guidance: Clubs, classes, volunteering, team sports, or other structured group
+        activities.
+    - type: detail
+      id: social_context_detail
+      text: Describe your social connections and activities.
+      detail_id: social_context
+      guidance: How often do you interact socially, and what kinds of groups or activities
+        are you involved in?
+  - title: Team Sports
+    description: Your involvement in competitive team activities.
+    questions:
+    - type: binary
+      id: plays_team_sports
+      text: Do you play team sports?
+      properties:
+      - team_sport_player
 - id: lifestyle
   title: Lifestyle
-  description: "Your daily habits and how you spend your downtime."
+  description: Your daily habits and how you spend your downtime.
   subsections:
-    - title: Sedentary Habits
-      description: Your indoor and sedentary tendencies.
-      questions:
-        - type: binary
-          id: mostly_sedentary
-          text: Is your leisure time predominantly indoor and sedentary?
-          properties: [indoor_sedentary]
-          guidance: "Mostly screen time, reading, or other sit-down activities during free time."
+  - title: Sedentary Habits
+    description: Your indoor and sedentary tendencies.
+    questions:
+    - type: binary
+      id: mostly_sedentary
+      text: Is your leisure time predominantly indoor and sedentary?
+      properties:
+      - indoor_sedentary
+      guidance: Mostly screen time, reading, or other sit-down activities during free
+        time.

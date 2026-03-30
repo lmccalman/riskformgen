@@ -262,3 +262,4 @@ Run all four checks before considering a change complete:
 ```bash
 uv run ruff check . && uv run ruff format --check . && uv run basedpyright && uv run pytest tests/ -v
 ```
+
