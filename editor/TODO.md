@@ -6,11 +6,6 @@ header comments (e.g. explaining activation modes, condition fields) that will b
 lost on first save through the editor. Switch `yaml_io.py` to use `ruamel.yaml`
 for comment-preserving round-trips.
 
-## Reordering in sections editor
-Subsections and questions within a section can be added and removed but not
-reordered. Add up/down arrow buttons (or drag-and-drop) so users can control
-the display order.
-
 ## DAG click-to-navigate
 The DAG page navigates to the correct entity page on node click and passes
 `?selected=id` as a query parameter, but the entity pages don't read the query
