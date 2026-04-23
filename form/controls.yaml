@@ -3,38 +3,22 @@
   property: outdoors_oriented
   effects:
   - risk_id: burnout_risk
-    reduces_likelihood: false
-    reduces_consequence: true
   - risk_id: sedentary_risk
-    reduces_likelihood: true
-    reduces_consequence: false
 - id: regular_exercise
   description: Regular exercise programme
   property: exercises_frequently
   effects:
   - risk_id: sedentary_risk
-    reduces_likelihood: true
-    reduces_consequence: true
   - risk_id: burnout_risk
-    reduces_likelihood: true
-    reduces_consequence: false
 - id: group_participation
   description: Group activity participation
   property: group_participant
   effects:
   - risk_id: isolation_risk
-    reduces_likelihood: true
-    reduces_consequence: false
   - risk_id: burnout_risk
-    reduces_likelihood: false
-    reduces_consequence: true
 - id: team_sports
   description: Team sport involvement
   property: team_sport_player
   effects:
   - risk_id: isolation_risk
-    reduces_likelihood: true
-    reduces_consequence: false
   - risk_id: sedentary_risk
-    reduces_likelihood: true
-    reduces_consequence: false

@@ -261,8 +261,6 @@ def prepare_controls(
                     {
                         "id": ctrl.id,
                         "description": ctrl.description,
-                        "reduces_likelihood": effect.reduces_likelihood,
-                        "reduces_consequence": effect.reduces_consequence,
                     }
                 )
 
@@ -300,6 +298,8 @@ def render_form(
         control_getters=control_getters,
         property_getters=property_getters,
         detail_ids=detail_ids,
+        likelihoods=list(config.LIKELIHOODS),
+        consequences=list(config.CONSEQUENCES),
         likelihoods_js=json.dumps(list(config.LIKELIHOODS)),
         consequences_js=json.dumps(list(config.CONSEQUENCES)),
         risk_levels=list(config.RISK_LEVELS),

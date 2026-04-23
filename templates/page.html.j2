@@ -29,7 +29,15 @@
             '{{ did }}': ''{% if not loop.last %},{% endif %}
             {% endfor %}
           }),
-          assessed_risks: $persist({
+          control_effectiveness: $persist({
+            {% for risk in risks %}'{{ risk.id }}': ''{% if not loop.last %},{% endif %}
+            {% endfor %}
+          }),
+          residual_likelihood: $persist({
+            {% for risk in risks %}'{{ risk.id }}': ''{% if not loop.last %},{% endif %}
+            {% endfor %}
+          }),
+          residual_consequence: $persist({
             {% for risk in risks %}'{{ risk.id }}': ''{% if not loop.last %},{% endif %}
             {% endfor %}
           }),
@@ -90,12 +98,16 @@
             const freshDetails = {};
             for (const id of this._detailIds) freshDetails[id] = '';
             this.details = freshDetails;
-            const freshAssessed = {};
+            const freshEffectiveness = {};
+            const freshResidualL = {};
+            const freshResidualC = {};
             const freshJustifications = {};
             const freshMandated = {};
             const freshComments = {};
             for (const id of this._riskIds) {
-              freshAssessed[id] = '';
+              freshEffectiveness[id] = '';
+              freshResidualL[id] = '';
+              freshResidualC[id] = '';
               freshJustifications[id] = '';
               freshMandated[id] = {};
               freshComments[id] = {};
@@ -104,7 +116,9 @@
                 freshComments[id][ctrl] = '';
               }
             }
-            this.assessed_risks = freshAssessed;
+            this.control_effectiveness = freshEffectiveness;
+            this.residual_likelihood = freshResidualL;
+            this.residual_consequence = freshResidualC;
             this.justifications = freshJustifications;
             this.mandated_controls = freshMandated;
             this.mandated_comments = freshComments;
@@ -181,10 +195,12 @@
           exportAssessment() {
             this._downloadJson({
               format: 'riskformgen-assessment',
-              version: 1,
+              version: 2,
               exported_at: new Date().toISOString(),
               risk_ids: this._riskIds,
-              assessed_risks: this.assessed_risks,
+              control_effectiveness: this.control_effectiveness,
+              residual_likelihood: this.residual_likelihood,
+              residual_consequence: this.residual_consequence,
               justifications: this.justifications,
               mandated_controls: this.mandated_controls,
               mandated_comments: this.mandated_comments,
@@ -197,16 +213,34 @@
               currentIds: this._riskIds,
               label: 'assessments',
               count: (data, ids) => {
+                const hasNew = data.control_effectiveness || data.residual_likelihood || data.residual_consequence;
+                if (data.assessed_risks && !hasNew) {
+                  alert('This assessment was exported from a pre-effectiveness build. Re-enter the assessments.');
+                  return {loaded: 0};
+                }
                 let loaded = 0;
                 for (const id of ids) {
-                  if (id in (data.assessed_risks || {}) || id in (data.justifications || {})) loaded++;
+                  if (
+                    id in (data.control_effectiveness || {}) ||
+                    id in (data.residual_likelihood || {}) ||
+                    id in (data.residual_consequence || {}) ||
+                    id in (data.justifications || {})
+                  ) loaded++;
                 }
                 return {loaded};
               },
               apply: (data, ids) => {
+                const hasNew = data.control_effectiveness || data.residual_likelihood || data.residual_consequence;
+                if (data.assessed_risks && !hasNew) return;
                 for (const id of ids) {
-                  if (data.assessed_risks && id in data.assessed_risks) {
-                    this.assessed_risks[id] = data.assessed_risks[id];
+                  if (data.control_effectiveness && id in data.control_effectiveness) {
+                    this.control_effectiveness[id] = data.control_effectiveness[id];
+                  }
+                  if (data.residual_likelihood && id in data.residual_likelihood) {
+                    this.residual_likelihood[id] = data.residual_likelihood[id];
+                  }
+                  if (data.residual_consequence && id in data.residual_consequence) {
+                    this.residual_consequence[id] = data.residual_consequence[id];
                   }
                   if (data.justifications && id in data.justifications) {
                     this.justifications[id] = data.justifications[id];
@@ -250,6 +284,25 @@
             return {
               likelihood, consequence,
               level: (this._risk_matrix[likelihood] || {})[consequence] || 'not_applicable'
+            };
+          },
+          get {{ risk.id }}_residual() {
+            const inherent = this.{{ risk.id }};
+            if (inherent.level === 'not_applicable') return inherent;
+            const eff = this.control_effectiveness['{{ risk.id }}'] || 'ineffective';
+            if (eff === 'ineffective') return inherent;
+            if (eff === 'controlled') return {
+              likelihood: inherent.likelihood,
+              consequence: inherent.consequence,
+              level: 'controlled'
+            };
+            const rL = this.residual_likelihood['{{ risk.id }}'];
+            const rC = this.residual_consequence['{{ risk.id }}'];
+            if (!rL || !rC) return inherent;
+            return {
+              likelihood: rL,
+              consequence: rC,
+              level: (this._risk_matrix[rL] || {})[rC] || 'not_applicable'
             };
           },
           {% endfor %}
@@ -315,8 +368,12 @@
             '{{ risk.id }}': {{ risk.id }}{% if not loop.last %},{% endif %}
             {% endfor %}
           }, null, 2)"></pre>
-          <h3 class="title is-5">Assessed Risks</h3>
-          <pre x-text="JSON.stringify(assessed_risks, null, 2)"></pre>
+          <h3 class="title is-5">Control Effectiveness</h3>
+          <pre x-text="JSON.stringify(control_effectiveness, null, 2)"></pre>
+          <h3 class="title is-5">Residual Likelihood</h3>
+          <pre x-text="JSON.stringify(residual_likelihood, null, 2)"></pre>
+          <h3 class="title is-5">Residual Consequence</h3>
+          <pre x-text="JSON.stringify(residual_consequence, null, 2)"></pre>
           <h3 class="title is-5">Justifications</h3>
           <pre x-text="JSON.stringify(justifications, null, 2)"></pre>
           <h3 class="title is-5">Mandated Controls</h3>

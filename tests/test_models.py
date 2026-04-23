@@ -123,18 +123,9 @@ class TestConditionMapping:
 
 
 class TestControlEffect:
-    def test_validation_both_false(self):
-        with pytest.raises(ValueError, match="at least one"):
-            ControlEffect(risk_id="r1")
-
-    def test_valid_likelihood_only(self):
-        e = ControlEffect(risk_id="r1", reduces_likelihood=True)
-        assert e.reduces_likelihood
-        assert not e.reduces_consequence
-
-    def test_valid_both(self):
-        e = ControlEffect(risk_id="r1", reduces_likelihood=True, reduces_consequence=True)
-        assert e.reduces_likelihood and e.reduces_consequence
+    def test_basic(self):
+        e = ControlEffect(risk_id="r1")
+        assert e.risk_id == "r1"
 
 
 # ---------------------------------------------------------------------------

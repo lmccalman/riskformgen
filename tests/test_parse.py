@@ -268,25 +268,9 @@ class TestParseSection:
 
 class TestParseControlEffect:
     def test_basic(self):
-        e = parse_control_effect(
-            {
-                "risk_id": "r1",
-                "reduces_likelihood": True,
-            }
-        )
+        e = parse_control_effect({"risk_id": "r1"})
         assert isinstance(e, ControlEffect)
-        assert e.reduces_likelihood
-        assert not e.reduces_consequence
-
-    def test_defaults_to_false(self):
-        e = parse_control_effect(
-            {
-                "risk_id": "r1",
-                "reduces_consequence": True,
-            }
-        )
-        assert not e.reduces_likelihood
-        assert e.reduces_consequence
+        assert e.risk_id == "r1"
 
 
 class TestParseControl:
@@ -297,7 +281,7 @@ class TestParseControl:
                 "description": "Encryption enabled",
                 "property": "encrypted",
                 "effects": [
-                    {"risk_id": "r1", "reduces_likelihood": True},
+                    {"risk_id": "r1"},
                 ],
             }
         )
@@ -540,7 +524,7 @@ class TestValidateControlProperties:
                 id="c1",
                 description="C",
                 property="p1",
-                effects=(ControlEffect(risk_id="r1", reduces_likelihood=True),),
+                effects=(ControlEffect(risk_id="r1"),),
             )
         ]
         validate_control_properties(controls, props)  # should not raise
@@ -552,7 +536,7 @@ class TestValidateControlProperties:
                 id="c1",
                 description="C",
                 property="p_missing",
-                effects=(ControlEffect(risk_id="r1", reduces_likelihood=True),),
+                effects=(ControlEffect(risk_id="r1"),),
             )
         ]
         with pytest.raises(ValueError, match="unknown property 'p_missing'"):
@@ -565,13 +549,13 @@ class TestValidateControlProperties:
                 id="c1",
                 description="C1",
                 property="bad1",
-                effects=(ControlEffect(risk_id="r1", reduces_likelihood=True),),
+                effects=(ControlEffect(risk_id="r1"),),
             ),
             Control(
                 id="c2",
                 description="C2",
                 property="bad2",
-                effects=(ControlEffect(risk_id="r1", reduces_likelihood=True),),
+                effects=(ControlEffect(risk_id="r1"),),
             ),
         ]
         with pytest.raises(ValueError, match="bad1") as exc_info:
@@ -601,7 +585,7 @@ class TestValidateControlRiskIds:
                 id="c1",
                 description="C",
                 property="p1",
-                effects=(ControlEffect(risk_id="r1", reduces_likelihood=True),),
+                effects=(ControlEffect(risk_id="r1"),),
             )
         ]
         validate_control_risk_ids(controls, risks)  # should not raise
@@ -623,7 +607,7 @@ class TestValidateControlRiskIds:
                 id="c1",
                 description="C",
                 property="p1",
-                effects=(ControlEffect(risk_id="r_missing", reduces_likelihood=True),),
+                effects=(ControlEffect(risk_id="r_missing"),),
             )
         ]
         with pytest.raises(ValueError, match="unknown risk 'r_missing'"):

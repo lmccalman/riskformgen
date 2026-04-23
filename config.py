@@ -15,9 +15,10 @@ form_dir = project_root / "form"
 
 LIKELIHOODS = ("rare", "unlikely", "possible", "likely", "almost_certain")
 CONSEQUENCES = ("minor", "medium", "major")
-RISK_LEVELS = ("not_applicable", "low", "medium", "high")
+RISK_LEVELS = ("not_applicable", "controlled", "low", "medium", "high")
 RISK_LEVEL_COLOURS: dict[str, str] = {
     "not_applicable": "gray",
+    "controlled": "teal",
     "low": "green",
     "medium": "amber",
     "high": "red",

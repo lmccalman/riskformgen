@@ -93,7 +93,7 @@ def sample_control():
         id="ctrl1",
         description="Encryption enabled",
         property="prop_a",
-        effects=(ControlEffect(risk_id="r1", reduces_likelihood=True),),
+        effects=(ControlEffect(risk_id="r1"),),
     )
 
 

@@ -65,34 +65,15 @@ def _to_risks(spec: SpecPayload) -> list[Risk]:
 
 
 def _to_controls(spec: SpecPayload) -> list[Control]:
-    results = []
-    for c in spec.controls:
-        effects = []
-        for e in c.effects:
-            try:
-                effects.append(
-                    ControlEffect(
-                        risk_id=e.risk_id,
-                        reduces_likelihood=e.reduces_likelihood,
-                        reduces_consequence=e.reduces_consequence,
-                    )
-                )
-            except ValueError as err:
-                # ControlEffect.__post_init__ validates at least one is True;
-                # we still want to collect other errors, so skip this effect
-                results.append(
-                    Control(id=c.id, description=c.description, property=c.property, effects=())
-                )
-                raise ValueError(f"Control {c.id!r}: {err}") from err
-        results.append(
-            Control(
-                id=c.id,
-                description=c.description,
-                property=c.property,
-                effects=tuple(effects),
-            )
+    return [
+        Control(
+            id=c.id,
+            description=c.description,
+            property=c.property,
+            effects=tuple(ControlEffect(risk_id=e.risk_id) for e in c.effects),
         )
-    return results
+        for c in spec.controls
+    ]
 
 
 def _to_questions(sections: list[SectionSchema], details: list[Detail]):

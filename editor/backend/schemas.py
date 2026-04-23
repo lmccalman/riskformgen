@@ -27,8 +27,6 @@ class RiskSchema(BaseModel):
 
 class ControlEffectSchema(BaseModel):
     risk_id: str
-    reduces_likelihood: bool = False
-    reduces_consequence: bool = False
 
 
 class ControlSchema(BaseModel):

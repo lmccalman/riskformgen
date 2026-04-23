@@ -65,7 +65,9 @@ The system is built around a **property DAG** that decouples questions from risk
 
 - **Risks** (`form/risks.yaml`) — Each risk has `conditions` (a list of `ConditionMapping`). Each condition checks a set of properties (via `mode: "any"` or `"all"`) and contributes a `{likelihood, consequence}` pair when the check passes. When multiple conditions fire, **worst-case-wins** per dimension independently. When no conditions fire, the risk level is `"not_applicable"`. Conditions are compiled to JS expressions at build time via `to_js()`.
 
-- **Controls** (`form/controls.yaml`) — Safeguards linked to a single property. A control is "present" when its property is `true`. Each control has `effects` listing which risks it reduces and in which dimension (`reduces_likelihood`, `reduces_consequence`).
+- **Controls** (`form/controls.yaml`) — Safeguards linked to a single property. A control is "present" when its property is `true`. Each control has `effects` listing which risks it addresses (via `risk_id`). Controls do **not** automatically reduce risk — the assessor judges their collective effectiveness per risk at assessment time (see "Residual risk" below).
+
+- **Residual risk** (assessor input at runtime) — For every risk where inherent level is not `not_applicable`, the assessor picks a **control effectiveness**: `ineffective` (default — residual equals inherent), `partial` (assessor picks residual likelihood and consequence independently; level is computed from the matrix), or `controlled` (residual level is the dedicated `controlled` level). A single "Residual Risk Justification" textarea captures the reasoning. State lives in `control_effectiveness`, `residual_likelihood`, `residual_consequence`, and `justifications` on the Alpine scope and is included in the assessment export.
 
 The data flow is: **Questions → Properties → Risks / Controls**.
 
@@ -100,7 +102,7 @@ No changes needed to `question.html.j2`, `subsection.html.j2`, `render.py`, or t
 
 To add a new **risk**, add an entry to `form/risks.yaml` with `id`, `description`, and `conditions` (each referencing properties by ID).
 
-To add a new **control**, add an entry to `form/controls.yaml` with `id`, `description`, `property` (the property ID that activates it), and `effects` (which risks it reduces).
+To add a new **control**, add an entry to `form/controls.yaml` with `id`, `description`, `property` (the property ID that activates it), and `effects` (the list of risks this control addresses, each as `{risk_id: ...}`).
 
 New risks and controls automatically appear in the Risk Analysis tab — no code changes needed.
 

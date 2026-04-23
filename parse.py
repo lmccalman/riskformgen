@@ -148,11 +148,7 @@ def parse_risk(data: YamlDict) -> Risk:
 
 def parse_control_effect(data: YamlDict) -> ControlEffect:
     """Parse a control effect dict into a ControlEffect dataclass."""
-    return ControlEffect(
-        risk_id=data["risk_id"],
-        reduces_likelihood=data.get("reduces_likelihood", False),
-        reduces_consequence=data.get("reduces_consequence", False),
-    )
+    return ControlEffect(risk_id=data["risk_id"])
 
 
 def parse_control(data: YamlDict) -> Control:

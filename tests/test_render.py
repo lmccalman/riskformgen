@@ -313,14 +313,14 @@ class TestPrepareControls:
         prepare_controls([sample_control], risk_dicts)
         assert len(risk_dicts[0]["controls"]) == 1
         assert risk_dicts[0]["controls"][0]["id"] == "ctrl1"
-        assert risk_dicts[0]["controls"][0]["reduces_likelihood"] is True
+        assert risk_dicts[0]["controls"][0]["description"] == "Encryption enabled"
 
     def test_missing_risk_skipped(self):
         ctrl = Control(
             id="c1",
             description="C",
             property="p1",
-            effects=(ControlEffect(risk_id="nonexistent", reduces_likelihood=True),),
+            effects=(ControlEffect(risk_id="nonexistent"),),
         )
         risk_dicts = [{"id": "r1", "description": "R"}]
         getters = prepare_controls([ctrl], risk_dicts)
@@ -461,3 +461,26 @@ class TestRenderFormSaveLoad:
     def test_hidden_file_inputs_present(self, binary_html):
         assert 'type="file"' in binary_html
         assert 'accept=".json"' in binary_html
+
+
+class TestRenderFormResidual:
+    """Verify the control-effectiveness / residual-risk wiring is emitted."""
+
+    @pytest.fixture
+    def risk_html(self, sample_sections, sample_properties, sample_risk):
+        return render_form(sample_sections, [sample_risk], properties=sample_properties)
+
+    def test_residual_getter_emitted_per_risk(self, risk_html):
+        assert "get r1_residual()" in risk_html
+
+    def test_controlled_level_in_colour_map(self, risk_html):
+        assert "'controlled':" in risk_html
+
+    def test_effectiveness_state_seeded(self, risk_html):
+        assert "control_effectiveness: $persist({" in risk_html
+        assert "residual_likelihood: $persist({" in risk_html
+        assert "residual_consequence: $persist({" in risk_html
+
+    def test_assessed_risks_state_removed(self, risk_html):
+        assert "assessed_risks: $persist" not in risk_html
+        assert "this.assessed_risks" not in risk_html

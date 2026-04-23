@@ -25,6 +25,8 @@
   --ent-risk-red-fg:    #8B3A2E;
   --ent-risk-gray-bg:   #E8E0D8;
   --ent-risk-gray-fg:   #6B5F55;
+  --ent-risk-teal-bg:   #D0E4E2;
+  --ent-risk-teal-fg:   #2D5F5C;
 
   /* Dimension badges (likelihood / consequence) */
   --ent-badge-sage-bg:  #D8E8D0;
@@ -246,6 +248,11 @@ p.has-text-grey {
 .badge-red {
   background: var(--ent-risk-red-bg);
   color: var(--ent-risk-red-fg);
+}
+
+.badge-teal {
+  background: var(--ent-risk-teal-bg);
+  color: var(--ent-risk-teal-fg);
 }
 
 /* ── Risk grid (likelihood / consequence / level) ── */
@@ -530,6 +537,8 @@ p.has-text-grey {
     --ent-risk-red-fg:    #C87070;
     --ent-risk-gray-bg:   rgba(156, 142, 126, 0.15);
     --ent-risk-gray-fg:   #9C8E7E;
+    --ent-risk-teal-bg:   rgba(95, 160, 155, 0.15);
+    --ent-risk-teal-fg:   #7FB8B4;
 
     --ent-badge-sage-bg:  rgba(123, 174, 127, 0.15);
     --ent-badge-sage-fg:  #8FBF8F;

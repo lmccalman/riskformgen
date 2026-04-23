@@ -110,17 +110,9 @@ class Risk:
 
 @dataclass(frozen=True)
 class ControlEffect:
-    """Links a control to a risk, indicating which dimensions it reduces."""
+    """Links a control to a risk it addresses."""
 
     risk_id: str
-    reduces_likelihood: bool = False
-    reduces_consequence: bool = False
-
-    def __post_init__(self) -> None:
-        if not self.reduces_likelihood and not self.reduces_consequence:
-            raise ValueError(
-                "ControlEffect requires at least one of reduces_likelihood or reduces_consequence"
-            )
 
 
 @dataclass(frozen=True)

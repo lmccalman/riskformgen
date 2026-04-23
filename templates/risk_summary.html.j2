@@ -57,12 +57,6 @@
           <span
             :class="ctrl_{{ ctrl.id }} ? '' : 'answer-missing'"
             >{{ ctrl.description }}</span>
-          <span class="control-effect">
-            {% if ctrl.reduces_likelihood and ctrl.reduces_consequence %}↓ Likelihood &amp; Consequence
-            {% elif ctrl.reduces_likelihood %}↓ Likelihood
-            {% else %}↓ Consequence
-            {% endif %}
-          </span>
         </div>
         {% endfor %}
       </div>
@@ -116,38 +110,108 @@
     </div>
     {% endif %}
 
-    {# ── Assessed risk (user-selected) ── #}
-    <div class="risk-card-section">
-      <span class="dim-label">Assessed Risk</span>
-      <div class="assessed-row">
-        <div class="select is-small">
-          <select x-model="assessed_risks.{{ risk.id }}">
-            <option value="">— Select —</option>
-            {% for level in risk_levels %}
-            <option value="{{ level }}">{{ level | replace("_", " ") | title }}</option>
-            {% endfor %}
-          </select>
+    {# ── Residual risk (assessor judgement) ── #}
+    <div
+      class="risk-card-section"
+      x-show="{{ risk.id }}.level !== 'not_applicable'"
+      x-cloak
+    >
+      <span class="dim-label">Control Effectiveness</span>
+      <div class="options-row">
+        <label class="radio">
+          <input
+            type="radio"
+            value="ineffective"
+            x-model="control_effectiveness['{{ risk.id }}']"
+          />
+          Ineffective
+        </label>
+        <label class="radio">
+          <input
+            type="radio"
+            value="partial"
+            x-model="control_effectiveness['{{ risk.id }}']"
+          />
+          Partial
+        </label>
+        <label class="radio">
+          <input
+            type="radio"
+            value="controlled"
+            x-model="control_effectiveness['{{ risk.id }}']"
+          />
+          Controlled
+        </label>
+      </div>
+
+      <template x-if="control_effectiveness['{{ risk.id }}'] === 'partial'">
+        <div class="risk-grid" style="margin-top: 0.75rem;">
+          <div>
+            <span class="dim-label">Residual Likelihood</span>
+            <div
+              class="select is-small"
+              :class="!residual_likelihood['{{ risk.id }}'] ? 'is-danger' : ''"
+            >
+              <select x-model="residual_likelihood['{{ risk.id }}']">
+                <option value="">— Select —</option>
+                {% for lk in likelihoods %}
+                <option value="{{ lk }}">{{ lk | replace("_", " ") | title }}</option>
+                {% endfor %}
+              </select>
+            </div>
+          </div>
+          <div>
+            <span class="dim-label">Residual Consequence</span>
+            <div
+              class="select is-small"
+              :class="!residual_consequence['{{ risk.id }}'] ? 'is-danger' : ''"
+            >
+              <select x-model="residual_consequence['{{ risk.id }}']">
+                <option value="">— Select —</option>
+                {% for cs in consequences %}
+                <option value="{{ cs }}">{{ cs | replace("_", " ") | title }}</option>
+                {% endfor %}
+              </select>
+            </div>
+          </div>
+          <div></div>
         </div>
+      </template>
+
+      <div style="margin-top: 0.75rem;">
+        <span class="dim-label">Residual Risk</span>
         <span
-          x-show="assessed_risks.{{ risk.id }}"
-          x-cloak
           class="badge"
-          :class="'badge-' + ({ {% for level, colour in risk_level_colours.items() %}'{{ level }}': '{{ colour }}'{% if not loop.last %}, {% endif %}{% endfor %} }[assessed_risks.{{ risk.id }}] || 'gray')"
-          x-text="assessed_risks.{{ risk.id }}.replace(/_/g, ' ')"
+          :class="'badge-' + ({ {% for level, colour in risk_level_colours.items() %}'{{ level }}': '{{ colour }}'{% if not loop.last %}, {% endif %}{% endfor %} }[{{ risk.id }}_residual.level] || 'gray')"
+          x-text="{{ risk.id }}_residual.level.replace(/_/g, ' ')"
         ></span>
       </div>
+
+      {% if risk.controls %}
+      <p
+        class="help is-warning"
+        x-show="control_effectiveness['{{ risk.id }}'] === 'controlled' && !({% for ctrl in risk.controls %}ctrl_{{ ctrl.id }}{% if not loop.last %} || {% endif %}{% endfor %})"
+        x-cloak
+      >
+        No controls are currently marked present. Provide justification.
+      </p>
+      {% endif %}
     </div>
 
     {# ── Justification ── #}
-    <div class="risk-card-section">
-      <label class="dim-label" for="justification_{{ risk.id }}">Justification</label>
+    <div
+      class="risk-card-section"
+      x-show="{{ risk.id }}.level !== 'not_applicable'"
+      x-cloak
+    >
+      <label class="dim-label" for="justification_{{ risk.id }}">Residual Risk Justification</label>
       <div>
         <textarea
           class="textarea"
           id="justification_{{ risk.id }}"
           x-model="justifications.{{ risk.id }}"
           rows="2"
-          placeholder="Provide reasoning for the assessed risk level…"
+          placeholder="Provide reasoning for the residual risk, control effectiveness, and any compensating factors…"
         ></textarea>
       </div>
     </div>

@@ -17,7 +17,7 @@ what is still outstanding: `grep -B1 "Status:\*\* open" AUDIT.md`.
 ## 1. Bugs and incorrect implementation
 
 ### 1.1 ⚠ Controls don't actually reduce risk — only displayed
-**Status:** open
+**Status:** resolved (2026-04-23) — replaced auto-reduction with assessor-judged control effectiveness + residual risk (see `control_effectiveness` / `residual_likelihood` / `residual_consequence` state in `templates/page.html.j2`).
 `templates/page.html.j2:241-254` computes the risk level purely from
 `ConditionMapping` results and the `RISK_MATRIX` lookup. Controls never enter
 the calculation.
@@ -281,7 +281,7 @@ See §1.9 — the function and its comment are unreferenced.
 ## 4. Architecture and implementation improvements
 
 ### 4.1 Implement (or remove) the control-reduction semantics
-**Status:** open
+**Status:** resolved (2026-04-23) — chose assessor-judged effectiveness rather than implementing auto-reduction or removing the display. See §1.1 note.
 Pick one of:
 - Implement: in the risk getter (`page.html.j2:241`), before the matrix
   lookup, step the worst likelihood/consequence down by one index per active
@@ -334,7 +334,7 @@ typed records, or on the dataclasses themselves as cached properties. Saves a
 See §1.4.
 
 ### 4.7 Consider a single-enum `ControlEffect.reduces`
-**Status:** open
+**Status:** resolved (2026-04-23) — obsoleted by §1.1 resolution. `reduces_likelihood` / `reduces_consequence` removed entirely; `ControlEffect` now holds only `risk_id`.
 Instead of two booleans with a `__post_init__` that forbids `(False, False)`
 (`models.py:119-123`), a single `reduces: Literal["likelihood",
 "consequence", "both"]` field is equally expressive and removes the
