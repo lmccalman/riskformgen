@@ -31,10 +31,14 @@ def _form(
     risks: list[Risk] | None = None,
     controls: list[Control] | None = None,
     details: list[Detail] | None = None,
+    *,
+    persisted_state: dict[str, object] | None = None,
 ) -> Scope:
     sub = SubSection(title="t", description="", questions=tuple(questions))
     sec = Section(id="s1", title="S", description="", subsections=(sub,))
-    return build_scope([sec], properties, risks or [], controls, details)
+    return build_scope(
+        [sec], properties, risks or [], controls, details, persisted_state=persisted_state
+    )
 
 
 # ---------------------------------------------------------------------------
@@ -467,3 +471,197 @@ class TestDetailShow:
         scope, expr = scope_and_expr
         scope.set_answer("q1", "yes")
         assert scope.visibility(expr) is True
+
+
+# ---------------------------------------------------------------------------
+# Schema migration — init() fills keys missing from $persist-restored state
+# ---------------------------------------------------------------------------
+
+
+class TestSchemaMigration:
+    """Pins §1.3's fix: on component init, any ID present in the current build
+    but absent from the localStorage-restored object is seeded with its default
+    (empty string for most fields, `false` for mandated-control checkboxes)."""
+
+    def _risk(self, rid: str, prop_id: str = "p1") -> Risk:
+        return Risk(
+            id=rid,
+            description="",
+            conditions=(
+                ConditionMapping(
+                    properties=(prop_id,),
+                    mode="all",
+                    likelihood="likely",
+                    consequence="major",
+                ),
+            ),
+        )
+
+    def test_answers_missing_key_gets_default(self) -> None:
+        q1 = BinaryQuestion(id="q1", text="", properties=("p1",))
+        q2 = BinaryQuestion(id="q2", text="", properties=("p2",))
+        p1 = Property(id="p1", description="")
+        p2 = Property(id="p2", description="")
+        scope = _form([q1, q2], [p1, p2], persisted_state={"_x_answers": {"q1": "yes"}})
+        assert scope.eval("scope.answers") == {"q1": "yes", "q2": ""}
+
+    def test_details_missing_key_gets_default(self) -> None:
+        q = BinaryQuestion(id="q1", text="", properties=("p1",))
+        p = Property(id="p1", description="")
+        d1 = Detail(id="d1", description="", properties=("p1",))
+        d2 = Detail(id="d2", description="", properties=("p1",))
+        scope = _form(
+            [q],
+            [p],
+            details=[d1, d2],
+            persisted_state={"_x_details": {"d1": "prior note"}},
+        )
+        assert scope.eval("scope.details") == {"d1": "prior note", "d2": ""}
+
+    @pytest.mark.parametrize(
+        "persist_key,field_name",
+        [
+            ("_x_justifications", "justifications"),
+            ("_x_control_effectiveness", "control_effectiveness"),
+            ("_x_residual_likelihood", "residual_likelihood"),
+            ("_x_residual_consequence", "residual_consequence"),
+        ],
+    )
+    def test_risk_keyed_field_seeds_missing_risk(self, persist_key: str, field_name: str) -> None:
+        q = BinaryQuestion(id="q1", text="", properties=("p1",))
+        p = Property(id="p1", description="")
+        scope = _form(
+            [q],
+            [p],
+            risks=[self._risk("r1"), self._risk("r2")],
+            persisted_state={persist_key: {"r1": "prior"}},
+        )
+        assert scope.eval(f"scope.{field_name}") == {"r1": "prior", "r2": ""}
+
+    def test_mandated_controls_missing_risk_fills_all_controls_false(self) -> None:
+        q = BinaryQuestion(id="q1", text="", properties=("p1",))
+        p = Property(id="p1", description="")
+        r1 = self._risk("r1")
+        r2 = self._risk("r2")
+        c1 = Control(
+            id="c1",
+            description="",
+            property="p1",
+            effects=(ControlEffect(risk_id="r2"),),
+        )
+        scope = _form(
+            [q],
+            [p],
+            risks=[r1, r2],
+            controls=[c1],
+            persisted_state={"_x_mandated_controls": {"r1": {}}},
+        )
+        assert scope.eval("scope.mandated_controls") == {"r1": {}, "r2": {"c1": False}}
+
+    def test_mandated_controls_existing_risk_seeds_missing_control(self) -> None:
+        q = BinaryQuestion(id="q1", text="", properties=("p1",))
+        p = Property(id="p1", description="")
+        r1 = self._risk("r1")
+        c1 = Control(
+            id="c1",
+            description="",
+            property="p1",
+            effects=(ControlEffect(risk_id="r1"),),
+        )
+        c2 = Control(
+            id="c2",
+            description="",
+            property="p1",
+            effects=(ControlEffect(risk_id="r1"),),
+        )
+        scope = _form(
+            [q],
+            [p],
+            risks=[r1],
+            controls=[c1, c2],
+            persisted_state={"_x_mandated_controls": {"r1": {"c1": True}}},
+        )
+        assert scope.eval("scope.mandated_controls") == {"r1": {"c1": True, "c2": False}}
+
+    def test_mandated_comments_missing_risk_fills_all_controls_empty(self) -> None:
+        q = BinaryQuestion(id="q1", text="", properties=("p1",))
+        p = Property(id="p1", description="")
+        r1 = self._risk("r1")
+        r2 = self._risk("r2")
+        c1 = Control(
+            id="c1",
+            description="",
+            property="p1",
+            effects=(ControlEffect(risk_id="r2"),),
+        )
+        scope = _form(
+            [q],
+            [p],
+            risks=[r1, r2],
+            controls=[c1],
+            persisted_state={"_x_mandated_comments": {"r1": {}}},
+        )
+        assert scope.eval("scope.mandated_comments") == {"r1": {}, "r2": {"c1": ""}}
+
+    def test_mandated_comments_existing_risk_seeds_missing_control(self) -> None:
+        q = BinaryQuestion(id="q1", text="", properties=("p1",))
+        p = Property(id="p1", description="")
+        r1 = self._risk("r1")
+        c1 = Control(
+            id="c1",
+            description="",
+            property="p1",
+            effects=(ControlEffect(risk_id="r1"),),
+        )
+        c2 = Control(
+            id="c2",
+            description="",
+            property="p1",
+            effects=(ControlEffect(risk_id="r1"),),
+        )
+        scope = _form(
+            [q],
+            [p],
+            risks=[r1],
+            controls=[c1, c2],
+            persisted_state={"_x_mandated_comments": {"r1": {"c1": "prior note"}}},
+        )
+        assert scope.eval("scope.mandated_comments") == {"r1": {"c1": "prior note", "c2": ""}}
+
+    def test_existing_values_are_not_clobbered(self) -> None:
+        """init() is additive only — it must never overwrite restored values."""
+        q1 = BinaryQuestion(id="q1", text="", properties=("p1",))
+        q2 = BinaryQuestion(id="q2", text="", properties=("p2",))
+        p1 = Property(id="p1", description="")
+        p2 = Property(id="p2", description="")
+        r1 = self._risk("r1")
+        scope = _form(
+            [q1, q2],
+            [p1, p2],
+            risks=[r1],
+            persisted_state={
+                "_x_answers": {"q1": "yes", "q2": "no"},
+                "_x_control_effectiveness": {"r1": "controlled"},
+                "_x_justifications": {"r1": "prior justification"},
+            },
+        )
+        assert scope.eval("scope.answers") == {"q1": "yes", "q2": "no"}
+        assert scope.eval("scope.control_effectiveness") == {"r1": "controlled"}
+        assert scope.eval("scope.justifications") == {"r1": "prior justification"}
+
+    def test_no_persisted_state_is_noop(self) -> None:
+        """Without an injected persisted state, init() should see the full seed
+        and make no changes — guards the common (non-migration) case."""
+        q = BinaryQuestion(id="q1", text="", properties=("p1",))
+        p = Property(id="p1", description="")
+        r1 = self._risk("r1")
+        c1 = Control(
+            id="c1",
+            description="",
+            property="p1",
+            effects=(ControlEffect(risk_id="r1"),),
+        )
+        scope = _form([q], [p], risks=[r1], controls=[c1])
+        assert scope.eval("scope.answers") == {"q1": ""}
+        assert scope.eval("scope.mandated_controls") == {"r1": {"c1": False}}
+        assert scope.eval("scope.mandated_comments") == {"r1": {"c1": ""}}

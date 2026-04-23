@@ -54,6 +54,27 @@ document.addEventListener('alpine:init', () => {
     _likelihoods: {{ likelihoods_js }},
     _consequences: {{ consequences_js }},
     _risk_matrix: {{ risk_matrix_js }},
+    init() {
+      // Fill gaps when $persist restores state from a previous build that predates newly-added IDs.
+      for (const id of this._questionIds) {
+        if (!(id in this.answers)) this.answers[id] = '';
+      }
+      for (const id of this._detailIds) {
+        if (!(id in this.details)) this.details[id] = '';
+      }
+      for (const id of this._riskIds) {
+        if (!(id in this.justifications)) this.justifications[id] = '';
+        if (!(id in this.control_effectiveness)) this.control_effectiveness[id] = '';
+        if (!(id in this.residual_likelihood)) this.residual_likelihood[id] = '';
+        if (!(id in this.residual_consequence)) this.residual_consequence[id] = '';
+        if (!(id in this.mandated_controls)) this.mandated_controls[id] = {};
+        if (!(id in this.mandated_comments)) this.mandated_comments[id] = {};
+        for (const cid of (this._controlIds[id] || [])) {
+          if (!(cid in this.mandated_controls[id])) this.mandated_controls[id][cid] = false;
+          if (!(cid in this.mandated_comments[id])) this.mandated_comments[id][cid] = '';
+        }
+      }
+    },
     _worst(results, dim, scale) {
       const vals = results.map(r => r[dim]).filter(v => v !== null);
       if (vals.length === 0) return null;

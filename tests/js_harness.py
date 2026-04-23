@@ -26,8 +26,11 @@ from render import render_app_js
 
 _BOOTSTRAP_JS = """
 const __state = { factory: null };
+const __persistedState = {};
 const Alpine = {
-    $persist: (initial) => ({ as: (_key) => initial }),
+    $persist: (initial) => ({
+        as: (key) => (key in __persistedState) ? __persistedState[key] : initial
+    }),
     data: (_name, factory) => { __state.factory = factory; }
 };
 const document = {
@@ -100,11 +103,21 @@ def build_scope(
     risks: list[Risk],
     controls: list[Control] | None = None,
     details: list[Detail] | None = None,
+    persisted_state: dict[str, object] | None = None,
 ) -> Scope:
-    """Compile the Alpine factory for the given form and return a live Scope."""
+    """Compile the Alpine factory for the given form and return a live Scope.
+
+    `persisted_state` maps `$persist` keys (e.g. `'_x_answers'`) to the value
+    that would be restored from `localStorage`. Unset keys fall back to the
+    factory seed. After the scope is constructed, `scope.init()` is invoked
+    so the post-hydration migration pass runs before readers see state.
+    """
     app_js = render_app_js(sections, risks, controls, properties, details)
     ctx = MiniRacer()
     ctx.eval(_BOOTSTRAP_JS)
+    if persisted_state is not None:
+        ctx.eval(f"Object.assign(__persistedState, {json.dumps(persisted_state)});")
     ctx.eval(app_js)
     ctx.eval("var scope = __state.factory();")
+    ctx.eval("if (typeof scope.init === 'function') scope.init();")
     return Scope(ctx)
