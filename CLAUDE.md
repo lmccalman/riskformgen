@@ -49,11 +49,11 @@ Use `uv run ruff check --fix .` and `uv run ruff format .` to auto-fix lint and 
 
 The build pipeline has three phases:
 
-1. **Python/Jinja2 (build time)** — `main.py` orchestrates the build. Form structure is defined in YAML files under `form/`, parsed by `parse.py` into frozen dataclasses from `models.py`. `render.py` converts them to dicts and renders `templates/page.html.j2` into static HTML. `graph.py` computes a Sugiyama layered layout of the property/risk/control DAG using `grandalf`.
+1. **Python/Jinja2 (build time)** — `main.py` orchestrates the build. Form structure is defined in YAML files under `form/`, parsed by `parse.py` into frozen dataclasses from `models.py`. `render.py` converts them to dicts and renders `templates/page.html.j2` into static HTML.
 
-2. **CSS (build time)** — `bulma.min.css` provides class-based styling (layout, typography, form controls, cards, tabs). `input.css` contains custom CSS for app-specific components (badges, risk grid, graph styles, spacing stacks, etc.). Both are copied directly to `output/` — no compilation step needed.
+2. **CSS (build time)** — `bulma.min.css` provides class-based styling (layout, typography, form controls, cards, tabs). `input.css` contains custom CSS for app-specific components (badges, risk grid, spacing stacks, etc.). Both are copied directly to `output/` — no compilation step needed.
 
-3. **Alpine.js (runtime)** — A parent `<div>` holds the `x-data` scope shared by all section forms, the risks panel, and the graph tab. It contains reactive `answers` state, computed property getters (`prop_*`), control getters (`ctrl_*`), and risk getters — all compiled from Python at build time. Each section renders as its own `<form>` shown/hidden via `x-show`. Question visibility is driven by the property DAG (questions are shown when their target properties are reachable). Risk getters re-evaluate automatically as answers change.
+3. **Alpine.js (runtime)** — A parent `<div>` holds the `x-data` scope shared by all section forms and the risks panel. It contains reactive `answers` state, computed property getters (`prop_*`), control getters (`ctrl_*`), and risk getters — all compiled from Python at build time. Each section renders as its own `<form>` shown/hidden via `x-show`. Question visibility is driven by the property DAG (questions are shown when their target properties are reachable). Risk getters re-evaluate automatically as answers change.
 
 ### Core domain model
 
@@ -67,7 +67,7 @@ The system is built around a **property DAG** that decouples questions from risk
 
 - **Controls** (`form/controls.yaml`) — Safeguards linked to a single property. A control is "present" when its property is `true`. Each control has `effects` listing which risks it reduces and in which dimension (`reduces_likelihood`, `reduces_consequence`).
 
-The data flow is: **Questions → Properties → Risks / Controls**. This is the DAG that the graph visualisation renders.
+The data flow is: **Questions → Properties → Risks / Controls**.
 
 ### Key files
 
@@ -76,34 +76,16 @@ The data flow is: **Questions → Properties → Risks / Controls**. This is the
 | `config.py` | Project paths, risk scales (`LIKELIHOODS`, `CONSEQUENCES`, `RISK_LEVELS`), and `RISK_MATRIX` lookup table |
 | `models.py` | Frozen dataclasses: `BinaryQuestion`, `Property`, `ConditionMapping`, `Risk`, `Control`, `ControlEffect`, `Section`, `SubSection` |
 | `parse.py` | YAML → dataclass parsing (one `load_*` function per YAML file) plus validation functions |
-| `render.py` | Jinja2 environment, `prepare_properties()`, `prepare_sections()`, `prepare_risks()`, `prepare_controls()`, `prepare_graph()`, and `render_form()` |
-| `graph.py` | DAG layout computation using `grandalf` Sugiyama layout — produces `GraphNode`, `GraphEdge`, `GraphLayout` |
+| `render.py` | Jinja2 environment, `prepare_properties()`, `prepare_sections()`, `prepare_risks()`, `prepare_controls()`, and `render_form()` |
 | `main.py` | Build orchestrator — loads YAML, validates, renders HTML, copies assets |
 | `form/*.yaml` | Form definitions: `sections.yaml`, `properties.yaml`, `risks.yaml`, `controls.yaml` |
-| `templates/page.html.j2` | Page skeleton with Alpine.js state, tab navigation, property/risk/control getters, panzoom init |
-| `templates/graph.html.j2` | SVG DAG visualisation with Alpine.js `:class` bindings for reactive colouring and Bulma modal for node details |
+| `templates/page.html.j2` | Page skeleton with Alpine.js state, tab navigation, property/risk/control getters |
 | `templates/subsection.html.j2` | Sub-section partial — heading + question loop |
 | `templates/question.html.j2` | Dispatcher — includes `questions/{type}.html.j2` |
 | `templates/questions/binary.html.j2` | Binary (yes/no) question partial |
 | `templates/risk_summary.html.j2` | Risk card partial with colour-coded level badge |
 | `templates/save_load.html.j2` | Reusable save/load button bar partial |
-| `input.css` | Custom CSS: tabs, badges, risk grid, graph styles, spacing stacks, etc. |
-
-### Graph visualisation
-
-The Graph tab renders the property/risk/control DAG as an interactive SVG:
-
-- **Layout** is computed at build time by `graph.py` using `grandalf` (pure Python Sugiyama layered layout). The layout flows left-to-right by computing top-to-bottom then swapping x/y coordinates.
-- **Rendering** is an SVG emitted by `templates/graph.html.j2` with Alpine.js `:class` bindings for reactive node/edge colouring.
-- **Pan/zoom** is provided by the vendored `panzoom` library, lazily initialised when the Graph tab is first visited.
-- **Node detail modal** uses a Bulma `.modal` triggered by `@click` on SVG nodes, showing type, description, current state, and connections.
-
-Node colouring by state:
-- **Property**: green (true), grey (false), amber (unknown/null)
-- **Risk**: green (low), amber (medium), red (high), grey (not applicable)
-- **Control**: blue (active), grey (inactive)
-
-Edge colouring: solid when the source node is active; dashed grey when inactive.
+| `input.css` | Custom CSS: tabs, badges, risk grid, spacing stacks, etc. |
 
 ### Adding a new question type
 
@@ -120,7 +102,7 @@ To add a new **risk**, add an entry to `form/risks.yaml` with `id`, `description
 
 To add a new **control**, add an entry to `form/controls.yaml` with `id`, `description`, `property` (the property ID that activates it), and `effects` (which risks it reduces).
 
-New risks and controls automatically appear in the Risk Analysis tab and the Graph tab — no code changes needed.
+New risks and controls automatically appear in the Risk Analysis tab — no code changes needed.
 
 ### Adding a new property
 
@@ -128,7 +110,7 @@ Add an entry to `form/properties.yaml` with `id`, `description`, and optionally 
 
 ### Form structure
 
-Forms are organised into **Sections** (rendered as tabs) and **SubSections** (visual groupings within a section), defined in `form/sections.yaml`. Section `id` values are used as Alpine.js tab identifiers — keep them as simple slugs. The Graph tab (blue accent) and Risk Analysis tab (red accent, right-aligned) are always present and not defined in the sections list.
+Forms are organised into **Sections** (rendered as tabs) and **SubSections** (visual groupings within a section), defined in `form/sections.yaml`. Section `id` values are used as Alpine.js tab identifiers — keep them as simple slugs. The Risk Analysis tab (red accent, right-aligned) is always present and not defined in the sections list.
 
 ### Bulma CSS conventions
 
@@ -140,9 +122,8 @@ Templates use Bulma's class-based styling:
 - `.radio` / `.checkbox` on labels for radio/checkbox inputs
 - `.button.is-primary` / `.button.is-light` for action buttons
 - `.title` / `.subtitle` / `.has-text-grey` for typography
-- `.modal` / `.modal-card` for graph node detail popups
 
-Custom classes in `input.css` handle app-specific components: `.badge-{color}`, `.risk-grid`, `.graph-container`, `.graph-fill-*`, `.graph-edge-*`, `.graph-node`, `.graph-label`, `.control-row`, `.stack-{lg,md,sm}`, `.options-{row,col}`, `.assessed-row`, `.linked-answer`, `.debug-panel`.
+Custom classes in `input.css` handle app-specific components: `.badge-{color}`, `.risk-grid`, `.control-row`, `.stack-{lg,md,sm}`, `.options-{row,col}`, `.assessed-row`, `.linked-answer`, `.debug-panel`.
 
 ### Gotcha: Jinja2 autoescape and Alpine.js
 
@@ -150,13 +131,12 @@ The Jinja2 environment uses `autoescape=True`. When rendering JS expressions ins
 
 ### Gotcha: pyright and untyped libraries
 
-`grandalf` and YAML parsing boundaries lack type stubs. Files that interact heavily with these use per-file pyright comment overrides:
-- `graph.py`: `# pyright: reportAttributeAccessIssue=false`
+YAML parsing boundaries lack type stubs. Files that interact heavily with these use per-file pyright comment overrides:
 - `parse.py`: `# pyright: reportArgumentType=false, reportIndexIssue=false, reportGeneralTypeIssues=false`
 
 ### Output
 
-All generated files go to `output/` (gitignored): `index.html`, `bulma.min.css`, `input.css`, `alpine3.15.8.min.js`, `alpine-persist.min.js`, `panzoom.min.js`.
+All generated files go to `output/` (gitignored): `index.html`, `bulma.min.css`, `input.css`, `alpine3.15.8.min.js`, `alpine-persist.min.js`.
 
 ### Spec Editor
 
