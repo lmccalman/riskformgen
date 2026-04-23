@@ -36,25 +36,11 @@ README need to be reframed so the reader doesn't think they reduce anything.
 This is the single biggest source of user confusion in the codebase.
 
 ### 1.2 ◑ Follow-up questions appear before their parent is answered
-**Status:** open
-`render.py:_compile_question_visibility` uses `prop_{parent} !== false`
-(`render.py:94, 97`). Before any answer is given, `prop_parent` returns `null`,
-and `null !== false` is `true`, so the child question is visible.
-
-Concretely, in the demo form the question "Do you exercise at least a few times
-per week?" (`is_active` parent) is visible *before* the user answers "Do you
-engage in regular physical activity?". The inline comment
-(`render.py:81-83`) calls this "reachable", but the UX result is that all
-questions on a tab appear at once. If the intent is "hide until parent is
-answered affirmatively", change the check to `=== true`.
-
-This is a semantic decision rather than a clear bug, but the current behaviour
-is likely surprising given the emphasis on DAG-driven visibility in
-`CLAUDE.md`.
-
-Current behaviour is now pinned by `TestQuestionVisibility` in
-`tests/test_js_behaviour.py` (see §4.8); flipping to `=== true` requires a
-deliberate test update.
+**Status:** resolved (2026-04-23) — `render.py:_compile_question_visibility`
+now emits `prop_{parent} === true` in both `all` and `any` activation
+branches, so child questions stay hidden until a parent is explicitly
+answered "yes". `TestQuestionVisibility` in `tests/test_js_behaviour.py` was
+updated to pin the new progressive-disclosure semantics.
 
 ### 1.3 ◑ `$persist` + schema migration produces phantom-missing keys
 **Status:** resolved (2026-04-23) — added an Alpine `init()` hook in

@@ -12,27 +12,6 @@ file.
 
 ## 1. Bugs and incorrect implementation
 
-### 1.2 ◑ Follow-up questions appear before their parent is answered
-**Status:** open
-`render.py:_compile_question_visibility` uses `prop_{parent} !== false`
-(`render.py:94, 97`). Before any answer is given, `prop_parent` returns `null`,
-and `null !== false` is `true`, so the child question is visible.
-
-Concretely, in the demo form the question "Do you exercise at least a few times
-per week?" (`is_active` parent) is visible *before* the user answers "Do you
-engage in regular physical activity?". The inline comment
-(`render.py:81-83`) calls this "reachable", but the UX result is that all
-questions on a tab appear at once. If the intent is "hide until parent is
-answered affirmatively", change the check to `=== true`.
-
-This is a semantic decision rather than a clear bug, but the current behaviour
-is likely surprising given the emphasis on DAG-driven visibility in
-`CLAUDE.md`.
-
-Current behaviour is now pinned by `TestQuestionVisibility` in
-`tests/test_js_behaviour.py` (see §4.8); flipping to `=== true` requires a
-deliberate test update.
-
 ### 1.4 ◑ Output directory is never cleaned
 **Status:** open
 `main.py:ensure_output_dir` (line 22) only calls `mkdir(exist_ok=True)`. If a

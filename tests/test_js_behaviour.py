@@ -160,10 +160,10 @@ class TestPropertyCascadeAnyMode:
 
 
 class TestQuestionVisibility:
-    """Pins §1.2's current behaviour: a child question becomes visible as soon
-    as its parent property is *not false* — including when the parent is still
-    `null` (unanswered). A future decision to hide until `=== true` must
-    deliberately update these tests."""
+    """A child question is visible only once its parent property is explicitly
+    `true` (the parent question answered "yes"). An unanswered parent (`null`)
+    or a parent answered "no" (`false`) keeps the child hidden — the form
+    expands progressively as the user answers."""
 
     @pytest.fixture
     def scope_and_expr(self) -> tuple[Scope, str]:
@@ -182,9 +182,9 @@ class TestQuestionVisibility:
         scope = _form([q_parent, q_child], props)
         return scope, vis_expr
 
-    def test_visible_when_parent_unanswered(self, scope_and_expr: tuple[Scope, str]) -> None:
+    def test_hidden_when_parent_unanswered(self, scope_and_expr: tuple[Scope, str]) -> None:
         scope, expr = scope_and_expr
-        assert scope.visibility(expr) is True
+        assert scope.visibility(expr) is False
 
     def test_visible_when_parent_yes(self, scope_and_expr: tuple[Scope, str]) -> None:
         scope, expr = scope_and_expr

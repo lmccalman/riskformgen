@@ -84,16 +84,16 @@ class TestCompileQuestionVisibility:
         prop = Property(id="p1", description="Child", parents=("parent1", "parent2"))
         q = BinaryQuestion(id="q1", text="Q", properties=("p1",))
         vis = _compile_question_visibility(q, {"p1": prop})
-        assert "prop_parent1 !== false" in vis
-        assert "prop_parent2 !== false" in vis
+        assert "prop_parent1 === true" in vis
+        assert "prop_parent2 === true" in vis
         assert "&&" in vis
 
     def test_child_any_mode(self):
         prop = Property(id="p1", description="Child", parents=("pa", "pb"), activation="any")
         q = BinaryQuestion(id="q1", text="Q", properties=("p1",))
         vis = _compile_question_visibility(q, {"p1": prop})
-        assert "prop_pa !== false" in vis
-        assert "prop_pb !== false" in vis
+        assert "prop_pa === true" in vis
+        assert "prop_pb === true" in vis
         assert "||" in vis
 
     def test_no_properties(self):
@@ -115,8 +115,8 @@ class TestCompileQuestionVisibility:
         q = BinaryQuestion(id="q1", text="Q", properties=("p1", "p2"))
         vis = _compile_question_visibility(q, {"p1": p1, "p2": p2})
         assert "||" in vis
-        assert "prop_root !== false" in vis
-        assert "prop_root2 !== false" in vis
+        assert "prop_root === true" in vis
+        assert "prop_root2 === true" in vis
 
 
 # ---------------------------------------------------------------------------
@@ -138,8 +138,8 @@ class TestPrepareProperties:
         assert len(getters) == 2
         assert getters[0]["id"] == "root"
         assert getters[1]["id"] == "child"
-        assert visibility["q1"] == "true"  # root is always reachable
-        assert "prop_root !== false" in visibility["q2"]
+        assert visibility["q1"] == "true"  # root is always visible
+        assert "prop_root === true" in visibility["q2"]
 
     def test_empty(self):
         getters, visibility = prepare_properties([], [])
@@ -183,9 +183,9 @@ class TestPrepareSections:
         q2_dict = result[0]["subsections"][0]["questions"][1]
         # q1 targets root (always visible) — no visibility_js
         assert "visibility_js" not in q1_dict
-        # q2 targets child (needs root !== false) — has visibility_js
+        # q2 targets child (needs root === true) — has visibility_js
         assert "visibility_js" in q2_dict
-        assert "prop_root !== false" in q2_dict["visibility_js"]
+        assert "prop_root === true" in q2_dict["visibility_js"]
 
     def test_subsection_visibility(self):
         props = [
