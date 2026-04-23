@@ -121,11 +121,6 @@ class TestParseQuestion:
         with pytest.raises(ValueError, match="Unknown question type"):
             parse_question({"type": "slider", "id": "q1", "text": "Q"})
 
-    def test_old_types_raise(self):
-        for old_type in ["yes_no", "free_text", "multiple_choice", "multiple_select"]:
-            with pytest.raises(ValueError, match="Unknown question type"):
-                parse_question({"type": old_type, "id": "q1", "text": "Q"})
-
 
 # ---------------------------------------------------------------------------
 # parse_condition_mapping / parse_risk
@@ -340,6 +335,20 @@ class TestValidatePropertyDag:
         ]
         with pytest.raises(ValueError, match="cycle"):
             validate_property_dag(props)
+
+    def test_multiple_errors_reported(self):
+        props = [
+            Property(id="dup", description="First"),
+            Property(id="dup", description="Second"),
+            Property(id="orphan", description="O", parents=("missing",)),
+            Property(id="lone", description="L", parents=("also_missing",)),
+        ]
+        with pytest.raises(ValueError, match="Duplicate") as exc_info:
+            validate_property_dag(props)
+        msg = str(exc_info.value)
+        assert "dup" in msg
+        assert "missing" in msg
+        assert "also_missing" in msg
 
 
 class TestValidateQuestionProperties:

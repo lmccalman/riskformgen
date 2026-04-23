@@ -10,6 +10,7 @@ from models import (
     Control,
     ControlEffect,
     Detail,
+    DetailQuestion,
     Property,
     Risk,
     Section,
@@ -199,6 +200,22 @@ class TestPrepareSections:
         result = prepare_sections([sec], vis)
         # Subsection should have visibility_js since all questions are conditional
         assert "visibility_js" in result[0]["subsections"][0]
+
+    def test_subsection_always_visible_when_any_question_is(self):
+        # One always-visible (root) question + one conditional (grandchild) question.
+        # The subsection as a whole is always visible, so no visibility_js key.
+        props = [
+            Property(id="root", description="Root"),
+            Property(id="child", description="Child", parents=("root",)),
+            Property(id="gc", description="Grandchild", parents=("child",)),
+        ]
+        q_root = BinaryQuestion(id="q_root", text="Q root", properties=("root",))
+        q_gc = BinaryQuestion(id="q_gc", text="Q grandchild", properties=("gc",))
+        sub = SubSection(title="Mixed", description="", questions=(q_root, q_gc))
+        sec = Section(id="s", title="S", description="", subsections=(sub,))
+        _, vis = prepare_properties(props, [q_root, q_gc])
+        result = prepare_sections([sec], vis)
+        assert "visibility_js" not in result[0]["subsections"][0]
 
     def test_empty_sections(self):
         assert prepare_sections([], {}) == []
@@ -402,6 +419,59 @@ class TestRenderForm:
         assert "details:" in js
         assert "det1" in js
 
+    def test_detail_rendered_beside_relevant_risk(self, sample_sections, sample_properties):
+        risk = Risk(
+            id="r1",
+            description="Risk tied to prop_a",
+            conditions=(
+                ConditionMapping(
+                    properties=("prop_a",),
+                    mode="all",
+                    likelihood="likely",
+                    consequence="major",
+                ),
+            ),
+        )
+        relevant = Detail(
+            id="det_relevant",
+            description="Outdoor context",
+            properties=("prop_a",),
+        )
+        unrelated = Detail(
+            id="det_unrelated",
+            description="Something else",
+            properties=("prop_b",),
+        )
+        html = render_form(
+            sample_sections,
+            [risk],
+            properties=sample_properties,
+            details=[relevant, unrelated],
+        )
+        # The relevant detail's description and show_js condition reach the risk card
+        assert "Outdoor context" in html
+        assert "prop_prop_a === true" in html
+        assert "details['det_relevant']" in html
+        # The unrelated detail (referencing prop_b, which isn't in risk r1's conditions)
+        # is filtered out of this risk's card
+        assert "Something else" not in html
+        assert "details['det_unrelated']" not in html
+
+    def test_detail_question_guidance_rendered(self, sample_properties, sample_detail):
+        dq = DetailQuestion(
+            id="q_det",
+            text="Describe the context.",
+            detail_id=sample_detail.id,
+            properties=sample_detail.properties,
+            guidance="Be specific about locations.",
+        )
+        sub = SubSection(title="Context", description="", questions=(dq,))
+        sec = Section(id="ctx", title="Context", description="", subsections=(sub,))
+        html = render_form([sec], [], properties=sample_properties, details=[sample_detail])
+        assert "Describe the context." in html
+        assert "Be specific about locations." in html
+        assert "details['det1']" in html
+
 
 # ---------------------------------------------------------------------------
 # render_form — save/load export/import
@@ -439,14 +509,13 @@ class TestRenderFormMetadata:
     """Verify build-time metadata arrays are embedded in the Alpine app bundle."""
 
     def test_question_ids_present(self, binary_app_js):
-        assert '"q_bin"' in binary_app_js
-        assert '"q_bin2"' in binary_app_js
+        assert '_questionIds: ["q_bin", "q_bin2"]' in binary_app_js
 
     def test_risk_ids_empty(self, binary_app_js):
-        assert "_riskIds: [" in binary_app_js
-        start = binary_app_js.index("_riskIds: [")
-        end = binary_app_js.index("]", start)
-        assert binary_app_js[start:end].strip() == "_riskIds: ["
+        assert "_riskIds: []" in binary_app_js
+
+    def test_control_ids_empty(self, binary_app_js):
+        assert "_controlIds: {}" in binary_app_js
 
 
 class TestRenderFormSaveLoad:

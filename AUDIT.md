@@ -359,7 +359,9 @@ See §4.8. This is the single most important gap — nothing in CI currently
 catches a regression in risk calculation.
 
 ### 5.2 ◑ `test_form_files.py` asserts on demo counts
-**Status:** open
+**Status:** resolved (2026-04-23) — count assertions removed; tests now check
+invariants (unique IDs, references resolve, DAG valid) and load via module-scoped
+pytest fixtures.
 `tests/test_form_files.py:43, 67, 89, 115` hard-code the number of sections,
 properties, risks, and controls in the demo form. Changing the demo (which is
 intended behaviour — the form is illustrative) forces a test update.
@@ -371,14 +373,18 @@ Note also the inconsistency: `TestDetails` (lines 146-162) does *not* assert
 a specific detail count, unlike its siblings. Pick a side.
 
 ### 5.3 ◑ Module-level YAML loading
-**Status:** open
+**Status:** resolved (2026-04-23) — YAML loading moved to
+`@pytest.fixture(scope="module")` wrappers; syntax errors now surface as
+per-test errors rather than a collection failure.
 `tests/test_form_files.py:22-33` loads every YAML at import time. A YAML
 syntax error anywhere produces a test-collection failure with a pytest stack
 trace that blames the test file, not the YAML. Move to fixtures with
 `pytest.fixture(scope="module")` so a failure becomes a clean per-test error.
 
 ### 5.4 ◑ `main.py` has no tests
-**Status:** open
+**Status:** resolved (2026-04-23) — `tests/test_main.py` runs `main.main()`
+into a tmpdir and asserts all expected output files exist, are non-empty, and
+contain the Alpine bootstrap markup.
 `ensure_output_dir`, `write_html`, `copy_css`, `copy_alpine`, and the
 orchestrating `main()` function (`main.py:22-82`) are uncovered. A smoke test
 that runs `main()` into a tmpdir and asserts the expected files exist (and
@@ -393,7 +399,10 @@ lives in JS. There's no Python test, and the only render-side test is
 harness (§4.8) or a Playwright test would close this.
 
 ### 5.6 ◑ Subsection visibility dominance rule is not tested
-**Status:** open
+**Status:** resolved (2026-04-23) — added
+`test_subsection_always_visible_when_any_question_is` in
+`TestPrepareSections`, covering a subsection with one root + one conditional
+question.
 `render.py:180` says: if any question in the subsection is always visible,
 the subsection has no `visibility_js`. `test_render.py:TestPrepareSections`
 exercises the "all conditional" case (`test_subsection_visibility`, line
@@ -402,7 +411,10 @@ the dominance rule. Add a test that constructs a subsection with one root
 question and one child-of-child question and asserts no `visibility_js` key.
 
 ### 5.7 ◑ No tests for detail rendering in the final HTML
-**Status:** open
+**Status:** resolved (2026-04-23) — added
+`test_detail_rendered_beside_relevant_risk` (asserts per-risk filtering,
+`show_js`, and `details['<id>']` binding reach the template) and
+`test_detail_question_guidance_rendered` (guidance text next to textarea).
 `TestRenderForm::test_with_details` (line 396) only checks that `"details:"`
 and `"det1"` appear. Nothing verifies the per-risk `relevant_details`
 filtering is wired through to the template, the `show_js` conditional
@@ -411,7 +423,10 @@ renders, or that detail guidance appears beside the textarea. Given
 most likely to drift.
 
 ### 5.8 · Validation tests only check messages, not that all errors are reported
-**Status:** open
+**Status:** resolved (2026-04-23) — `validate_property_dag` now accumulates
+errors instead of early-raising (cycle check is skipped when the graph is
+ill-formed), and `test_multiple_errors_reported` covers duplicate IDs +
+multiple unknown parents together.
 `test_parse.py:TestValidatePropertyDag` checks one error at a time. The
 "`multiple_errors_reported`" pattern used elsewhere
 (`test_parse.py:408, 509, 561`) is good — extend it to
@@ -419,17 +434,18 @@ most likely to drift.
 together).
 
 ### 5.9 · `test_old_types_raise` (test_parse.py:145) hard-codes old type names
-**Status:** open
+**Status:** resolved (2026-04-23) — deleted; §3.1 rewrote the README so the
+test was no longer defending against a documented schema.
 This is a defensive test that the old YAML types (`yes_no` etc.) are rejected.
 It's correct, but its existence only makes sense in light of the README (see
 §3.1) — it's effectively testing that the README is stale. Once the README
 is rewritten, delete this test.
 
 ### 5.10 · `TestRenderFormMetadata` tests internal array names
-**Status:** open
-`test_render.py:434-442` asserts on `_riskIds: [` in the HTML. If §2.2 is
-adopted (pass state as `json.dumps()`), the name or format changes and the
-test becomes stale without surfacing an actual behavioural regression.
+**Status:** resolved (2026-04-23) — post-§2.2 the metadata is emitted via
+`json.dumps()`; assertions now check for the actual JSON payload
+(`_questionIds: ["q_bin", "q_bin2"]`, `_riskIds: []`, `_controlIds: {}`)
+instead of substring-scanning around the bracket.
 
 ---
 

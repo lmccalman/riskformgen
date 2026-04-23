@@ -113,75 +113,11 @@ wants to surface build output.
 
 ## 5. Test coverage and correctness
 
-### 5.2 ◑ `test_form_files.py` asserts on demo counts
-**Status:** open
-`tests/test_form_files.py:43, 67, 89, 115` hard-code the number of sections,
-properties, risks, and controls in the demo form. Changing the demo (which is
-intended behaviour — the form is illustrative) forces a test update.
-Better: drop the counts and assert invariants (unique IDs, references resolve,
-DAG valid). Even better: use a dedicated fixture YAML under `tests/fixtures/`
-so the production form can evolve independently.
-
-Note also the inconsistency: `TestDetails` (lines 146-162) does *not* assert
-a specific detail count, unlike its siblings. Pick a side.
-
-### 5.3 ◑ Module-level YAML loading
-**Status:** open
-`tests/test_form_files.py:22-33` loads every YAML at import time. A YAML
-syntax error anywhere produces a test-collection failure with a pytest stack
-trace that blames the test file, not the YAML. Move to fixtures with
-`pytest.fixture(scope="module")` so a failure becomes a clean per-test error.
-
-### 5.4 ◑ `main.py` has no tests
-**Status:** open
-`ensure_output_dir`, `write_html`, `copy_css`, `copy_alpine`, and the
-orchestrating `main()` function (`main.py:22-82`) are uncovered. A smoke test
-that runs `main()` into a tmpdir and asserts the expected files exist (and
-that `index.html` is non-empty) would catch breakage in the wiring.
-
 ### 5.5 ◑ Export/import roundtrip is untested
 **Status:** open
 `page.html.j2:112-230` contains substantial logic (version-gated parsing,
 added/removed ID diffs, mandate-control merging, error paths). All of it
 lives in JS. There's no Python test, and the only render-side test is
 `TestRenderFormSaveLoad` which verifies *strings appear*. A JS-behaviour test
-harness (§4.8) or a Playwright test would close this.
-
-### 5.6 ◑ Subsection visibility dominance rule is not tested
-**Status:** open
-`render.py:180` says: if any question in the subsection is always visible,
-the subsection has no `visibility_js`. `test_render.py:TestPrepareSections`
-exercises the "all conditional" case (`test_subsection_visibility`, line
-189) but not the "mixed" case (conditional + always-visible) that triggers
-the dominance rule. Add a test that constructs a subsection with one root
-question and one child-of-child question and asserts no `visibility_js` key.
-
-### 5.7 ◑ No tests for detail rendering in the final HTML
-**Status:** open
-`TestRenderForm::test_with_details` (line 396) only checks that `"details:"`
-and `"det1"` appear. Nothing verifies the per-risk `relevant_details`
-filtering is wired through to the template, the `show_js` conditional
-renders, or that detail guidance appears beside the textarea. Given
-`details.yaml` is the newest addition (commit `e28191d`), this is the area
-most likely to drift.
-
-### 5.8 · Validation tests only check messages, not that all errors are reported
-**Status:** open
-`test_parse.py:TestValidatePropertyDag` checks one error at a time. The
-"`multiple_errors_reported`" pattern used elsewhere
-(`test_parse.py:408, 509, 561`) is good — extend it to
-`validate_property_dag` (e.g. duplicate ID + unknown parent + cycle
-together).
-
-### 5.9 · `test_old_types_raise` (test_parse.py:145) hard-codes old type names
-**Status:** open
-This is a defensive test that the old YAML types (`yes_no` etc.) are rejected.
-It's correct, but its existence only makes sense in light of the README (see
-§3.1) — it's effectively testing that the README is stale. Once the README
-is rewritten, delete this test.
-
-### 5.10 · `TestRenderFormMetadata` tests internal array names
-**Status:** open
-`test_render.py:434-442` asserts on `_riskIds: [` in the HTML. If §2.2 is
-adopted (pass state as `json.dumps()`), the name or format changes and the
-test becomes stale without surfacing an actual behavioural regression.
+harness (§4.8, now resolved — see `tests/js_harness.py`) or a Playwright
+test would close this.

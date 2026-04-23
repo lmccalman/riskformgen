@@ -285,44 +285,53 @@ def load_properties(path: Path) -> list[Property]:
 def validate_property_dag(properties: list[Property]) -> None:
     """Validate properties form a valid DAG: no duplicate IDs, all parents exist, no cycles."""
     ids = [p.id for p in properties]
+    errors: list[str] = []
 
-    # Check for duplicate IDs
+    # Duplicate IDs — report each duplicate once, not per extra occurrence
     seen: set[str] = set()
+    flagged_dupes: set[str] = set()
     for pid in ids:
-        if pid in seen:
-            raise ValueError(f"Duplicate property ID: {pid!r}")
+        if pid in seen and pid not in flagged_dupes:
+            errors.append(f"Duplicate property ID: {pid!r}")
+            flagged_dupes.add(pid)
         seen.add(pid)
 
-    # Check all parent references resolve
+    # Unknown parent references
     id_set = set(ids)
     for p in properties:
         for parent in p.parents:
             if parent not in id_set:
-                raise ValueError(f"Property {p.id!r} references unknown parent {parent!r}")
+                errors.append(f"Property {p.id!r} references unknown parent {parent!r}")
 
     # Cycle detection via Kahn's algorithm (topological sort).
     # In-degree of a node = number of parents it has. Roots (no parents) start
     # at 0 and seed the queue; Kahn's peels layers outward and anything left
-    # with in-degree > 0 at the end is part of a cycle.
-    in_degree: dict[str, int] = {pid: 0 for pid in ids}
-    children: dict[str, list[str]] = {pid: [] for pid in ids}
-    for p in properties:
-        for parent in p.parents:
-            in_degree[p.id] += 1
-            children[parent].append(p.id)
+    # with in-degree > 0 at the end is part of a cycle. Skip if the graph is
+    # already known to be ill-formed (dupes or unknown parents) — Kahn's would
+    # misreport otherwise.
+    if not errors:
+        in_degree: dict[str, int] = {pid: 0 for pid in ids}
+        children: dict[str, list[str]] = {pid: [] for pid in ids}
+        for p in properties:
+            for parent in p.parents:
+                in_degree[p.id] += 1
+                children[parent].append(p.id)
 
-    queue = [pid for pid, deg in in_degree.items() if deg == 0]
-    visited = 0
-    while queue:
-        node = queue.pop()
-        visited += 1
-        for child in children[node]:
-            in_degree[child] -= 1
-            if in_degree[child] == 0:
-                queue.append(child)
+        queue = [pid for pid, deg in in_degree.items() if deg == 0]
+        visited = 0
+        while queue:
+            node = queue.pop()
+            visited += 1
+            for child in children[node]:
+                in_degree[child] -= 1
+                if in_degree[child] == 0:
+                    queue.append(child)
 
-    if visited != len(ids):
-        raise ValueError("Property DAG contains a cycle")
+        if visited != len(ids):
+            errors.append("Property DAG contains a cycle")
+
+    if errors:
+        raise ValueError("Invalid property DAG:\n  " + "\n  ".join(errors))
 
 
 def validate_question_properties(

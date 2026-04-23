@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+import pytest
+
 import config
 from models import all_questions
 from parse import (
@@ -19,18 +21,51 @@ from parse import (
     validate_risk_properties,
 )
 
-_details_path = config.form_dir / "details.yaml"
-DETAILS = load_details(_details_path) if _details_path.exists() else []
-DETAILS_BY_ID = {d.id: d for d in DETAILS}
 
-SECTIONS = load_sections(config.form_dir / "sections.yaml", DETAILS_BY_ID)
-PROPERTIES = load_properties(config.form_dir / "properties.yaml")
-RISKS = load_risks(config.form_dir / "risks.yaml")
-CONTROLS = load_controls(config.form_dir / "controls.yaml")
-QUESTIONS = all_questions(SECTIONS)
-QUESTION_IDS = {q.id for q in QUESTIONS}
-PROPERTY_IDS = {p.id for p in PROPERTIES}
-RISK_IDS = {r.id for r in RISKS}
+@pytest.fixture(scope="module")
+def details():
+    path = config.form_dir / "details.yaml"
+    return load_details(path) if path.exists() else []
+
+
+@pytest.fixture(scope="module")
+def details_by_id(details):
+    return {d.id: d for d in details}
+
+
+@pytest.fixture(scope="module")
+def sections(details_by_id):
+    return load_sections(config.form_dir / "sections.yaml", details_by_id)
+
+
+@pytest.fixture(scope="module")
+def properties():
+    return load_properties(config.form_dir / "properties.yaml")
+
+
+@pytest.fixture(scope="module")
+def risks():
+    return load_risks(config.form_dir / "risks.yaml")
+
+
+@pytest.fixture(scope="module")
+def controls():
+    return load_controls(config.form_dir / "controls.yaml")
+
+
+@pytest.fixture(scope="module")
+def questions(sections):
+    return all_questions(sections)
+
+
+@pytest.fixture(scope="module")
+def property_ids(properties):
+    return {p.id for p in properties}
+
+
+@pytest.fixture(scope="module")
+def risk_ids(risks):
+    return {r.id for r in risks}
 
 
 # ---------------------------------------------------------------------------
@@ -39,21 +74,18 @@ RISK_IDS = {r.id for r in RISKS}
 
 
 class TestSections:
-    def test_section_count(self):
-        assert len(SECTIONS) == 3
+    def test_section_ids_unique(self, sections):
+        ids = [s.id for s in sections]
+        assert len(ids) == len(set(ids)), f"Duplicate section IDs: {ids}"
 
-    def test_section_ids(self):
-        ids = [s.id for s in SECTIONS]
-        assert ids == ["personal", "social", "lifestyle"]
-
-    def test_question_ids_unique(self):
-        ids = [q.id for q in QUESTIONS]
+    def test_question_ids_unique(self, questions):
+        ids = [q.id for q in questions]
         dupes = [x for x in ids if ids.count(x) > 1]
         assert len(ids) == len(set(ids)), f"Duplicate question IDs: {dupes}"
 
-    def test_question_types_are_known(self):
+    def test_question_types_are_known(self, questions):
         known_types = {"binary", "detail"}
-        for q in QUESTIONS:
+        for q in questions:
             assert q.type in known_types, f"Question {q.id!r} has unknown type {q.type!r}"
 
 
@@ -63,19 +95,16 @@ class TestSections:
 
 
 class TestProperties:
-    def test_property_count(self):
-        assert len(PROPERTIES) == 7
+    def test_dag_valid(self, properties):
+        validate_property_dag(properties)  # should not raise
 
-    def test_dag_valid(self):
-        validate_property_dag(PROPERTIES)  # should not raise
+    def test_question_properties_valid(self, questions, properties):
+        validate_question_properties(questions, properties)  # should not raise
 
-    def test_question_properties_valid(self):
-        validate_question_properties(QUESTIONS, PROPERTIES)  # should not raise
-
-    def test_all_question_property_refs_exist(self):
-        for q in QUESTIONS:
+    def test_all_question_property_refs_exist(self, questions, property_ids):
+        for q in questions:
             for pid in q.properties:
-                assert pid in PROPERTY_IDS, (
+                assert pid in property_ids, (
                     f"Question {q.id!r} references unknown property {pid!r}"
                 )
 
@@ -86,21 +115,18 @@ class TestProperties:
 
 
 class TestRisks:
-    def test_risk_count(self):
-        assert len(RISKS) == 3
-
-    def test_risk_ids_unique(self):
-        ids = [r.id for r in RISKS]
+    def test_risk_ids_unique(self, risks):
+        ids = [r.id for r in risks]
         assert len(ids) == len(set(ids)), f"Duplicate risk IDs: {ids}"
 
-    def test_risk_properties_valid(self):
-        validate_risk_properties(RISKS, PROPERTIES)  # should not raise
+    def test_risk_properties_valid(self, risks, properties):
+        validate_risk_properties(risks, properties)  # should not raise
 
-    def test_all_condition_property_refs_exist(self):
-        for risk in RISKS:
+    def test_all_condition_property_refs_exist(self, risks, property_ids):
+        for risk in risks:
             for cond in risk.conditions:
                 for pid in cond.properties:
-                    assert pid in PROPERTY_IDS, (
+                    assert pid in property_ids, (
                         f"Risk {risk.id!r} references unknown property {pid!r}"
                     )
 
@@ -111,29 +137,26 @@ class TestRisks:
 
 
 class TestControls:
-    def test_control_count(self):
-        assert len(CONTROLS) == 4
-
-    def test_control_ids_unique(self):
-        ids = [c.id for c in CONTROLS]
+    def test_control_ids_unique(self, controls):
+        ids = [c.id for c in controls]
         assert len(ids) == len(set(ids)), f"Duplicate control IDs: {ids}"
 
-    def test_control_properties_valid(self):
-        validate_control_properties(CONTROLS, PROPERTIES)  # should not raise
+    def test_control_properties_valid(self, controls, properties):
+        validate_control_properties(controls, properties)  # should not raise
 
-    def test_control_risk_ids_valid(self):
-        validate_control_risk_ids(CONTROLS, RISKS)  # should not raise
+    def test_control_risk_ids_valid(self, controls, risks):
+        validate_control_risk_ids(controls, risks)  # should not raise
 
-    def test_all_property_refs_exist(self):
-        for ctrl in CONTROLS:
-            assert ctrl.property in PROPERTY_IDS, (
+    def test_all_property_refs_exist(self, controls, property_ids):
+        for ctrl in controls:
+            assert ctrl.property in property_ids, (
                 f"Control {ctrl.id!r} references unknown property {ctrl.property!r}"
             )
 
-    def test_all_effect_risk_refs_exist(self):
-        for ctrl in CONTROLS:
+    def test_all_effect_risk_refs_exist(self, controls, risk_ids):
+        for ctrl in controls:
             for effect in ctrl.effects:
-                assert effect.risk_id in RISK_IDS, (
+                assert effect.risk_id in risk_ids, (
                     f"Control {ctrl.id!r} references unknown risk {effect.risk_id!r}"
                 )
 
@@ -144,19 +167,19 @@ class TestControls:
 
 
 class TestDetails:
-    def test_detail_ids_unique(self):
-        ids = [d.id for d in DETAILS]
+    def test_detail_ids_unique(self, details):
+        ids = [d.id for d in details]
         assert len(ids) == len(set(ids)), f"Duplicate detail IDs: {ids}"
 
-    def test_detail_properties_valid(self):
-        validate_detail_properties(DETAILS, PROPERTIES)  # should not raise
+    def test_detail_properties_valid(self, details, properties):
+        validate_detail_properties(details, properties)  # should not raise
 
-    def test_detail_questions_valid(self):
-        validate_detail_questions(QUESTIONS, DETAILS)  # should not raise
+    def test_detail_questions_valid(self, questions, details):
+        validate_detail_questions(questions, details)  # should not raise
 
-    def test_all_detail_property_refs_exist(self):
-        for detail in DETAILS:
+    def test_all_detail_property_refs_exist(self, details, property_ids):
+        for detail in details:
             for pid in detail.properties:
-                assert pid in PROPERTY_IDS, (
+                assert pid in property_ids, (
                     f"Detail {detail.id!r} references unknown property {pid!r}"
                 )
