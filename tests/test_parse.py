@@ -13,9 +13,12 @@ from models import (
     DetailQuestion,
     Property,
     Risk,
+    Section,
+    SubSection,
 )
 from parse import (
     _ensure_str,
+    _validate_id,
     parse_condition_mapping,
     parse_control,
     parse_control_effect,
@@ -29,6 +32,7 @@ from parse import (
     validate_control_risk_ids,
     validate_detail_properties,
     validate_detail_questions,
+    validate_id_namespaces,
     validate_property_dag,
     validate_question_properties,
     validate_risk_properties,
@@ -615,3 +619,192 @@ class TestValidateControlRiskIds:
 
     def test_empty_controls_pass(self):
         validate_control_risk_ids([], [])  # should not raise
+
+
+# ---------------------------------------------------------------------------
+# _validate_id
+# ---------------------------------------------------------------------------
+
+
+class TestValidateId:
+    @pytest.mark.parametrize("good", ["foo", "foo_bar", "_foo", "Foo123", "a"])
+    def test_valid_ids_pass(self, good):
+        _validate_id(good, kind="property")  # should not raise
+
+    @pytest.mark.parametrize(
+        "bad",
+        [
+            "my-risk",  # hyphen
+            "2fa_required",  # leading digit
+            "",  # empty
+            "foo bar",  # space
+            "foo.bar",  # dot
+            "foo$bar",  # dollar sign (legal JS but we don't allow it)
+            "café",  # non-ASCII
+        ],
+    )
+    def test_invalid_shape_raises(self, bad):
+        with pytest.raises(ValueError, match="Invalid id"):
+            _validate_id(bad, kind="property")
+
+    @pytest.mark.parametrize("reserved", ["class", "return", "new", "this", "null"])
+    def test_reserved_words_raise(self, reserved):
+        with pytest.raises(ValueError, match="reserved word"):
+            _validate_id(reserved, kind="risk")
+
+    def test_non_string_raises(self):
+        with pytest.raises(ValueError, match="Invalid id"):
+            _validate_id(123, kind="property")
+
+    def test_error_mentions_kind(self):
+        with pytest.raises(ValueError, match="risk"):
+            _validate_id("bad-id", kind="risk")
+
+
+# ---------------------------------------------------------------------------
+# Per-parse_* bad-id cases
+# ---------------------------------------------------------------------------
+
+
+class TestParseBadIds:
+    """Spot-check that each parse_* function actually calls _validate_id."""
+
+    def test_parse_property_bad_id(self):
+        with pytest.raises(ValueError, match="Invalid id"):
+            parse_property({"id": "bad-id", "description": "X"})
+
+    def test_parse_detail_bad_id(self):
+        with pytest.raises(ValueError, match="Invalid id"):
+            parse_detail({"id": "2bad", "description": "X"})
+
+    def test_parse_binary_question_bad_id(self):
+        with pytest.raises(ValueError, match="Invalid id"):
+            parse_question({"type": "binary", "id": "bad id", "text": "Q"})
+
+    def test_parse_detail_question_bad_id(self):
+        det = Detail(id="det1", description="D", properties=())
+        with pytest.raises(ValueError, match="Invalid id"):
+            parse_question(
+                {"type": "detail", "id": "bad-q", "text": "Q", "detail_id": "det1"},
+                details_by_id={"det1": det},
+            )
+
+    def test_parse_section_bad_id(self):
+        with pytest.raises(ValueError, match="Invalid id"):
+            parse_section(
+                {
+                    "id": "bad-section",
+                    "title": "T",
+                    "description": "D",
+                    "subsections": [],
+                }
+            )
+
+    def test_parse_risk_bad_id(self):
+        with pytest.raises(ValueError, match="Invalid id"):
+            parse_risk({"id": "bad-risk", "description": "D", "conditions": []})
+
+    def test_parse_control_bad_id(self):
+        with pytest.raises(ValueError, match="Invalid id"):
+            parse_control({"id": "bad-ctrl", "description": "D", "property": "p1", "effects": []})
+
+
+# ---------------------------------------------------------------------------
+# validate_id_namespaces
+# ---------------------------------------------------------------------------
+
+
+def _risk(rid: str) -> Risk:
+    return Risk(
+        id=rid,
+        description="D",
+        conditions=(
+            ConditionMapping(
+                properties=("p1",), mode="all", likelihood="rare", consequence="minor"
+            ),
+        ),
+    )
+
+
+def _section(sid: str, question_ids: tuple[str, ...] = ()) -> Section:
+    return Section(
+        id=sid,
+        title="T",
+        description="D",
+        subsections=(
+            SubSection(
+                title="Sub",
+                description="D",
+                questions=tuple(
+                    BinaryQuestion(id=qid, text="Q", properties=()) for qid in question_ids
+                ),
+            ),
+        ),
+    )
+
+
+class TestValidateIdNamespaces:
+    def test_valid(self):
+        validate_id_namespaces(
+            sections=[_section("s1", ("q1",))],
+            properties=[Property(id="p1", description="P")],
+            risks=[_risk("r1")],
+            controls=[Control(id="c1", description="C", property="p1", effects=())],
+            details=[Detail(id="d1", description="D", properties=())],
+        )  # should not raise
+
+    def test_risk_collides_with_state_field(self):
+        with pytest.raises(ValueError, match="reserved Alpine scope name"):
+            validate_id_namespaces(
+                sections=[],
+                properties=[],
+                risks=[_risk("answers")],
+                controls=[],
+                details=[],
+            )
+
+    def test_risk_collides_with_helper_method(self):
+        with pytest.raises(ValueError, match="reserved Alpine scope name"):
+            validate_id_namespaces(
+                sections=[],
+                properties=[],
+                risks=[_risk("_worst")],
+                controls=[],
+                details=[],
+            )
+
+    def test_risk_residual_collides_with_state_field(self):
+        # "control_effectiveness_residual" isn't a real state name, so this
+        # checks the other direction: a risk id whose `_residual` sibling
+        # would collide with a different risk id.
+        with pytest.raises(ValueError, match="collides with"):
+            validate_id_namespaces(
+                sections=[],
+                properties=[],
+                risks=[_risk("foo"), _risk("foo_residual")],
+                controls=[],
+                details=[],
+            )
+
+    def test_cross_namespace_collision(self):
+        with pytest.raises(ValueError, match="unique across namespaces"):
+            validate_id_namespaces(
+                sections=[],
+                properties=[Property(id="shared", description="P")],
+                risks=[],
+                controls=[Control(id="shared", description="C", property="shared", effects=())],
+                details=[],
+            )
+
+    def test_multiple_errors_reported(self):
+        with pytest.raises(ValueError, match="answers") as exc_info:
+            validate_id_namespaces(
+                sections=[],
+                properties=[Property(id="dup", description="P")],
+                risks=[_risk("answers"), _risk("details")],
+                controls=[Control(id="dup", description="C", property="dup", effects=())],
+                details=[],
+            )
+        msg = str(exc_info.value)
+        assert "details" in msg
+        assert "unique across namespaces" in msg

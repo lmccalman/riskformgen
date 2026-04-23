@@ -12,6 +12,7 @@ from parse import (
     validate_control_risk_ids,
     validate_detail_properties,
     validate_detail_questions,
+    validate_id_namespaces,
     validate_property_dag,
     validate_question_properties,
     validate_risk_properties,
@@ -83,6 +84,7 @@ def main() -> None:
     validate_control_risk_ids(controls, risks)
     validate_detail_properties(details, properties)
     validate_detail_questions(questions, details)
+    validate_id_namespaces(sections, properties, risks, controls, details)
 
     ensure_output_dir()
     write_html(sections, risks, controls, properties, details)

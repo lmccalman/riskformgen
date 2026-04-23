@@ -81,18 +81,13 @@ lingers in `output/`. Consider `shutil.rmtree(output_dir, ignore_errors=True)`
 before rebuilding, or track copied files and delete stragglers.
 
 ### 1.5 ◑ No validation that IDs are valid JS identifiers
-**Status:** open
-`render.py` and `page.html.j2` generate identifiers like
-`get prop_{{ prop.id }}()`, `get {{ risk.id }}()`, `x-model="answers.{{
-question.id }}"`. If a YAML author writes `id: my-risk` or `id: 2fa_required`,
-the emitted HTML will throw a silent JS syntax error at runtime. The only
-guard is convention. Add a `_validate_id(str)` check in `parse.py` that
-enforces `^[A-Za-z_][A-Za-z0-9_]*$`.
-
-Related risk: no check prevents a risk, control, question, property, or detail
-from colliding with each other or with reserved names in the Alpine state
-(`answers`, `details`, `_worst`, `_questionIds`, …). Build-time collision
-detection would catch these before they become ugly runtime bugs.
+**Status:** resolved (2026-04-23) — `parse._validate_id` now enforces
+`^[A-Za-z_][A-Za-z0-9_]*$` and rejects JS reserved words at every
+`parse_*` entry point (property, question, section, risk, control,
+detail). `parse.validate_id_namespaces` (called from `main.py`) catches
+risk-id collisions with the Alpine scope (`answers`, `_worst`, …) and
+cross-namespace duplicates. Tests in `tests/test_parse.py`:
+`TestValidateId`, `TestParseBadIds`, `TestValidateIdNamespaces`.
 
 ### 1.6 · Risk "n/a" fallback bypasses the scale tuples
 **Status:** open
@@ -218,7 +213,11 @@ attribute.
 ## 3. Old or inconsistent documentation
 
 ### 3.1 ⚠ `README.md` is entirely wrong about the schema
-**Status:** open
+**Status:** resolved (2026-04-23) — commit `1b4653f` deleted the 214
+lines of outdated schema content. The current `README.md` is a 51-line
+quickstart pointing at `CLAUDE.md` for schema details. The table below
+is kept for historical reference.
+
 The README notes itself is "earlier version" (`README.md:3-6`), but then spends
 ~250 lines documenting a form schema that does not exist in the code:
 
@@ -304,13 +303,7 @@ left as a standalone follow-up — it is now trivial because `app.js.j2`
 renders with autoescape off.
 
 ### 4.3 Typed identifiers and collision check
-**Status:** open
-- `_validate_id(str) -> None` rejecting anything not `^[A-Za-z_]\w*$`.
-- Call from every `parse_*` function that sees an `id` / `detail_id` /
-  `risk_id`.
-- Add a `validate_id_uniqueness_across_namespaces(sections, props, risks,
-  controls, details)` that asserts disjoint sets (or at least prefixed
-  disjoint sets).
+**Status:** resolved (2026-04-23) — see §1.5.
 
 ### 4.4 Stop mutating in `prepare_controls`
 **Status:** open
@@ -466,16 +459,12 @@ test becomes stale without surfacing an actual behavioural regression.
 
 ## Summary of highest-leverage follow-ups
 
-1. **Decide on control semantics** (§1.1, §4.1) — either implement risk
-   reduction or refactor the display. Everything downstream depends on this.
-2. **Rewrite `README.md`** (§3.1) — the current file actively misleads. In the
-   short term, replace the body with a pointer to `CLAUDE.md` and a one-page
-   quickstart.
+1. ~~**Decide on control semantics** (§1.1, §4.1)~~ — **done.**
+2. ~~**Rewrite `README.md`** (§3.1)~~ — **done** (commit `1b4653f`).
 3. ~~**Prune `CLAUDE.md`** of all graph-visualisation references (§3.2)~~ —
    **done.**
 4. ~~**Add a JS-behaviour test layer** (§4.8, §5.1)~~ — **done.**
 5. ~~**Lift `x-data` out of the HTML attribute** (§2.1, §4.2)~~ — **done.**
-6. **Tighten ID validation** (§1.5, §4.3) — cheap, closes a class of silent
-   runtime bugs.
+6. ~~**Tighten ID validation** (§1.5, §4.3)~~ — **done.**
 7. **Delete dead code** (§1.9, §1.10) — small but keeps the next reader from
    wondering why it's there.

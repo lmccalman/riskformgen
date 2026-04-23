@@ -3,6 +3,7 @@
 
 from __future__ import annotations
 
+import re
 from collections.abc import Sequence
 from pathlib import Path
 from typing import Any
@@ -27,6 +28,87 @@ from models import (
 type YamlDict = dict[str, Any]
 
 
+# ---------------------------------------------------------------------------
+# ID validation
+# ---------------------------------------------------------------------------
+#
+# IDs are emitted directly into generated JavaScript (see templates/app.js.j2
+# and render.py). Property and control getters are prefixed (`prop_*`,
+# `ctrl_*`), but risk getters are unprefixed (`get {risk.id}()`), and all IDs
+# appear as object keys in dot-accessed expressions like `answers.{id}`.
+# Invalid identifiers or reserved-name collisions cause silent JS runtime
+# errors, so we reject them at parse time.
+
+_ID_RE = re.compile(r"^[A-Za-z_][A-Za-z0-9_]*$")
+
+# ECMAScript reserved words that would produce syntax errors if used as
+# identifiers (getter names) or dot-accessed property keys emitted verbatim
+# into JS source.
+_JS_RESERVED: frozenset[str] = frozenset(
+    {
+        "break", "case", "catch", "class", "const", "continue", "debugger",
+        "default", "delete", "do", "else", "enum", "export", "extends",
+        "false", "finally", "for", "function", "if", "import", "in",
+        "instanceof", "new", "null", "return", "super", "switch", "this",
+        "throw", "true", "try", "typeof", "var", "void", "while", "with",
+        "yield", "let", "static",
+    }
+)  # fmt: skip
+
+# Top-level names on the Alpine scope declared in templates/app.js.j2. Risk
+# getters are emitted unprefixed, so a risk whose id equals one of these
+# would silently shadow the state field / helper.
+_ALPINE_RESERVED: frozenset[str] = frozenset(
+    {
+        # $persist-backed state fields
+        "activeTab",
+        "answers",
+        "details",
+        "control_effectiveness",
+        "residual_likelihood",
+        "residual_consequence",
+        "justifications",
+        "mandated_controls",
+        "mandated_comments",
+        # Internal data arrays/maps
+        "_questionIds",
+        "_detailIds",
+        "_riskIds",
+        "_controlIds",
+        "_likelihoods",
+        "_consequences",
+        "_risk_matrix",
+        # Helper methods
+        "_worst",
+        "_formatAnswer",
+        "_downloadJson",
+        "_importJson",
+        "clearAll",
+        "exportAnswers",
+        "importAnswers",
+        "exportAssessment",
+        "importAssessment",
+    }
+)
+
+
+def _validate_id(value: object, *, kind: str, owner: str | None = None) -> None:
+    """Reject IDs that aren't safe to emit into generated JS.
+
+    `kind` labels the entity type in the error ("property", "risk", ...).
+    `owner` optionally names the containing item for context (e.g. the
+    section id when validating a question id).
+    """
+    where = f" on {kind} {owner!r}" if owner else f" for {kind}"
+    if not isinstance(value, str) or not _ID_RE.match(value):
+        raise ValueError(
+            f"Invalid id{where}: {value!r} — must match "
+            f"{_ID_RE.pattern} (letters, digits, underscore; no leading digit)"
+        )
+    if value in _JS_RESERVED:
+        raise ValueError(f"Invalid id{where}: {value!r} — cannot be a JavaScript reserved word")
+
+
 def _ensure_str(value: object) -> str:
     """Convert YAML booleans back to 'yes'/'no' strings; pass strings through."""
     if value is True:
@@ -45,6 +127,7 @@ def _ensure_str(value: object) -> str:
 
 def parse_detail(data: YamlDict) -> Detail:
     """Parse a detail dict into a Detail dataclass."""
+    _validate_id(data["id"], kind="detail")
     return Detail(
         id=data["id"],
         description=data["description"],
@@ -68,6 +151,7 @@ def parse_question(data: YamlDict, details_by_id: dict[str, Detail] | None = Non
     qtype = data["type"]
     match qtype:
         case "binary":
+            _validate_id(data["id"], kind="question")
             return BinaryQuestion(
                 id=data["id"],
                 text=data["text"],
@@ -75,6 +159,7 @@ def parse_question(data: YamlDict, details_by_id: dict[str, Detail] | None = Non
                 guidance=data.get("guidance"),
             )
         case "detail":
+            _validate_id(data["id"], kind="question")
             did = data["detail_id"]
             resolved = details_by_id or {}
             if did not in resolved:
@@ -109,6 +194,7 @@ def parse_subsection(data: YamlDict, details_by_id: dict[str, Detail] | None = N
 
 def parse_section(data: YamlDict, details_by_id: dict[str, Detail] | None = None) -> Section:
     """Parse a section dict into a Section dataclass."""
+    _validate_id(data["id"], kind="section")
     return Section(
         id=data["id"],
         title=data["title"],
@@ -134,6 +220,7 @@ def parse_condition_mapping(data: YamlDict) -> ConditionMapping:
 
 def parse_risk(data: YamlDict) -> Risk:
     """Parse a risk dict into a Risk dataclass."""
+    _validate_id(data["id"], kind="risk")
     return Risk(
         id=data["id"],
         description=data["description"],
@@ -153,6 +240,7 @@ def parse_control_effect(data: YamlDict) -> ControlEffect:
 
 def parse_control(data: YamlDict) -> Control:
     """Parse a control dict into a Control dataclass."""
+    _validate_id(data["id"], kind="control")
     return Control(
         id=data["id"],
         description=data["description"],
@@ -191,6 +279,7 @@ def load_controls(path: Path) -> list[Control]:
 
 def parse_property(data: YamlDict) -> Property:
     """Parse a property dict into a Property dataclass."""
+    _validate_id(data["id"], kind="property")
     return Property(
         id=data["id"],
         description=data["description"],
@@ -335,3 +424,68 @@ def validate_detail_questions(questions: Sequence[Question], details: list[Detai
             errors.append(f"DetailQuestion {q.id!r} references unknown detail {q.detail_id!r}")
     if errors:
         raise ValueError("Invalid DetailQuestion→detail references:\n  " + "\n  ".join(errors))
+
+
+def validate_id_namespaces(
+    sections: Sequence[Section],
+    properties: list[Property],
+    risks: list[Risk],
+    controls: list[Control],
+    details: list[Detail],
+) -> None:
+    """Validate IDs don't collide with Alpine scope names or across namespaces.
+
+    Risk IDs in particular are emitted as unprefixed getter names on the
+    Alpine scope (`get {risk.id}()` and `get {risk.id}_residual()`), so they
+    must not collide with state fields, internal arrays, helper methods, or
+    with another risk's id / `<id>_residual` pairing.
+    """
+    errors: list[str] = []
+
+    # Risk getters live on the Alpine scope unprefixed. Reject collisions
+    # with state/helper names, and with another risk's derived `_residual`
+    # getter.
+    risk_ids = {r.id for r in risks}
+    risk_getters: set[str] = set()
+    for r in risks:
+        for name in (r.id, f"{r.id}_residual"):
+            if name in _ALPINE_RESERVED:
+                errors.append(
+                    f"Risk id {r.id!r} produces getter {name!r} which "
+                    f"collides with a reserved Alpine scope name"
+                )
+            if name in risk_getters:
+                other = name[: -len("_residual")] if name.endswith("_residual") else None
+                if other and other in risk_ids and other != r.id:
+                    errors.append(
+                        f"Risk id {r.id!r} collides with {other!r}_residual; rename one."
+                    )
+                else:
+                    errors.append(f"Duplicate risk getter name {name!r}")
+            risk_getters.add(name)
+
+    # Cross-namespace uniqueness: within-namespace duplicates are caught
+    # elsewhere (e.g. validate_property_dag); this catches e.g. a property
+    # and a control sharing an id, which would confuse humans and tools
+    # even if JS doesn't strictly require uniqueness.
+    buckets: dict[str, set[str]] = {
+        "property": {p.id for p in properties},
+        "risk": risk_ids,
+        "control": {c.id for c in controls},
+        "detail": {d.id for d in details},
+        "question": {q.id for sec in sections for sub in sec.subsections for q in sub.questions},
+        "section": {s.id for s in sections},
+    }
+    seen: dict[str, str] = {}
+    for kind, ids in buckets.items():
+        for i in sorted(ids):
+            if i in seen:
+                errors.append(
+                    f"ID {i!r} is used as both a {seen[i]} and a {kind}; "
+                    f"IDs must be unique across namespaces"
+                )
+            else:
+                seen[i] = kind
+
+    if errors:
+        raise ValueError("Invalid ID usage:\n  " + "\n  ".join(errors))
