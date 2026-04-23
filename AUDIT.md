@@ -285,12 +285,15 @@ renders with autoescape off.
 **Status:** resolved (2026-04-23) — see §2.3.
 
 ### 4.5 Collapse the dict-conversion layer
-**Status:** open
-Jinja2 is happy to traverse dataclasses via attribute access. The `prepare_*`
-functions exist mostly to attach computed `visibility_js` strings and JSON
-bodies. Those could live in a thin dataclass-to-context function that returns
-typed records, or on the dataclasses themselves as cached properties. Saves a
-~200-line module and the associated tests that mirror its shape.
+**Status:** resolved (2026-04-23) — `render.py` now builds typed frozen view
+dataclasses (`QuestionView`, `SubSectionView`, `SectionView`, `PropertyGetter`,
+`ControlGetter`, `DetailView`, `RiskView`) in a single `_build_template_context`
+pass. The `prepare_*` helpers and the tests mirroring their dict shape are
+gone; the pure JS compile helpers (`_compile_property_getter`,
+`_compile_question_visibility`, `_detail_show_js`) and their substring tests
+remain. `Risk.rules_js` moved onto the domain dataclass as a `@property`.
+Templates switched `visibility_js is defined` to `visibility_js != "true"` with
+no change in rendered output.
 
 ### 4.6 Clean `output/` before each build
 **Status:** resolved (2026-04-23) — see §1.4.

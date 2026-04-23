@@ -1,5 +1,6 @@
 import json
-from collections.abc import Iterable, Sequence
+from collections.abc import Sequence
+from dataclasses import dataclass
 
 from jinja2 import Environment, FileSystemLoader, select_autoescape
 
@@ -38,7 +39,70 @@ def create_environment() -> Environment:
 
 
 # ---------------------------------------------------------------------------
-# Property compilation
+# Template view dataclasses
+# ---------------------------------------------------------------------------
+#
+# Jinja2 traverses these via attribute access directly. `visibility_js == "true"`
+# is the always-visible sentinel — templates should suppress the x-show attribute
+# in that case so the rendered HTML stays clean.
+
+
+@dataclass(frozen=True)
+class QuestionView:
+    id: str
+    text: str
+    type: str
+    guidance: str | None
+    detail_id: str | None
+    visibility_js: str
+
+
+@dataclass(frozen=True)
+class SubSectionView:
+    title: str
+    description: str
+    questions: tuple[QuestionView, ...]
+    visibility_js: str
+
+
+@dataclass(frozen=True)
+class SectionView:
+    id: str
+    title: str
+    description: str
+    subsections: tuple[SubSectionView, ...]
+
+
+@dataclass(frozen=True)
+class PropertyGetter:
+    id: str
+    js_body: str
+
+
+@dataclass(frozen=True)
+class ControlGetter:
+    id: str
+    js: str
+
+
+@dataclass(frozen=True)
+class DetailView:
+    id: str
+    description: str
+    show_js: str
+
+
+@dataclass(frozen=True)
+class RiskView:
+    id: str
+    description: str
+    rules_js: tuple[str, ...]
+    controls: tuple[Control, ...]
+    relevant_details: tuple[DetailView, ...]
+
+
+# ---------------------------------------------------------------------------
+# JS compilation helpers
 # ---------------------------------------------------------------------------
 
 
@@ -113,169 +177,96 @@ def _compile_question_visibility(
     return " || ".join(parts)
 
 
-def _detail_show_js(props: list[str]) -> str:
+def _detail_show_js(props: Sequence[str]) -> str:
     """JS expression: true when any of the detail's properties is active (true)."""
     if not props:
         return "false"
     return " || ".join(f"prop_{pid} === true" for pid in props)
 
 
-def prepare_properties(
-    properties: list[Property],
-    questions: Sequence[Question],
-) -> tuple[list[dict[str, str]], dict[str, str]]:
-    """Compile property getters and question visibility expressions.
-
-    Returns:
-        property_getters: list of {id, js_body} for the template
-        question_visibility: dict of {question_id: visibility_js_expression}
-    """
-    # Only BinaryQuestions set property state; DetailQuestions use properties for visibility only
-    question_for_prop: dict[str, BinaryQuestion] = {}
-    for q in questions:
-        if isinstance(q, BinaryQuestion):
-            for pid in q.properties:
-                question_for_prop[pid] = q
-
-    prop_by_id = {p.id: p for p in properties}
-
-    property_getters = [
-        {"id": prop.id, "js_body": _compile_property_getter(prop, question_for_prop)}
-        for prop in properties
-    ]
-
-    question_visibility = {q.id: _compile_question_visibility(q, prop_by_id) for q in questions}
-
-    return property_getters, question_visibility
-
-
 # ---------------------------------------------------------------------------
-# Section / question preparation
+# View construction
 # ---------------------------------------------------------------------------
 
 
-def _prepare_question(q: Question, visibility_js: str) -> dict:
-    """Convert a Question dataclass to a template-ready dict with visibility JS."""
-    d: dict = {
-        "id": q.id,
-        "text": q.text,
-        "type": q.type,
-        "properties": list(q.properties),
-        "guidance": q.guidance,
-    }
-    if isinstance(q, DetailQuestion):
-        d["detail_id"] = q.detail_id
-    if visibility_js != "true":
-        d["visibility_js"] = visibility_js
-    return d
+def _build_question_view(q: Question, visibility_js: str) -> QuestionView:
+    return QuestionView(
+        id=q.id,
+        text=q.text,
+        type=q.type,
+        guidance=q.guidance,
+        detail_id=q.detail_id if isinstance(q, DetailQuestion) else None,
+        visibility_js=visibility_js,
+    )
 
 
-def _prepare_subsection(
+def _build_subsection_view(
     sub: SubSection,
     question_visibility: dict[str, str],
-) -> dict:
-    """Convert a SubSection to a template-ready dict with compiled visibility JS."""
-    q_dicts = [_prepare_question(q, question_visibility.get(q.id, "true")) for q in sub.questions]
-
-    d: dict = {
-        "title": sub.title,
-        "description": sub.description,
-        "questions": q_dicts,
-    }
-
-    # Subsection is visible when any of its questions is visible
-    vis_exprs = [qd["visibility_js"] for qd in q_dicts if "visibility_js" in qd]
-    if vis_exprs:
-        # If some questions are always visible, the subsection is always visible
-        always_visible = any("visibility_js" not in qd for qd in q_dicts)
-        if not always_visible:
-            d["visibility_js"] = " || ".join(vis_exprs)
-
-    return d
+) -> SubSectionView:
+    q_views = tuple(
+        _build_question_view(q, question_visibility.get(q.id, "true")) for q in sub.questions
+    )
+    # Subsection is always visible if any of its questions is; otherwise the
+    # OR of the conditional-question expressions.
+    if any(qv.visibility_js == "true" for qv in q_views) or not q_views:
+        vis = "true"
+    else:
+        vis = " || ".join(qv.visibility_js for qv in q_views)
+    return SubSectionView(
+        title=sub.title,
+        description=sub.description,
+        questions=q_views,
+        visibility_js=vis,
+    )
 
 
-def prepare_sections(
-    sections: list[Section],
+def _build_section_views(
+    sections: Sequence[Section],
     question_visibility: dict[str, str],
-) -> list[dict]:
-    """Convert Section dataclasses to template-ready nested dicts."""
-    return [
-        {
-            "id": section.id,
-            "title": section.title,
-            "description": section.description,
-            "subsections": [
-                _prepare_subsection(sub, question_visibility) for sub in section.subsections
-            ],
-        }
-        for section in sections
-    ]
-
-
-# ---------------------------------------------------------------------------
-# Risks and controls
-# ---------------------------------------------------------------------------
-
-
-def prepare_risks(risks: list[Risk], details: list[Detail] | None = None) -> list[dict]:
-    """Convert Risk dataclasses to template-ready dicts with compiled JS expressions."""
-    _details = details or []
-
-    result = []
-    for risk in risks:
-        # Collect all property IDs referenced by this risk's conditions
-        risk_prop_ids = {pid for cond in risk.conditions for pid in cond.properties}
-
-        relevant_details = [
-            {
-                "id": d.id,
-                "description": d.description,
-                "show_js": _detail_show_js(list(d.properties)),
-            }
-            for d in _details
-            if risk_prop_ids & set(d.properties)
-        ]
-
-        result.append(
-            {
-                "id": risk.id,
-                "description": risk.description,
-                "rules_js": [cond.to_js() for cond in risk.conditions],
-                "relevant_details": relevant_details,
-            }
+) -> tuple[SectionView, ...]:
+    return tuple(
+        SectionView(
+            id=section.id,
+            title=section.title,
+            description=section.description,
+            subsections=tuple(
+                _build_subsection_view(sub, question_visibility) for sub in section.subsections
+            ),
         )
+        for section in sections
+    )
 
-    return result
 
-
-def prepare_controls(
-    controls: list[Control],
-    risk_ids: Iterable[str],
-) -> tuple[list[dict], dict[str, list[dict]]]:
-    """Build control getters and group controls by the risks they address.
-
-    Returns:
-        control_getters: list of {id, js} for the template
-        controls_by_risk_id: {risk_id: [{id, description}, ...]} for every risk id
-            in ``risk_ids`` (entries are empty lists when no controls apply).
-    """
-    control_getters = [
-        {"id": ctrl.id, "js": f"this.prop_{ctrl.property} === true"} for ctrl in controls
-    ]
-
-    controls_by_risk_id: dict[str, list[dict]] = {rid: [] for rid in risk_ids}
-
+def _build_risk_views(
+    risks: Sequence[Risk],
+    controls: Sequence[Control],
+    details: Sequence[Detail],
+) -> tuple[RiskView, ...]:
+    controls_by_risk: dict[str, list[Control]] = {r.id: [] for r in risks}
     for ctrl in controls:
         for effect in ctrl.effects:
-            if effect.risk_id in controls_by_risk_id:
-                controls_by_risk_id[effect.risk_id].append(
-                    {
-                        "id": ctrl.id,
-                        "description": ctrl.description,
-                    }
-                )
+            if effect.risk_id in controls_by_risk:
+                controls_by_risk[effect.risk_id].append(ctrl)
 
-    return control_getters, controls_by_risk_id
+    result: list[RiskView] = []
+    for risk in risks:
+        risk_prop_ids = {pid for cond in risk.conditions for pid in cond.properties}
+        relevant = tuple(
+            DetailView(id=d.id, description=d.description, show_js=_detail_show_js(d.properties))
+            for d in details
+            if risk_prop_ids & set(d.properties)
+        )
+        result.append(
+            RiskView(
+                id=risk.id,
+                description=risk.description,
+                rules_js=risk.rules_js,
+                controls=tuple(controls_by_risk[risk.id]),
+                relevant_details=relevant,
+            )
+        )
+    return tuple(result)
 
 
 # ---------------------------------------------------------------------------
@@ -284,30 +275,47 @@ def prepare_controls(
 
 
 def _build_template_context(
-    sections: list[Section],
-    risks: list[Risk],
-    controls: list[Control] | None = None,
-    properties: list[Property] | None = None,
-    details: list[Detail] | None = None,
+    sections: Sequence[Section],
+    risks: Sequence[Risk],
+    controls: Sequence[Control] | None = None,
+    properties: Sequence[Property] | None = None,
+    details: Sequence[Detail] | None = None,
 ) -> dict:
     """Build the shared template context used by both page.html.j2 and app.js.j2."""
+    controls = controls or ()
+    properties = properties or ()
+    details = details or ()
     questions = all_questions(sections)
-    property_getters, question_visibility = prepare_properties(properties or [], questions)
-    section_dicts = prepare_sections(sections, question_visibility)
-    question_dicts = [
-        q for sec in section_dicts for sub in sec["subsections"] for q in sub["questions"]
-    ]
-    risk_dicts = prepare_risks(risks, details)
-    control_getters, controls_by_risk_id = prepare_controls(
-        controls or [], (r["id"] for r in risk_dicts)
+
+    # Only BinaryQuestions set property state; DetailQuestions use properties for visibility only.
+    question_for_prop: dict[str, BinaryQuestion] = {}
+    for q in questions:
+        if isinstance(q, BinaryQuestion):
+            for pid in q.properties:
+                question_for_prop[pid] = q
+
+    prop_by_id = {p.id: p for p in properties}
+
+    property_getters = tuple(
+        PropertyGetter(id=prop.id, js_body=_compile_property_getter(prop, question_for_prop))
+        for prop in properties
     )
-    for risk_dict in risk_dicts:
-        risk_dict["controls"] = controls_by_risk_id.get(risk_dict["id"], [])
-    detail_ids = [d.id for d in (details or [])]
+    question_visibility = {q.id: _compile_question_visibility(q, prop_by_id) for q in questions}
+
+    section_views = _build_section_views(sections, question_visibility)
+    question_views = tuple(
+        q for s in section_views for sub in s.subsections for q in sub.questions
+    )
+    risk_views = _build_risk_views(risks, controls, details)
+    control_getters = tuple(
+        ControlGetter(id=ctrl.id, js=f"this.prop_{ctrl.property} === true") for ctrl in controls
+    )
+    detail_ids = [d.id for d in details]
+
     return {
-        "sections": section_dicts,
-        "questions": question_dicts,
-        "risks": risk_dicts,
+        "sections": section_views,
+        "questions": question_views,
+        "risks": risk_views,
         "control_getters": control_getters,
         "property_getters": property_getters,
         "detail_ids": detail_ids,
@@ -318,33 +326,31 @@ def _build_template_context(
         "risk_levels": list(config.RISK_LEVELS),
         "risk_level_colours": config.RISK_LEVEL_COLOURS,
         "risk_matrix_js": json.dumps(config.RISK_MATRIX),
-        "answers_init_js": json.dumps({q["id"]: "" for q in question_dicts}),
+        "answers_init_js": json.dumps({q.id: "" for q in question_views}),
         "details_init_js": json.dumps({did: "" for did in detail_ids}),
-        "control_effectiveness_init_js": json.dumps({r["id"]: "" for r in risk_dicts}),
-        "residual_likelihood_init_js": json.dumps({r["id"]: "" for r in risk_dicts}),
-        "residual_consequence_init_js": json.dumps({r["id"]: "" for r in risk_dicts}),
-        "justifications_init_js": json.dumps({r["id"]: "" for r in risk_dicts}),
+        "control_effectiveness_init_js": json.dumps({r.id: "" for r in risk_views}),
+        "residual_likelihood_init_js": json.dumps({r.id: "" for r in risk_views}),
+        "residual_consequence_init_js": json.dumps({r.id: "" for r in risk_views}),
+        "justifications_init_js": json.dumps({r.id: "" for r in risk_views}),
         "mandated_controls_init_js": json.dumps(
-            {r["id"]: {c["id"]: False for c in r.get("controls", [])} for r in risk_dicts}
+            {r.id: {c.id: False for c in r.controls} for r in risk_views}
         ),
         "mandated_comments_init_js": json.dumps(
-            {r["id"]: {c["id"]: "" for c in r.get("controls", [])} for r in risk_dicts}
+            {r.id: {c.id: "" for c in r.controls} for r in risk_views}
         ),
-        "question_ids_js": json.dumps([q["id"] for q in question_dicts]),
+        "question_ids_js": json.dumps([q.id for q in question_views]),
         "detail_ids_js": json.dumps(detail_ids),
-        "risk_ids_js": json.dumps([r["id"] for r in risk_dicts]),
-        "control_ids_js": json.dumps(
-            {r["id"]: [c["id"] for c in r.get("controls", [])] for r in risk_dicts}
-        ),
+        "risk_ids_js": json.dumps([r.id for r in risk_views]),
+        "control_ids_js": json.dumps({r.id: [c.id for c in r.controls] for r in risk_views}),
     }
 
 
 def render_form(
-    sections: list[Section],
-    risks: list[Risk],
-    controls: list[Control] | None = None,
-    properties: list[Property] | None = None,
-    details: list[Detail] | None = None,
+    sections: Sequence[Section],
+    risks: Sequence[Risk],
+    controls: Sequence[Control] | None = None,
+    properties: Sequence[Property] | None = None,
+    details: Sequence[Detail] | None = None,
 ) -> str:
     """Render the form page HTML from sections, risks, properties, and details."""
     env = create_environment()
@@ -354,11 +360,11 @@ def render_form(
 
 
 def render_app_js(
-    sections: list[Section],
-    risks: list[Risk],
-    controls: list[Control] | None = None,
-    properties: list[Property] | None = None,
-    details: list[Detail] | None = None,
+    sections: Sequence[Section],
+    risks: Sequence[Risk],
+    controls: Sequence[Control] | None = None,
+    properties: Sequence[Property] | None = None,
+    details: Sequence[Detail] | None = None,
 ) -> str:
     """Render the Alpine.js component factory as a standalone JS file."""
     env = create_environment()

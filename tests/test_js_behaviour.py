@@ -21,7 +21,7 @@ from models import (
     Section,
     SubSection,
 )
-from render import _compile_question_visibility, prepare_risks
+from render import _compile_question_visibility, _detail_show_js
 from tests.js_harness import Scope, build_scope
 
 
@@ -454,8 +454,7 @@ class TestDetailShow:
         )
         detail = Detail(id="d1", description="", properties=("p1",))
         scope = _form([q], [p], risks=[risk], details=[detail])
-        risk_dicts = prepare_risks([risk], [detail])
-        show_js = risk_dicts[0]["relevant_details"][0]["show_js"]
+        show_js = _detail_show_js(detail.properties)
         return scope, show_js
 
     def test_hidden_when_property_null(self, scope_and_expr: tuple[Scope, str]) -> None:

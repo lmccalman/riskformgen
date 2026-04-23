@@ -7,30 +7,23 @@ import pytest
 from models import (
     BinaryQuestion,
     ConditionMapping,
-    Control,
-    ControlEffect,
     Detail,
     DetailQuestion,
     Property,
     Risk,
     Section,
     SubSection,
-    all_questions,
 )
 from render import (
     _compile_property_getter,
     _compile_question_visibility,
     _detail_show_js,
-    prepare_controls,
-    prepare_properties,
-    prepare_risks,
-    prepare_sections,
     render_app_js,
     render_form,
 )
 
 # ---------------------------------------------------------------------------
-# prepare_properties — property getters
+# Property getter compilation
 # ---------------------------------------------------------------------------
 
 
@@ -70,7 +63,7 @@ class TestCompilePropertyGetter:
 
 
 # ---------------------------------------------------------------------------
-# prepare_properties — question visibility
+# Question visibility compilation
 # ---------------------------------------------------------------------------
 
 
@@ -121,108 +114,7 @@ class TestCompileQuestionVisibility:
 
 
 # ---------------------------------------------------------------------------
-# prepare_properties (integration)
-# ---------------------------------------------------------------------------
-
-
-class TestPrepareProperties:
-    def test_returns_getters_and_visibility(self):
-        props = [
-            Property(id="root", description="Root"),
-            Property(id="child", description="Child", parents=("root",)),
-        ]
-        questions = [
-            BinaryQuestion(id="q1", text="Q1", properties=("root",)),
-            BinaryQuestion(id="q2", text="Q2", properties=("child",)),
-        ]
-        getters, visibility = prepare_properties(props, questions)
-        assert len(getters) == 2
-        assert getters[0]["id"] == "root"
-        assert getters[1]["id"] == "child"
-        assert visibility["q1"] == "true"  # root is always visible
-        assert "prop_root === true" in visibility["q2"]
-
-    def test_empty(self):
-        getters, visibility = prepare_properties([], [])
-        assert getters == []
-        assert visibility == {}
-
-
-# ---------------------------------------------------------------------------
-# prepare_sections
-# ---------------------------------------------------------------------------
-
-
-class TestPrepareSections:
-    def test_output_structure(self, sample_sections, sample_properties):
-        _, question_visibility = prepare_properties(
-            sample_properties,
-            all_questions(sample_sections),
-        )
-        result = prepare_sections(sample_sections, question_visibility)
-        assert len(result) == 1
-        sec = result[0]
-        assert sec["id"] == "sec1"
-        assert sec["title"] == "Section One"
-        assert len(sec["subsections"]) == 1
-        sub = sec["subsections"][0]
-        assert sub["title"] == "Basics"
-        assert len(sub["questions"]) == 2
-
-    def test_visibility_compiled(self):
-        props = [
-            Property(id="root", description="Root"),
-            Property(id="child", description="Child", parents=("root",)),
-        ]
-        q1 = BinaryQuestion(id="q1", text="Q1", properties=("root",))
-        q2 = BinaryQuestion(id="q2", text="Q2", properties=("child",))
-        sub = SubSection(title="S", description="", questions=(q1, q2))
-        sec = Section(id="s", title="S", description="", subsections=(sub,))
-        _, vis = prepare_properties(props, [q1, q2])
-        result = prepare_sections([sec], vis)
-        q1_dict = result[0]["subsections"][0]["questions"][0]
-        q2_dict = result[0]["subsections"][0]["questions"][1]
-        # q1 targets root (always visible) — no visibility_js
-        assert "visibility_js" not in q1_dict
-        # q2 targets child (needs root === true) — has visibility_js
-        assert "visibility_js" in q2_dict
-        assert "prop_root === true" in q2_dict["visibility_js"]
-
-    def test_subsection_visibility(self):
-        props = [
-            Property(id="root", description="Root"),
-            Property(id="child", description="Child", parents=("root",)),
-        ]
-        q = BinaryQuestion(id="q1", text="Q", properties=("child",))
-        sub = SubSection(title="Conditional", description="", questions=(q,))
-        sec = Section(id="s", title="S", description="", subsections=(sub,))
-        _, vis = prepare_properties(props, [q])
-        result = prepare_sections([sec], vis)
-        # Subsection should have visibility_js since all questions are conditional
-        assert "visibility_js" in result[0]["subsections"][0]
-
-    def test_subsection_always_visible_when_any_question_is(self):
-        # One always-visible (root) question + one conditional (grandchild) question.
-        # The subsection as a whole is always visible, so no visibility_js key.
-        props = [
-            Property(id="root", description="Root"),
-            Property(id="child", description="Child", parents=("root",)),
-            Property(id="gc", description="Grandchild", parents=("child",)),
-        ]
-        q_root = BinaryQuestion(id="q_root", text="Q root", properties=("root",))
-        q_gc = BinaryQuestion(id="q_gc", text="Q grandchild", properties=("gc",))
-        sub = SubSection(title="Mixed", description="", questions=(q_root, q_gc))
-        sec = Section(id="s", title="S", description="", subsections=(sub,))
-        _, vis = prepare_properties(props, [q_root, q_gc])
-        result = prepare_sections([sec], vis)
-        assert "visibility_js" not in result[0]["subsections"][0]
-
-    def test_empty_sections(self):
-        assert prepare_sections([], {}) == []
-
-
-# ---------------------------------------------------------------------------
-# prepare_risks
+# Detail show_js compilation
 # ---------------------------------------------------------------------------
 
 
@@ -241,115 +133,8 @@ class TestDetailShowJs:
         assert _detail_show_js([]) == "false"
 
 
-class TestPrepareRisks:
-    def test_output_structure(self):
-        risk = Risk(
-            id="r1",
-            description="D",
-            conditions=(
-                ConditionMapping(
-                    properties=("p1",), mode="all", likelihood="likely", consequence="major"
-                ),
-            ),
-        )
-        result = prepare_risks([risk])
-        assert len(result) == 1
-        r = result[0]
-        assert r["id"] == "r1"
-        assert r["description"] == "D"
-        assert "rules_js" in r
-        assert len(r["rules_js"]) == 1
-        assert r["relevant_details"] == []
-
-    def test_multiple_conditions(self):
-        risk = Risk(
-            id="r1",
-            description="D",
-            conditions=(
-                ConditionMapping(
-                    properties=("p1",), mode="all", likelihood="likely", consequence="major"
-                ),
-                ConditionMapping(
-                    properties=("p2",), mode="any", likelihood="rare", consequence="minor"
-                ),
-            ),
-        )
-        result = prepare_risks([risk])
-        assert len(result[0]["rules_js"]) == 2
-
-    def test_relevant_detail_included(self):
-        risk = Risk(
-            id="r1",
-            description="D",
-            conditions=(
-                ConditionMapping(
-                    properties=("p1",), mode="all", likelihood="likely", consequence="major"
-                ),
-            ),
-        )
-        det = Detail(id="det1", description="Outdoor context", properties=("p1",))
-        result = prepare_risks([risk], details=[det])
-        assert len(result[0]["relevant_details"]) == 1
-        rd = result[0]["relevant_details"][0]
-        assert rd["id"] == "det1"
-        assert rd["description"] == "Outdoor context"
-        assert "prop_p1 === true" in rd["show_js"]
-
-    def test_irrelevant_detail_excluded(self):
-        risk = Risk(
-            id="r1",
-            description="D",
-            conditions=(
-                ConditionMapping(
-                    properties=("p1",), mode="all", likelihood="likely", consequence="major"
-                ),
-            ),
-        )
-        det = Detail(id="det2", description="Unrelated", properties=("p_other",))
-        result = prepare_risks([risk], details=[det])
-        assert result[0]["relevant_details"] == []
-
-    def test_empty(self):
-        assert prepare_risks([]) == []
-
-
 # ---------------------------------------------------------------------------
-# prepare_controls
-# ---------------------------------------------------------------------------
-
-
-class TestPrepareControls:
-    def test_control_getters(self, sample_control):
-        getters, _ = prepare_controls([sample_control], ["r1"])
-        assert len(getters) == 1
-        assert getters[0]["id"] == "ctrl1"
-        assert "js" in getters[0]
-
-    def test_effects_grouped_by_risk(self, sample_control):
-        _, controls_by_risk = prepare_controls([sample_control], ["r1"])
-        assert len(controls_by_risk["r1"]) == 1
-        assert controls_by_risk["r1"][0]["id"] == "ctrl1"
-        assert controls_by_risk["r1"][0]["description"] == "Encryption enabled"
-
-    def test_missing_risk_skipped(self):
-        ctrl = Control(
-            id="c1",
-            description="C",
-            property="p1",
-            effects=(ControlEffect(risk_id="nonexistent"),),
-        )
-        getters, controls_by_risk = prepare_controls([ctrl], ["r1"])
-        assert len(getters) == 1
-        assert controls_by_risk == {"r1": []}
-
-    def test_empty_controls(self):
-        getters, controls_by_risk = prepare_controls([], ["r1"])
-        assert getters == []
-        assert controls_by_risk == {"r1": []}
-
-
-# ---------------------------------------------------------------------------
-# render_form (integration)
+# render_form / render_app_js — integration
 # ---------------------------------------------------------------------------
 
 
@@ -470,6 +255,60 @@ class TestRenderForm:
 
 
 # ---------------------------------------------------------------------------
+# Cross-entity visibility semantics (driven through the rendered output)
+# ---------------------------------------------------------------------------
+
+
+class TestRenderedVisibility:
+    def test_always_visible_question_has_no_xshow(self):
+        # A question targeting a root property never needs a per-question x-show.
+        root = Property(id="root", description="Root")
+        q = BinaryQuestion(id="q1", text="Always", properties=("root",))
+        sub = SubSection(title="S", description="", questions=(q,))
+        sec = Section(id="s", title="S", description="", subsections=(sub,))
+        html = render_form([sec], [], properties=[root])
+        # No conditional x-show wrapping an unconditional question.
+        assert 'x-show="true"' not in html
+
+    def test_conditional_question_has_xshow(self):
+        root = Property(id="root", description="Root")
+        child = Property(id="child", description="Child", parents=("root",))
+        q = BinaryQuestion(id="q1", text="Conditional", properties=("child",))
+        sub = SubSection(title="S", description="", questions=(q,))
+        sec = Section(id="s", title="S", description="", subsections=(sub,))
+        html = render_form([sec], [], properties=[root, child])
+        assert 'x-show="(prop_root === true)"' in html
+
+    def test_subsection_always_visible_when_any_question_is(self):
+        # A subsection with one always-visible + one conditional question should
+        # itself always render (no subsection-level x-show).
+        props = [
+            Property(id="root", description="Root"),
+            Property(id="child", description="Child", parents=("root",)),
+            Property(id="gc", description="Grandchild", parents=("child",)),
+        ]
+        q_root = BinaryQuestion(id="q_root", text="Q root", properties=("root",))
+        q_gc = BinaryQuestion(id="q_gc", text="Q grandchild", properties=("gc",))
+        sub = SubSection(title="Mixed", description="", questions=(q_root, q_gc))
+        sec = Section(id="s", title="S", description="", subsections=(sub,))
+        html = render_form([sec], [], properties=props)
+        # The subsection's opening <div class="box stack-md"> should have no x-show.
+        assert '<div class="box stack-md">' in html
+
+    def test_subsection_hidden_when_all_questions_are_conditional(self):
+        props = [
+            Property(id="root", description="Root"),
+            Property(id="child", description="Child", parents=("root",)),
+        ]
+        q = BinaryQuestion(id="q1", text="Q", properties=("child",))
+        sub = SubSection(title="Conditional", description="", questions=(q,))
+        sec = Section(id="s", title="S", description="", subsections=(sub,))
+        html = render_form([sec], [], properties=props)
+        # The subsection's <div class="box"> inherits the OR of its questions' conditions.
+        assert '<div class="box stack-md" x-show="(prop_root === true)">' in html
+
+
+# ---------------------------------------------------------------------------
 # render_form — save/load export/import
 # ---------------------------------------------------------------------------
 
@@ -586,3 +425,16 @@ class TestRenderAppJs:
         js = render_app_js(sample_sections, [sample_risk], properties=sample_properties)
         assert "get r1()" in js
         assert "get r1_residual()" in js
+
+    def test_control_getter_emitted(
+        self, sample_sections, sample_properties, sample_risk, sample_control
+    ):
+        js = render_app_js(sample_sections, [sample_risk], [sample_control], sample_properties)
+        assert "get ctrl_ctrl1()" in js
+        assert "this.prop_prop_a === true" in js
+
+    def test_risk_rules_js_from_property(self, sample_sections, sample_properties, sample_risk):
+        # Risk.rules_js (@property) drives the rules array in each risk getter.
+        js = render_app_js(sample_sections, [sample_risk], properties=sample_properties)
+        # sample_risk has two conditions → two rule expressions.
+        assert js.count("? {likelihood:") >= 2

@@ -1,7 +1,7 @@
-{% if question.visibility_js is defined %}
+{% if question.visibility_js != "true" %}
 <div x-show="{{ question.visibility_js }}">
 {% endif %}
 {% include "questions/" ~ question.type ~ ".html.j2" %}
-{% if question.visibility_js is defined %}
+{% if question.visibility_js != "true" %}
 </div>
 {% endif %}

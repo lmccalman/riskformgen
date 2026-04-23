@@ -102,6 +102,10 @@ class Risk:
     description: str
     conditions: tuple[ConditionMapping, ...]
 
+    @property
+    def rules_js(self) -> tuple[str, ...]:
+        return tuple(c.to_js() for c in self.conditions)
+
 
 # ---------------------------------------------------------------------------
 # Controls

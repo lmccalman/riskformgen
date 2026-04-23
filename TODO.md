@@ -66,13 +66,8 @@ rendered detail text; the mental model is different.
 
 ## 4. Architecture and implementation improvements
 
-### 4.5 Collapse the dict-conversion layer
-**Status:** open
-Jinja2 is happy to traverse dataclasses via attribute access. The `prepare_*`
-functions exist mostly to attach computed `visibility_js` strings and JSON
-bodies. Those could live in a thin dataclass-to-context function that returns
-typed records, or on the dataclasses themselves as cached properties. Saves a
-~200-line module and the associated tests that mirror its shape.
+_All open items in this section have been resolved. See `AUDIT.md` for the
+historical record._
 
 ---
 
