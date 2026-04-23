@@ -54,11 +54,9 @@ load after a schema change. Pinned by `TestSchemaMigration` in
 stale persisted-state overlay via `build_scope(..., persisted_state=...)`).
 
 ### 1.4 ◑ Output directory is never cleaned
-**Status:** open
-`main.py:ensure_output_dir` (line 22) only calls `mkdir(exist_ok=True)`. If a
-previously-copied asset is renamed (or the editor shrinks), the old file
-lingers in `output/`. Consider `shutil.rmtree(output_dir, ignore_errors=True)`
-before rebuilding, or track copied files and delete stragglers.
+**Status:** resolved (2026-04-23) — `main.ensure_output_dir` now
+`shutil.rmtree`s the directory before recreating it, so stale assets from
+prior builds no longer linger.
 
 ### 1.5 ◑ No validation that IDs are valid JS identifiers
 **Status:** resolved (2026-04-23) — `parse._validate_id` now enforces
@@ -85,29 +83,24 @@ in `tests/test_js_behaviour.py` (see §4.8); switching to `null` requires a
 deliberate test update.
 
 ### 1.7 · Import version field is declarative but not enforced
-**Status:** open
-`page.html.j2:115, 184` write `version: 1`. The importer
-(`page.html.j2:123-153`) only checks `format`. A future v2 would load silently
-into a v1 client. Add a version guard with a clear error message.
+**Status:** resolved (2026-04-23) — `_importJson` in `templates/app.js.j2`
+now takes an expected `version` and rejects mismatched files with a clear
+alert. `importAnswers` passes `1`, `importAssessment` passes `2`. The old
+feature-detection branch for pre-effectiveness assessment files is gone —
+the top-level version check catches those now.
 
 ### 1.8 · `validate_property_dag` comment contradicts the code
-**Status:** open
-`parse.py:231` says "Edges point child→parent, so in-degree counts how many
-children point to a node." The code then does `in_degree[p.id] += 1` (line 236)
-— incrementing the *child's* in-degree (i.e. "how many parents I have"). The
-topological sort is correct, but the comment describes the wrong direction.
+**Status:** resolved (2026-04-23) — the comment above the in-degree loop in
+`parse.validate_property_dag` now correctly describes in-degree as "number of
+parents a node has" and explains how Kahn's algorithm detects cycles.
 
 ### 1.9 · Dead: `_ensure_str`
-**Status:** open
-`parse.py:30-38` is only referenced by `tests/test_parse.py:18`. The function
-was presumably introduced for an older YAML shape where boolean literals could
-appear; nothing in the current parser uses it. Delete or wire it into
-`parse_question` if bool answers in YAML are still supported.
+**Status:** resolved (2026-04-23) — deleted from `parse.py`; `TestEnsureStr`
+and its import removed from `tests/test_parse.py`.
 
 ### 1.10 · Dead: `_formatAnswer`
-**Status:** open
-`templates/page.html.j2:72-75`. Not referenced anywhere in the templates.
-Likely a leftover from an older "export as Markdown" flow.
+**Status:** resolved (2026-04-23) — deleted from `templates/app.js.j2` and
+removed from `_ALPINE_RESERVED` in `parse.py`.
 
 ---
 
@@ -254,12 +247,10 @@ reference `DetailQuestion` as a worked example. The property flow diagram
 rendered detail text; the mental model is different.
 
 ### 3.5 · Misleading comment in `parse.py:231`
-**Status:** open
-See §1.8 — the in-degree direction is described backwards.
+**Status:** resolved (2026-04-23) — see §1.8.
 
 ### 3.6 · `_ensure_str`'s docstring describes YAML bool coercion that's unused
-**Status:** open
-See §1.9 — the function and its comment are unreferenced.
+**Status:** resolved (2026-04-23) — see §1.9.
 
 ---
 

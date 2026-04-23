@@ -12,37 +12,8 @@ file.
 
 ## 1. Bugs and incorrect implementation
 
-### 1.4 ◑ Output directory is never cleaned
-**Status:** open
-`main.py:ensure_output_dir` (line 22) only calls `mkdir(exist_ok=True)`. If a
-previously-copied asset is renamed (or the editor shrinks), the old file
-lingers in `output/`. Consider `shutil.rmtree(output_dir, ignore_errors=True)`
-before rebuilding, or track copied files and delete stragglers.
-
-### 1.7 · Import version field is declarative but not enforced
-**Status:** open
-`page.html.j2:115, 184` write `version: 1`. The importer
-(`page.html.j2:123-153`) only checks `format`. A future v2 would load silently
-into a v1 client. Add a version guard with a clear error message.
-
-### 1.8 · `validate_property_dag` comment contradicts the code
-**Status:** open
-`parse.py:231` says "Edges point child→parent, so in-degree counts how many
-children point to a node." The code then does `in_degree[p.id] += 1` (line 236)
-— incrementing the *child's* in-degree (i.e. "how many parents I have"). The
-topological sort is correct, but the comment describes the wrong direction.
-
-### 1.9 · Dead: `_ensure_str`
-**Status:** open
-`parse.py:30-38` is only referenced by `tests/test_parse.py:18`. The function
-was presumably introduced for an older YAML shape where boolean literals could
-appear; nothing in the current parser uses it. Delete or wire it into
-`parse_question` if bool answers in YAML are still supported.
-
-### 1.10 · Dead: `_formatAnswer`
-**Status:** open
-`templates/page.html.j2:72-75`. Not referenced anywhere in the templates.
-Likely a leftover from an older "export as Markdown" flow.
+_All open bugs in this section have been resolved. See `AUDIT.md` for the
+historical record._
 
 ---
 
@@ -110,14 +81,6 @@ reference `DetailQuestion` as a worked example. The property flow diagram
 (`CLAUDE.md:66`) says "Questions → Properties → Risks / Controls" but
 `DetailQuestion` actually copies properties from `Detail` and flows into
 rendered detail text; the mental model is different.
-
-### 3.5 · Misleading comment in `parse.py:231`
-**Status:** open
-See §1.8 — the in-degree direction is described backwards.
-
-### 3.6 · `_ensure_str`'s docstring describes YAML bool coercion that's unused
-**Status:** open
-See §1.9 — the function and its comment are unreferenced.
 
 ---
 

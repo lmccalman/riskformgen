@@ -80,7 +80,6 @@ _ALPINE_RESERVED: frozenset[str] = frozenset(
         "_risk_matrix",
         # Helper methods
         "_worst",
-        "_formatAnswer",
         "_downloadJson",
         "_importJson",
         "clearAll",
@@ -107,17 +106,6 @@ def _validate_id(value: object, *, kind: str, owner: str | None = None) -> None:
         )
     if value in _JS_RESERVED:
         raise ValueError(f"Invalid id{where}: {value!r} — cannot be a JavaScript reserved word")
-
-
-def _ensure_str(value: object) -> str:
-    """Convert YAML booleans back to 'yes'/'no' strings; pass strings through."""
-    if value is True:
-        return "yes"
-    if value is False:
-        return "no"
-    if isinstance(value, str):
-        return value
-    raise TypeError(f"Expected str or bool, got {type(value).__name__}: {value!r}")
 
 
 # ---------------------------------------------------------------------------
@@ -312,8 +300,10 @@ def validate_property_dag(properties: list[Property]) -> None:
             if parent not in id_set:
                 raise ValueError(f"Property {p.id!r} references unknown parent {parent!r}")
 
-    # Cycle detection via Kahn's algorithm (topological sort)
-    # Edges point child→parent, so in-degree counts how many children point to a node
+    # Cycle detection via Kahn's algorithm (topological sort).
+    # In-degree of a node = number of parents it has. Roots (no parents) start
+    # at 0 and seed the queue; Kahn's peels layers outward and anything left
+    # with in-degree > 0 at the end is part of a cycle.
     in_degree: dict[str, int] = {pid: 0 for pid in ids}
     children: dict[str, list[str]] = {pid: [] for pid in ids}
     for p in properties:

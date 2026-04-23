@@ -21,8 +21,9 @@ from render import render_app_js, render_form
 
 
 def ensure_output_dir() -> None:
-    """Create the output directory if it doesn't exist."""
-    config.output_dir.mkdir(exist_ok=True)
+    """Remove and recreate the output directory so stale files don't linger."""
+    shutil.rmtree(config.output_dir, ignore_errors=True)
+    config.output_dir.mkdir()
 
 
 def write_html(

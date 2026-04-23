@@ -42,10 +42,6 @@ document.addEventListener('alpine:init', () => {
       if (vals.length === 0) return null;
       return vals.reduce((w, v) => scale.indexOf(v) > scale.indexOf(w) ? v : w);
     },
-    _formatAnswer(val) {
-      if (Array.isArray(val)) return val.length ? val.join(', ') : 'Not answered';
-      return val || 'Not answered';
-    },
     _downloadJson(data, filename) {
       const blob = new Blob([JSON.stringify(data, null, 2)], {type: 'application/json'});
       const url = URL.createObjectURL(blob);
@@ -99,7 +95,7 @@ document.addEventListener('alpine:init', () => {
         details: this.details,
       }, 'riskformgen-answers.json');
     },
-    _importJson(event, {format, fileIdsKey, currentIds, label, count, apply}) {
+    _importJson(event, {format, version, fileIdsKey, currentIds, label, count, apply}) {
       const file = event.target.files[0];
       if (!file) return;
       event.target.value = '';
@@ -110,6 +106,10 @@ document.addEventListener('alpine:init', () => {
         catch { alert('Invalid JSON file.'); return; }
         if (data.format !== format) {
           alert(`This is not a ${label} file. Expected format: ${format}`);
+          return;
+        }
+        if (data.version !== version) {
+          alert(`Incompatible ${label} file version: got ${data.version}, expected ${version}. Re-export from a matching build.`);
           return;
         }
         const fileIds = new Set(data[fileIdsKey] || []);
@@ -133,6 +133,7 @@ document.addEventListener('alpine:init', () => {
     importAnswers(event) {
       this._importJson(event, {
         format: 'riskformgen-answers',
+        version: 1,
         fileIdsKey: 'question_ids',
         currentIds: this._questionIds,
         label: 'answers',
@@ -174,15 +175,11 @@ document.addEventListener('alpine:init', () => {
     importAssessment(event) {
       this._importJson(event, {
         format: 'riskformgen-assessment',
+        version: 2,
         fileIdsKey: 'risk_ids',
         currentIds: this._riskIds,
         label: 'assessments',
         count: (data, ids) => {
-          const hasNew = data.control_effectiveness || data.residual_likelihood || data.residual_consequence;
-          if (data.assessed_risks && !hasNew) {
-            alert('This assessment was exported from a pre-effectiveness build. Re-enter the assessments.');
-            return {loaded: 0};
-          }
           let loaded = 0;
           for (const id of ids) {
             if (
@@ -195,8 +192,6 @@ document.addEventListener('alpine:init', () => {
           return {loaded};
         },
         apply: (data, ids) => {
-          const hasNew = data.control_effectiveness || data.residual_likelihood || data.residual_consequence;
-          if (data.assessed_risks && !hasNew) return;
           for (const id of ids) {
             if (data.control_effectiveness && id in data.control_effectiveness) {
               this.control_effectiveness[id] = data.control_effectiveness[id];

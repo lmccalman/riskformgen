@@ -17,7 +17,6 @@ from models import (
     SubSection,
 )
 from parse import (
-    _ensure_str,
     _validate_id,
     parse_condition_mapping,
     parse_control,
@@ -37,30 +36,6 @@ from parse import (
     validate_question_properties,
     validate_risk_properties,
 )
-
-# ---------------------------------------------------------------------------
-# _ensure_str
-# ---------------------------------------------------------------------------
-
-
-class TestEnsureStr:
-    def test_true_becomes_yes(self):
-        assert _ensure_str(True) == "yes"
-
-    def test_false_becomes_no(self):
-        assert _ensure_str(False) == "no"
-
-    def test_string_passthrough(self):
-        assert _ensure_str("maybe") == "maybe"
-
-    def test_int_raises(self):
-        with pytest.raises(TypeError, match="int"):
-            _ensure_str(123)
-
-    def test_none_raises(self):
-        with pytest.raises(TypeError):
-            _ensure_str(None)
-
 
 # ---------------------------------------------------------------------------
 # parse_question
