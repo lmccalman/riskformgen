@@ -19,21 +19,6 @@ previously-copied asset is renamed (or the editor shrinks), the old file
 lingers in `output/`. Consider `shutil.rmtree(output_dir, ignore_errors=True)`
 before rebuilding, or track copied files and delete stragglers.
 
-### 1.6 · Risk "n/a" fallback bypasses the scale tuples
-**Status:** open
-`page.html.j2:247` returns `{likelihood: 'n/a', consequence: 'n/a', level:
-'not_applicable'}` when no condition fires. `'n/a'` isn't in `LIKELIHOODS` /
-`CONSEQUENCES`, so `_worst` can't ever work on it, and it only appears because
-of the short-circuit at line 247. The same condition is expressed with `null`
-elsewhere (`_worst` filter). Two conventions for the same state are confusing;
-pick one (`null` seems cleaner, and `risk_summary.html.j2:18,27` would then
-need a `|| '—'` default).
-
-Current behaviour (`'n/a'` string literal for the short-circuit) is now
-pinned by `TestRiskAggregation::test_no_conditions_fire_is_not_applicable`
-in `tests/test_js_behaviour.py` (see §4.8); switching to `null` requires a
-deliberate test update.
-
 ### 1.7 · Import version field is declarative but not enforced
 **Status:** open
 `page.html.j2:115, 184` write `version: 1`. The importer

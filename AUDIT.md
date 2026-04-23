@@ -70,7 +70,7 @@ cross-namespace duplicates. Tests in `tests/test_parse.py`:
 `TestValidateId`, `TestParseBadIds`, `TestValidateIdNamespaces`.
 
 ### 1.6 · Risk "n/a" fallback bypasses the scale tuples
-**Status:** open
+**Status:** resolved (2026-04-23)
 `page.html.j2:247` returns `{likelihood: 'n/a', consequence: 'n/a', level:
 'not_applicable'}` when no condition fires. `'n/a'` isn't in `LIKELIHOODS` /
 `CONSEQUENCES`, so `_worst` can't ever work on it, and it only appears because

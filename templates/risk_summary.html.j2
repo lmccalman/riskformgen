@@ -15,7 +15,7 @@
           <span class="dim-label">Likelihood</span>
           <span
             class="badge badge-blue"
-            x-text="{{ risk.id }}.likelihood.replace(/_/g, ' ')"
+            x-text="({{ risk.id }}.likelihood || '—').replace(/_/g, ' ')"
           ></span>
         </div>
 
@@ -24,7 +24,7 @@
           <span class="dim-label">Consequence</span>
           <span
             class="badge badge-purple"
-            x-text="{{ risk.id }}.consequence.replace(/_/g, ' ')"
+            x-text="({{ risk.id }}.consequence || '—').replace(/_/g, ' ')"
           ></span>
         </div>
 

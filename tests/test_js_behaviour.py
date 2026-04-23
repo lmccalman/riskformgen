@@ -225,8 +225,8 @@ class TestRiskAggregation:
         # q1 unanswered → p1 null → condition does not fire
         assert scope.risk("r1") == {
             "level": "not_applicable",
-            "likelihood": "n/a",
-            "consequence": "n/a",
+            "likelihood": None,
+            "consequence": None,
         }
 
     def test_single_condition_passes_through(self) -> None:
