@@ -136,6 +136,16 @@ Custom classes in `input.css` handle app-specific components: `.badge-{color}`, 
 
 YAML parsing boundaries lack type stubs. Files that interact heavily with these use per-file pyright comment overrides:
 - `parse.py`: `# pyright: reportArgumentType=false, reportIndexIssue=false, reportGeneralTypeIssues=false`
+- `tests/js_harness.py`: `# pyright: reportReturnType=false, reportCallIssue=false, reportArgumentType=false` (mini-racer's `ctx.eval` returns a very broad union)
+
+### Testing
+
+Two test layers coexist:
+
+- **Compiler-shape tests** — `tests/test_render.py` and `tests/test_models.py` assert on the substrings emitted by `_compile_property_getter`, `ConditionMapping.to_js`, and friends. They pin the generated code's *form*.
+- **Behaviour tests** — `tests/test_js_behaviour.py` uses `tests/js_harness.py` to evaluate the real `render_app_js()` output inside an embedded V8 context (`mini-racer`). Stubs for `Alpine.data` / `Alpine.$persist` / `document.addEventListener` capture the factory so `prop_*`, `ctrl_*`, risk and residual getters can be driven against in-memory `answers` / `details` / `control_effectiveness` fixtures. They pin the generated code's *semantics*.
+
+The two layers are complementary: a refactor that preserves semantics but changes the emitted format breaks the first layer only; a refactor that preserves the format but flips a branch breaks the second only. Write new tests in whichever layer matches what you're protecting against.
 
 ### Output
 

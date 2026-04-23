@@ -52,6 +52,10 @@ This is a semantic decision rather than a clear bug, but the current behaviour
 is likely surprising given the emphasis on DAG-driven visibility in
 `CLAUDE.md`.
 
+Current behaviour is now pinned by `TestQuestionVisibility` in
+`tests/test_js_behaviour.py` (see §4.8); flipping to `=== true` requires a
+deliberate test update.
+
 ### 1.3 ◑ `$persist` + schema migration produces phantom-missing keys
 **Status:** open
 `templates/page.html.j2:22-55` seeds `answers`, `details`, `assessed_risks`,
@@ -99,6 +103,11 @@ of the short-circuit at line 247. The same condition is expressed with `null`
 elsewhere (`_worst` filter). Two conventions for the same state are confusing;
 pick one (`null` seems cleaner, and `risk_summary.html.j2:18,27` would then
 need a `|| '—'` default).
+
+Current behaviour (`'n/a'` string literal for the short-circuit) is now
+pinned by `TestRiskAggregation::test_no_conditions_fire_is_not_applicable`
+in `tests/test_js_behaviour.py` (see §4.8); switching to `null` requires a
+deliberate test update.
 
 ### 1.7 · Import version field is declarative but not enforced
 **Status:** open
@@ -330,7 +339,12 @@ impossible-state class. Touch point: `parse_control_effect`
 (`parse.py:149-155`) and the template's display label.
 
 ### 4.8 Add a JS-behaviour test layer
-**Status:** open
+**Status:** resolved (2026-04-23) — `mini-racer`-backed harness in
+`tests/js_harness.py` evaluates `render_app_js()` output against answer
+fixtures; semantic coverage in `tests/test_js_behaviour.py` for property
+cascade (all + any modes), question visibility, risk aggregation, matrix
+lookup, residual risk (ineffective / controlled / partial), control getters,
+and detail `show_js`. Playwright (option 2 below) remains unimplemented.
 Everything from `_compile_property_getter` through `prepare_risks.to_js()` is
 string-building. The current tests check the strings, not the semantics. A
 few options, roughly in ascending cost:
@@ -354,7 +368,9 @@ wants to surface build output.
 ## 5. Test coverage and correctness
 
 ### 5.1 ⚠ No tests exercise the generated JavaScript
-**Status:** open
+**Status:** resolved (2026-04-23) — see §4.8. `tests/test_js_behaviour.py`
+now covers risk calculation, property cascade, and residual gating
+end-to-end by running the real compiled JS inside a V8 context.
 The heart of the product (parent-cascade null-propagation, worst-case-wins
 aggregation, risk matrix lookup, control/detail reactivity) runs in the
 browser. Every Python test of this logic asserts on the emitted *string*:
@@ -457,8 +473,7 @@ test becomes stale without surfacing an actual behavioural regression.
    quickstart.
 3. ~~**Prune `CLAUDE.md`** of all graph-visualisation references (§3.2)~~ —
    **done.**
-4. **Add a JS-behaviour test layer** (§4.8, §5.1) — currently nothing in CI
-   catches a regression in the actual risk calculation.
+4. ~~**Add a JS-behaviour test layer** (§4.8, §5.1)~~ — **done.**
 5. ~~**Lift `x-data` out of the HTML attribute** (§2.1, §4.2)~~ — **done.**
 6. **Tighten ID validation** (§1.5, §4.3) — cheap, closes a class of silent
    runtime bugs.
