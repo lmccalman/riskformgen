@@ -1,5 +1,5 @@
 import json
-from collections.abc import Sequence
+from collections.abc import Iterable, Sequence
 
 from jinja2 import Environment, FileSystemLoader, select_autoescape
 
@@ -250,31 +250,32 @@ def prepare_risks(risks: list[Risk], details: list[Detail] | None = None) -> lis
 
 def prepare_controls(
     controls: list[Control],
-    risk_dicts: list[dict],
-) -> list[dict]:
-    """Build control getters and attach per-risk control lists to risk dicts."""
+    risk_ids: Iterable[str],
+) -> tuple[list[dict], dict[str, list[dict]]]:
+    """Build control getters and group controls by the risks they address.
+
+    Returns:
+        control_getters: list of {id, js} for the template
+        controls_by_risk_id: {risk_id: [{id, description}, ...]} for every risk id
+            in ``risk_ids`` (entries are empty lists when no controls apply).
+    """
     control_getters = [
         {"id": ctrl.id, "js": f"this.prop_{ctrl.property} === true"} for ctrl in controls
     ]
 
-    # Index risk dicts by id for fast lookup
-    risk_by_id = {r["id"]: r for r in risk_dicts}
-
-    # Group control effects by risk_id
-    for risk_dict in risk_dicts:
-        risk_dict["controls"] = []
+    controls_by_risk_id: dict[str, list[dict]] = {rid: [] for rid in risk_ids}
 
     for ctrl in controls:
         for effect in ctrl.effects:
-            if effect.risk_id in risk_by_id:
-                risk_by_id[effect.risk_id]["controls"].append(
+            if effect.risk_id in controls_by_risk_id:
+                controls_by_risk_id[effect.risk_id].append(
                     {
                         "id": ctrl.id,
                         "description": ctrl.description,
                     }
                 )
 
-    return control_getters
+    return control_getters, controls_by_risk_id
 
 
 # ---------------------------------------------------------------------------
@@ -297,7 +298,11 @@ def _build_template_context(
         q for sec in section_dicts for sub in sec["subsections"] for q in sub["questions"]
     ]
     risk_dicts = prepare_risks(risks, details)
-    control_getters = prepare_controls(controls or [], risk_dicts)
+    control_getters, controls_by_risk_id = prepare_controls(
+        controls or [], (r["id"] for r in risk_dicts)
+    )
+    for risk_dict in risk_dicts:
+        risk_dict["controls"] = controls_by_risk_id.get(risk_dict["id"], [])
     detail_ids = [d.id for d in (details or [])]
     return {
         "sections": section_dicts,

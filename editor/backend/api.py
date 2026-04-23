@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 import io
-from contextlib import redirect_stdout
+import logging
 
 from fastapi import APIRouter
 
@@ -57,8 +57,17 @@ def post_rebuild() -> RebuildResult:
         import main
 
         buf = io.StringIO()
-        with redirect_stdout(buf):
+        handler = logging.StreamHandler(buf)
+        handler.setFormatter(logging.Formatter("%(message)s"))
+        main_logger = logging.getLogger("main")
+        main_logger.addHandler(handler)
+        previous_level = main_logger.level
+        main_logger.setLevel(logging.INFO)
+        try:
             main.main()
+        finally:
+            main_logger.removeHandler(handler)
+            main_logger.setLevel(previous_level)
         return RebuildResult(ok=True, message=buf.getvalue().strip())
     except Exception as e:
         return RebuildResult(ok=False, message=str(e))

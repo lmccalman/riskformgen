@@ -135,11 +135,11 @@ already do exactly this (`render.py:303-307`). Extending that pattern would
 delete ~50 lines of brittle comma-conditional Jinja.
 
 ### 2.3 ◑ `prepare_controls` mutates its argument
-**Status:** open
-`render.py:241-269` assigns `risk_dict["controls"] = []` into the caller's list
-and appends to it. This is the only mutation-in-place function in the module
-and forces call sites to know about the side effect. Return a new list of
-risk dicts (or a parallel `controls_by_risk_id: dict[str, list[dict]]`).
+**Status:** resolved (2026-04-23) — `prepare_controls` now takes an iterable
+of risk IDs and returns `(control_getters, controls_by_risk_id)`. The caller
+in `render._build_template_context` attaches the per-risk control lists onto
+the outgoing risk dicts; `TestPrepareControls` asserts on the returned
+mapping.
 
 ### 2.4 ◑ String literals for closed enums
 **Status:** open
@@ -165,10 +165,9 @@ at parse time would catch these.
 contract explicit. Jinja2 is fine with either; the cost is low.
 
 ### 2.7 · Single `validate_all` entry point
-**Status:** open
-`main.py:64-71` has seven `validate_*` calls in sequence. A single
-`parse.validate_all(sections, properties, risks, controls, details)` would
-make the public surface smaller and give tests a single target.
+**Status:** resolved (2026-04-23) — `parse.validate_all` now wraps the nine
+individual validators; `main.main()` calls it in one line. Individual
+validators remain public so existing tests still target them directly.
 
 ### 2.8 · `clearAll` wipes everything regardless of which tab's button is clicked
 **Status:** open
@@ -282,10 +281,7 @@ renders with autoescape off.
 **Status:** resolved (2026-04-23) — see §1.5.
 
 ### 4.4 Stop mutating in `prepare_controls`
-**Status:** open
-Have it return `dict[risk_id, list[ControlDisplay]]` and let `prepare_risks`
-or `render_form` attach those to the outgoing dicts. Tests then don't need to
-construct risk dicts and pass them in (`test_render.py:303-334`).
+**Status:** resolved (2026-04-23) — see §2.3.
 
 ### 4.5 Collapse the dict-conversion layer
 **Status:** open
@@ -296,8 +292,7 @@ typed records, or on the dataclasses themselves as cached properties. Saves a
 ~200-line module and the associated tests that mirror its shape.
 
 ### 4.6 Clean `output/` before each build
-**Status:** open
-See §1.4.
+**Status:** resolved (2026-04-23) — see §1.4.
 
 ### 4.7 Consider a single-enum `ControlEffect.reduces`
 **Status:** resolved (2026-04-23) — obsoleted by §1.1 resolution. `reduces_likelihood` / `reduces_consequence` removed entirely; `ControlEffect` now holds only `risk_id`.
@@ -328,9 +323,11 @@ few options, roughly in ascending cost:
   persistence bugs (§1.3) and the radio-selected class behaviour.
 
 ### 4.9 Replace `print` in `main.py` with a logger
-**Status:** open
-Trivial, but useful once the editor backend calls into `main.main()` and
-wants to surface build output.
+**Status:** resolved (2026-04-23) — `main` now logs via
+`logging.getLogger("main")`; the CLI configures `basicConfig` under
+`__main__` so terminal output is unchanged. `editor/backend/api.py` attaches
+a `StreamHandler` around `main.main()` to capture the summary into the
+rebuild response body.
 
 ---
 

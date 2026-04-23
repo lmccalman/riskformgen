@@ -19,13 +19,6 @@ historical record._
 
 ## 2. Simplicity and maintainability
 
-### 2.3 ◑ `prepare_controls` mutates its argument
-**Status:** open
-`render.py:241-269` assigns `risk_dict["controls"] = []` into the caller's list
-and appends to it. This is the only mutation-in-place function in the module
-and forces call sites to know about the side effect. Return a new list of
-risk dicts (or a parallel `controls_by_risk_id: dict[str, list[dict]]`).
-
 ### 2.4 ◑ String literals for closed enums
 **Status:** open
 - `Property.activation` ("all" | "any") — `models.py:163`
@@ -48,12 +41,6 @@ at parse time would catch these.
 `render.py` builds dicts with string-typed keys returned as `list[dict]`. A
 `TypedDict` per shape (question, risk, subsection) would make the template
 contract explicit. Jinja2 is fine with either; the cost is low.
-
-### 2.7 · Single `validate_all` entry point
-**Status:** open
-`main.py:64-71` has seven `validate_*` calls in sequence. A single
-`parse.validate_all(sections, properties, risks, controls, details)` would
-make the public surface smaller and give tests a single target.
 
 ### 2.8 · `clearAll` wipes everything regardless of which tab's button is clicked
 **Status:** open
@@ -86,12 +73,6 @@ rendered detail text; the mental model is different.
 
 ## 4. Architecture and implementation improvements
 
-### 4.4 Stop mutating in `prepare_controls`
-**Status:** open
-Have it return `dict[risk_id, list[ControlDisplay]]` and let `prepare_risks`
-or `render_form` attach those to the outgoing dicts. Tests then don't need to
-construct risk dicts and pass them in (`test_render.py:303-334`).
-
 ### 4.5 Collapse the dict-conversion layer
 **Status:** open
 Jinja2 is happy to traverse dataclasses via attribute access. The `prepare_*`
@@ -99,15 +80,6 @@ functions exist mostly to attach computed `visibility_js` strings and JSON
 bodies. Those could live in a thin dataclass-to-context function that returns
 typed records, or on the dataclasses themselves as cached properties. Saves a
 ~200-line module and the associated tests that mirror its shape.
-
-### 4.6 Clean `output/` before each build
-**Status:** open
-See §1.4.
-
-### 4.9 Replace `print` in `main.py` with a logger
-**Status:** open
-Trivial, but useful once the editor backend calls into `main.main()` and
-wants to surface build output.
 
 ---
 

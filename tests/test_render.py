@@ -320,18 +320,16 @@ class TestPrepareRisks:
 
 class TestPrepareControls:
     def test_control_getters(self, sample_control):
-        risk_dicts = [{"id": "r1", "description": "R"}]
-        getters = prepare_controls([sample_control], risk_dicts)
+        getters, _ = prepare_controls([sample_control], ["r1"])
         assert len(getters) == 1
         assert getters[0]["id"] == "ctrl1"
         assert "js" in getters[0]
 
     def test_effects_grouped_by_risk(self, sample_control):
-        risk_dicts: list[dict] = [{"id": "r1", "description": "R"}]
-        prepare_controls([sample_control], risk_dicts)
-        assert len(risk_dicts[0]["controls"]) == 1
-        assert risk_dicts[0]["controls"][0]["id"] == "ctrl1"
-        assert risk_dicts[0]["controls"][0]["description"] == "Encryption enabled"
+        _, controls_by_risk = prepare_controls([sample_control], ["r1"])
+        assert len(controls_by_risk["r1"]) == 1
+        assert controls_by_risk["r1"][0]["id"] == "ctrl1"
+        assert controls_by_risk["r1"][0]["description"] == "Encryption enabled"
 
     def test_missing_risk_skipped(self):
         ctrl = Control(
@@ -340,16 +338,14 @@ class TestPrepareControls:
             property="p1",
             effects=(ControlEffect(risk_id="nonexistent"),),
         )
-        risk_dicts = [{"id": "r1", "description": "R"}]
-        getters = prepare_controls([ctrl], risk_dicts)
+        getters, controls_by_risk = prepare_controls([ctrl], ["r1"])
         assert len(getters) == 1
-        assert risk_dicts[0]["controls"] == []
+        assert controls_by_risk == {"r1": []}
 
     def test_empty_controls(self):
-        risk_dicts = [{"id": "r1", "description": "R"}]
-        getters = prepare_controls([], risk_dicts)
+        getters, controls_by_risk = prepare_controls([], ["r1"])
         assert getters == []
-        assert risk_dicts[0]["controls"] == []
+        assert controls_by_risk == {"r1": []}
 
 
 # ---------------------------------------------------------------------------

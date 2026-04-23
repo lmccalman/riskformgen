@@ -1,3 +1,4 @@
+import logging
 import shutil
 
 import config
@@ -8,16 +9,11 @@ from parse import (
     load_properties,
     load_risks,
     load_sections,
-    validate_control_properties,
-    validate_control_risk_ids,
-    validate_detail_properties,
-    validate_detail_questions,
-    validate_id_namespaces,
-    validate_property_dag,
-    validate_question_properties,
-    validate_risk_properties,
+    validate_all,
 )
 from render import render_app_js, render_form
+
+logger = logging.getLogger(__name__)
 
 
 def ensure_output_dir() -> None:
@@ -77,28 +73,27 @@ def main() -> None:
     risks = load_risks(config.form_dir / "risks.yaml")
     controls = load_controls(config.form_dir / "controls.yaml")
 
-    validate_property_dag(properties)
-    questions = all_questions(sections)
-    validate_question_properties(questions, properties)
-    validate_risk_properties(risks, properties)
-    validate_control_properties(controls, properties)
-    validate_control_risk_ids(controls, risks)
-    validate_detail_properties(details, properties)
-    validate_detail_questions(questions, details)
-    validate_id_namespaces(sections, properties, risks, controls, details)
+    validate_all(sections, properties, risks, controls, details)
 
     ensure_output_dir()
     write_html(sections, risks, controls, properties, details)
     write_app_js(sections, risks, controls, properties, details)
     copy_css()
     copy_alpine()
-    print(
-        f"Built form with {len(sections)} sections, {len(questions)} questions,"
-        f" {len(properties)} properties, {len(risks)} risks,"
-        f" {len(controls)} controls, and {len(details)} details"
-        f" in {config.output_dir.resolve()}/"
+    questions = all_questions(sections)
+    logger.info(
+        "Built form with %d sections, %d questions, %d properties,"
+        " %d risks, %d controls, and %d details in %s/",
+        len(sections),
+        len(questions),
+        len(properties),
+        len(risks),
+        len(controls),
+        len(details),
+        config.output_dir.resolve(),
     )
 
 
 if __name__ == "__main__":
+    logging.basicConfig(level=logging.INFO, format="%(message)s")
     main()

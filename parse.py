@@ -22,6 +22,7 @@ from models import (
     Risk,
     Section,
     SubSection,
+    all_questions,
 )
 
 # Type aliases for readability
@@ -488,3 +489,22 @@ def validate_id_namespaces(
 
     if errors:
         raise ValueError("Invalid ID usage:\n  " + "\n  ".join(errors))
+
+
+def validate_all(
+    sections: Sequence[Section],
+    properties: list[Property],
+    risks: list[Risk],
+    controls: list[Control],
+    details: list[Detail],
+) -> None:
+    """Run every validator in dependency order, raising on the first failure."""
+    validate_property_dag(properties)
+    questions = all_questions(sections)
+    validate_question_properties(questions, properties)
+    validate_risk_properties(risks, properties)
+    validate_control_properties(controls, properties)
+    validate_control_risk_ids(controls, risks)
+    validate_detail_properties(details, properties)
+    validate_detail_questions(questions, details)
+    validate_id_namespaces(sections, properties, risks, controls, details)
