@@ -130,23 +130,12 @@ Likely a leftover from an older "export as Markdown" flow.
 ## 2. Simplicity and maintainability
 
 ### 2.1 ⚠ 240-line JS literal embedded in an HTML attribute
-**Status:** open
-`page.html.j2:20-256` is one enormous `x-data="{…}"` attribute containing
-state, methods (`clearAll`, `exportAnswers`, `importAnswers`, `_importJson`,
-`_worst`, `_formatAnswer`, `_downloadJson`), and a getter per property,
-control, and risk.
-
-Problems:
-- Not reachable by any JS linter or formatter.
-- The browser parses it as an HTML attribute first, so escaping bugs
-  (the gotcha called out in `CLAUDE.md:140-148`) are easy to reintroduce.
-- Hard to diff when either the template or the generated logic changes.
-- Stack traces from browser devtools land inside `index.html`.
-
-A big quality-of-life win would be to render a separate `output/app.js` from an
-`app.js.j2` template, keep the HTML file minimal, and load it with
-`<script defer src="app.js"></script>`. All the same Jinja substitutions still
-work; the file just isn't an HTML attribute anymore.
+**Status:** resolved (2026-04-23) — the Alpine component is now rendered from
+`templates/app.js.j2` into `output/app.js` and registered via
+`Alpine.data('app', () => ({...}))` on the `alpine:init` event.
+`templates/page.html.j2` carries only `<div x-data="app">` with no inline
+bundle. localStorage keys preserved by explicit `Alpine.$persist(...).as('_x_<field>')`
+for each persisted field.
 
 ### 2.2 ◑ Hand-built Jinja loops for JS object literals
 **Status:** open
@@ -207,10 +196,13 @@ make the public surface smaller and give tests a single target.
 only assessments. Minor UX; confirm dialog covers the blast radius.
 
 ### 2.9 · Jinja autoescape gotcha is documented but easy to regress
-**Status:** open
-`CLAUDE.md:140-148` explains why `|tojson` is unsafe inside an `x-data`
-attribute. If the `x-data` attribute is moved out into a script file
-(§2.1), that gotcha disappears entirely.
+**Status:** resolved (2026-04-23) — as predicted, obsoleted by §2.1's
+resolution. `create_environment()` now enables autoescape for
+`html`/`html.j2`/`htm`/`xml` templates only; `app.js.j2` renders without
+autoescape so compiled getter bodies emit cleanly. The CLAUDE.md note is
+trimmed to a brief reminder that the old `json.dumps()` pattern still
+applies to any *other* Jinja template that inlines JSON into an HTML
+attribute.
 
 ---
 
@@ -294,17 +286,13 @@ Pick one of:
 whether the next few weeks of schema work will fight the codebase.
 
 ### 4.2 Extract the Alpine bundle out of the HTML attribute
-**Status:** open
-See §2.1. A sketch:
-
-1. Add `templates/app.js.j2` that renders the entire Alpine component
-   (state + methods + getters).
-2. In `render.py`, render it to `output/app.js` alongside `index.html`.
-3. Import it with `<script defer src="app.js"></script>` and change
-   `x-data="app()"` in `page.html.j2`. Expose `window.app = () => ({…})` in
-   `app.js`.
-4. All current `json.dumps()` escaping (§2.2) stays — just moved to a context
-   where `|tojson` is also safe.
+**Status:** resolved (2026-04-23) — see §2.1. Implemented via
+`templates/app.js.j2` + `render_app_js()` + `write_app_js()` in
+`main.py`. Uses `Alpine.data('app', ...)` registered on `alpine:init`
+rather than `window.app = () => (...)`, because that is the supported
+factory form for the persist plugin. §2.2 (Jinja loops → `|tojson`) was
+left as a standalone follow-up — it is now trivial because `app.js.j2`
+renders with autoescape off.
 
 ### 4.3 Typed identifiers and collision check
 **Status:** open
@@ -471,8 +459,7 @@ test becomes stale without surfacing an actual behavioural regression.
    **done.**
 4. **Add a JS-behaviour test layer** (§4.8, §5.1) — currently nothing in CI
    catches a regression in the actual risk calculation.
-5. **Lift `x-data` out of the HTML attribute** (§2.1, §4.2) — unblocks
-   linting, debugging, and makes §4.8 much easier.
+5. ~~**Lift `x-data` out of the HTML attribute** (§2.1, §4.2)~~ — **done.**
 6. **Tighten ID validation** (§1.5, §4.3) — cheap, closes a class of silent
    runtime bugs.
 7. **Delete dead code** (§1.9, §1.10) — small but keeps the next reader from

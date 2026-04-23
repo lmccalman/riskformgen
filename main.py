@@ -16,7 +16,7 @@ from parse import (
     validate_question_properties,
     validate_risk_properties,
 )
-from render import render_form
+from render import render_app_js, render_form
 
 
 def ensure_output_dir() -> None:
@@ -36,6 +36,20 @@ def write_html(
         sections, risks=risks, controls=controls, properties=properties, details=details
     )
     (config.output_dir / "index.html").write_text(html)
+
+
+def write_app_js(
+    sections: list[Section],
+    risks: list[Risk],
+    controls: list[Control],
+    properties: list[Property],
+    details: list[Detail],
+) -> None:
+    """Render and write the Alpine component factory to output/app.js."""
+    js = render_app_js(
+        sections, risks=risks, controls=controls, properties=properties, details=details
+    )
+    (config.output_dir / "app.js").write_text(js)
 
 
 def copy_css() -> None:
@@ -72,6 +86,7 @@ def main() -> None:
 
     ensure_output_dir()
     write_html(sections, risks, controls, properties, details)
+    write_app_js(sections, risks, controls, properties, details)
     copy_css()
     copy_alpine()
     print(

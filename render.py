@@ -19,10 +19,19 @@ from models import (
 
 
 def create_environment() -> Environment:
-    """Create a Jinja2 environment loading from the templates directory."""
+    """Create a Jinja2 environment loading from the templates directory.
+
+    Autoescape is enabled for HTML-ish templates only. `app.js.j2` renders
+    JavaScript and must NOT be autoescaped — otherwise quote characters in
+    compiled getter bodies become HTML entities that break the emitted JS.
+    """
     return Environment(
         loader=FileSystemLoader(config.templates_dir),
-        autoescape=select_autoescape(default=True),
+        autoescape=select_autoescape(
+            enabled_extensions=("html", "htm", "xml", "html.j2"),
+            default_for_string=False,
+            default=False,
+        ),
         trim_blocks=True,
         lstrip_blocks=True,
     )
@@ -272,6 +281,40 @@ def prepare_controls(
 # ---------------------------------------------------------------------------
 
 
+def _build_template_context(
+    sections: list[Section],
+    risks: list[Risk],
+    controls: list[Control] | None = None,
+    properties: list[Property] | None = None,
+    details: list[Detail] | None = None,
+) -> dict:
+    """Build the shared template context used by both page.html.j2 and app.js.j2."""
+    questions = all_questions(sections)
+    property_getters, question_visibility = prepare_properties(properties or [], questions)
+    section_dicts = prepare_sections(sections, question_visibility)
+    question_dicts = [
+        q for sec in section_dicts for sub in sec["subsections"] for q in sub["questions"]
+    ]
+    risk_dicts = prepare_risks(risks, details)
+    control_getters = prepare_controls(controls or [], risk_dicts)
+    detail_ids = [d.id for d in (details or [])]
+    return {
+        "sections": section_dicts,
+        "questions": question_dicts,
+        "risks": risk_dicts,
+        "control_getters": control_getters,
+        "property_getters": property_getters,
+        "detail_ids": detail_ids,
+        "likelihoods": list(config.LIKELIHOODS),
+        "consequences": list(config.CONSEQUENCES),
+        "likelihoods_js": json.dumps(list(config.LIKELIHOODS)),
+        "consequences_js": json.dumps(list(config.CONSEQUENCES)),
+        "risk_levels": list(config.RISK_LEVELS),
+        "risk_level_colours": config.RISK_LEVEL_COLOURS,
+        "risk_matrix_js": json.dumps(config.RISK_MATRIX),
+    }
+
+
 def render_form(
     sections: list[Section],
     risks: list[Risk],
@@ -282,27 +325,19 @@ def render_form(
     """Render the form page HTML from sections, risks, properties, and details."""
     env = create_environment()
     template = env.get_template("page.html.j2")
-    questions = all_questions(sections)
-    property_getters, question_visibility = prepare_properties(properties or [], questions)
-    section_dicts = prepare_sections(sections, question_visibility)
-    question_dicts = [
-        q for sec in section_dicts for sub in sec["subsections"] for q in sub["questions"]
-    ]
-    risk_dicts = prepare_risks(risks, details)
-    control_getters = prepare_controls(controls or [], risk_dicts)
-    detail_ids = [d.id for d in (details or [])]
-    return template.render(
-        sections=section_dicts,
-        questions=question_dicts,
-        risks=risk_dicts,
-        control_getters=control_getters,
-        property_getters=property_getters,
-        detail_ids=detail_ids,
-        likelihoods=list(config.LIKELIHOODS),
-        consequences=list(config.CONSEQUENCES),
-        likelihoods_js=json.dumps(list(config.LIKELIHOODS)),
-        consequences_js=json.dumps(list(config.CONSEQUENCES)),
-        risk_levels=list(config.RISK_LEVELS),
-        risk_level_colours=config.RISK_LEVEL_COLOURS,
-        risk_matrix_js=json.dumps(config.RISK_MATRIX),
-    )
+    context = _build_template_context(sections, risks, controls, properties, details)
+    return template.render(**context)
+
+
+def render_app_js(
+    sections: list[Section],
+    risks: list[Risk],
+    controls: list[Control] | None = None,
+    properties: list[Property] | None = None,
+    details: list[Detail] | None = None,
+) -> str:
+    """Render the Alpine.js component factory as a standalone JS file."""
+    env = create_environment()
+    template = env.get_template("app.js.j2")
+    context = _build_template_context(sections, risks, controls, properties, details)
+    return template.render(**context)

@@ -53,7 +53,7 @@ The build pipeline has three phases:
 
 2. **CSS (build time)** — `bulma.min.css` provides class-based styling (layout, typography, form controls, cards, tabs). `input.css` contains custom CSS for app-specific components (badges, risk grid, spacing stacks, etc.). Both are copied directly to `output/` — no compilation step needed.
 
-3. **Alpine.js (runtime)** — A parent `<div>` holds the `x-data` scope shared by all section forms and the risks panel. It contains reactive `answers` state, computed property getters (`prop_*`), control getters (`ctrl_*`), and risk getters — all compiled from Python at build time. Each section renders as its own `<form>` shown/hidden via `x-show`. Question visibility is driven by the property DAG (questions are shown when their target properties are reachable). Risk getters re-evaluate automatically as answers change.
+3. **Alpine.js (runtime)** — The Alpine component is rendered from `templates/app.js.j2` into `output/app.js` (alongside `index.html`), which registers a factory via `Alpine.data('app', () => ({...}))` on the `alpine:init` event. The HTML carries only `<div x-data="app">`. The factory holds reactive `answers` state, computed property getters (`prop_*`), control getters (`ctrl_*`), and risk getters — all compiled from Python at build time. Each section renders as its own `<form>` shown/hidden via `x-show`. Question visibility is driven by the property DAG (questions are shown when their target properties are reachable). Risk getters re-evaluate automatically as answers change. Persisted state uses `Alpine.$persist(initial).as('_x_<field>')` so localStorage keys are stable across the component definition form.
 
 ### Core domain model
 
@@ -78,10 +78,11 @@ The data flow is: **Questions → Properties → Risks / Controls**.
 | `config.py` | Project paths, risk scales (`LIKELIHOODS`, `CONSEQUENCES`, `RISK_LEVELS`), and `RISK_MATRIX` lookup table |
 | `models.py` | Frozen dataclasses: `BinaryQuestion`, `Property`, `ConditionMapping`, `Risk`, `Control`, `ControlEffect`, `Section`, `SubSection` |
 | `parse.py` | YAML → dataclass parsing (one `load_*` function per YAML file) plus validation functions |
-| `render.py` | Jinja2 environment, `prepare_properties()`, `prepare_sections()`, `prepare_risks()`, `prepare_controls()`, and `render_form()` |
-| `main.py` | Build orchestrator — loads YAML, validates, renders HTML, copies assets |
+| `render.py` | Jinja2 environment, `prepare_properties()`, `prepare_sections()`, `prepare_risks()`, `prepare_controls()`, `render_form()`, and `render_app_js()` |
+| `main.py` | Build orchestrator — loads YAML, validates, renders HTML + `app.js`, copies assets |
 | `form/*.yaml` | Form definitions: `sections.yaml`, `properties.yaml`, `risks.yaml`, `controls.yaml` |
-| `templates/page.html.j2` | Page skeleton with Alpine.js state, tab navigation, property/risk/control getters |
+| `templates/page.html.j2` | Page skeleton with tab navigation and Alpine bindings (`x-data="app"`, `x-show`, `x-model`); no component body |
+| `templates/app.js.j2` | Alpine factory: `Alpine.data('app', () => ({...}))` with state, methods, and compiled property/control/risk getters |
 | `templates/subsection.html.j2` | Sub-section partial — heading + question loop |
 | `templates/question.html.j2` | Dispatcher — includes `questions/{type}.html.j2` |
 | `templates/questions/binary.html.j2` | Binary (yes/no) question partial |
@@ -94,7 +95,7 @@ The data flow is: **Questions → Properties → Risks / Controls**.
 1. **`models.py`** — Add a frozen dataclass with `id: str`, `text: str`, `properties: tuple[str, ...]`, any type-specific fields, and a `type: str = field(default="my_type", init=False)` discriminator. Add the class to the `Question` union type alias.
 2. **`parse.py`** — Add a `case` branch in `parse_question()` to construct the new dataclass from YAML dicts.
 3. **`templates/questions/my_type.html.j2`** — Create a Jinja2 partial for the new type. Use `x-model="answers.{{ question.id }}"` to bind to Alpine.js state.
-4. **`templates/page.html.j2`** — If the new type needs a non-string default (like `[]` for arrays), add a condition to the `x-data` initialiser.
+4. **`templates/app.js.j2`** — If the new type needs a non-string default (like `[]` for arrays), adjust the `answers` seed loop in the factory.
 
 No changes needed to `question.html.j2`, `subsection.html.j2`, `render.py`, or the build pipeline — the dispatcher and renderer work generically.
 
@@ -127,9 +128,9 @@ Templates use Bulma's class-based styling:
 
 Custom classes in `input.css` handle app-specific components: `.badge-{color}`, `.risk-grid`, `.control-row`, `.stack-{lg,md,sm}`, `.options-{row,col}`, `.assessed-row`, `.linked-answer`, `.debug-panel`.
 
-### Gotcha: Jinja2 autoescape and Alpine.js
+### Gotcha: Jinja2 autoescape and JS templates
 
-The Jinja2 environment uses `autoescape=True`. When rendering JS expressions inside `x-data="..."` attributes, **do NOT use `|safe` or `|tojson`**. Autoescape produces HTML entities (`&#34;` for `"`, `&gt;` for `>`, `&#39;` for `'`) which the browser decodes back to the original characters when reading the attribute value — before Alpine evaluates the JS. Using `|safe` or `|tojson` (which marks output as `Markup`) puts raw `"` into a `"`-delimited attribute, breaking HTML parsing. Instead, pre-serialise to JSON strings in Python with `json.dumps()` and pass as plain string template variables.
+`create_environment()` in `render.py` enables autoescape for `.html` / `.html.j2` / `.htm` / `.xml` templates and disables it everywhere else (including `.js.j2`). This lets `app.js.j2` emit compiled JS directly without HTML entities creeping in. If you ever inline JS expressions back into an HTML attribute (anywhere outside `app.js.j2`), you still cannot use `|tojson` / `|safe` there — pre-serialise with `json.dumps()` in Python and pass as plain string context variables, same pattern as `likelihoods_js` in `render.py`.
 
 ### Gotcha: pyright and untyped libraries
 
@@ -138,7 +139,7 @@ YAML parsing boundaries lack type stubs. Files that interact heavily with these 
 
 ### Output
 
-All generated files go to `output/` (gitignored): `index.html`, `bulma.min.css`, `input.css`, `alpine3.15.8.min.js`, `alpine-persist.min.js`.
+All generated files go to `output/` (gitignored): `index.html`, `app.js`, `bulma.min.css`, `input.css`, `alpine3.15.8.min.js`, `alpine-persist.min.js`.
 
 ### Spec Editor
 

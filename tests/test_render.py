@@ -24,6 +24,7 @@ from render import (
     prepare_properties,
     prepare_risks,
     prepare_sections,
+    render_app_js,
     render_form,
 )
 
@@ -347,7 +348,7 @@ class TestRenderForm:
 
     def test_contains_alpine_xdata(self, sample_sections, sample_properties):
         html = render_form(sample_sections, [], properties=sample_properties)
-        assert "x-data" in html
+        assert 'x-data="app"' in html
 
     def test_sections_appear_as_tabs(self, sample_sections, sample_properties):
         html = render_form(sample_sections, [], properties=sample_properties)
@@ -390,15 +391,16 @@ class TestRenderForm:
             ),
         )
         html = render_form(sample_sections, [risk], [sample_control], sample_properties)
+        js = render_app_js(sample_sections, [risk], [sample_control], sample_properties)
         assert "Encryption enabled" in html
-        assert "this.prop_prop_a === true" in html
+        assert "this.prop_prop_a === true" in js
 
     def test_with_details(self, sample_sections, sample_properties, sample_detail):
-        html = render_form(
+        js = render_app_js(
             sample_sections, [], properties=sample_properties, details=[sample_detail]
         )
-        assert "details:" in html
-        assert "det1" in html
+        assert "details:" in js
+        assert "det1" in js
 
 
 # ---------------------------------------------------------------------------
@@ -428,18 +430,23 @@ def binary_html(binary_sections, binary_properties):
     return render_form(binary_sections, [], properties=binary_properties)
 
 
+@pytest.fixture
+def binary_app_js(binary_sections, binary_properties):
+    return render_app_js(binary_sections, [], properties=binary_properties)
+
+
 class TestRenderFormMetadata:
-    """Verify build-time metadata arrays are embedded in rendered output."""
+    """Verify build-time metadata arrays are embedded in the Alpine app bundle."""
 
-    def test_question_ids_present(self, binary_html):
-        assert "'q_bin'" in binary_html
-        assert "'q_bin2'" in binary_html
+    def test_question_ids_present(self, binary_app_js):
+        assert "'q_bin'" in binary_app_js
+        assert "'q_bin2'" in binary_app_js
 
-    def test_risk_ids_empty(self, binary_html):
-        assert "_riskIds: [" in binary_html
-        start = binary_html.index("_riskIds: [")
-        end = binary_html.index("]", start)
-        assert binary_html[start:end].strip() == "_riskIds: ["
+    def test_risk_ids_empty(self, binary_app_js):
+        assert "_riskIds: [" in binary_app_js
+        start = binary_app_js.index("_riskIds: [")
+        end = binary_app_js.index("]", start)
+        assert binary_app_js[start:end].strip() == "_riskIds: ["
 
 
 class TestRenderFormSaveLoad:
@@ -470,17 +477,47 @@ class TestRenderFormResidual:
     def risk_html(self, sample_sections, sample_properties, sample_risk):
         return render_form(sample_sections, [sample_risk], properties=sample_properties)
 
-    def test_residual_getter_emitted_per_risk(self, risk_html):
-        assert "get r1_residual()" in risk_html
+    @pytest.fixture
+    def risk_app_js(self, sample_sections, sample_properties, sample_risk):
+        return render_app_js(sample_sections, [sample_risk], properties=sample_properties)
+
+    def test_residual_getter_emitted_per_risk(self, risk_app_js):
+        assert "get r1_residual()" in risk_app_js
 
     def test_controlled_level_in_colour_map(self, risk_html):
         assert "'controlled':" in risk_html
 
-    def test_effectiveness_state_seeded(self, risk_html):
-        assert "control_effectiveness: $persist({" in risk_html
-        assert "residual_likelihood: $persist({" in risk_html
-        assert "residual_consequence: $persist({" in risk_html
+    def test_effectiveness_state_seeded(self, risk_app_js):
+        assert "control_effectiveness: Alpine.$persist({" in risk_app_js
+        assert "residual_likelihood: Alpine.$persist({" in risk_app_js
+        assert "residual_consequence: Alpine.$persist({" in risk_app_js
 
-    def test_assessed_risks_state_removed(self, risk_html):
-        assert "assessed_risks: $persist" not in risk_html
+    def test_assessed_risks_state_removed(self, risk_html, risk_app_js):
+        assert "assessed_risks: Alpine.$persist" not in risk_app_js
         assert "this.assessed_risks" not in risk_html
+        assert "this.assessed_risks" not in risk_app_js
+
+
+class TestRenderAppJs:
+    """Smoke tests for render_app_js — the Alpine factory module."""
+
+    def test_registers_alpine_component(self, binary_app_js):
+        assert "alpine:init" in binary_app_js
+        assert "Alpine.data('app'" in binary_app_js
+
+    def test_no_html_autoescape_leaks(self, binary_app_js):
+        for entity in ("&#34;", "&#39;", "&quot;", "&amp;", "&gt;", "&lt;"):
+            assert entity not in binary_app_js, f"autoescape leak: {entity} in app.js"
+
+    def test_persist_keys_explicit(self, binary_app_js):
+        assert ".as('_x_activeTab')" in binary_app_js
+        assert ".as('_x_answers')" in binary_app_js
+
+    def test_property_getter_emitted(self, binary_app_js):
+        assert "get prop_p1()" in binary_app_js
+        assert "get prop_p2()" in binary_app_js
+
+    def test_risk_getter_emitted(self, sample_sections, sample_properties, sample_risk):
+        js = render_app_js(sample_sections, [sample_risk], properties=sample_properties)
+        assert "get r1()" in js
+        assert "get r1_residual()" in js

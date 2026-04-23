@@ -1,0 +1,292 @@
+document.addEventListener('alpine:init', () => {
+  Alpine.data('app', () => ({
+    activeTab: Alpine.$persist('{{ sections[0].id }}').as('_x_activeTab'),
+    answers: Alpine.$persist({
+      {% for q in questions %}
+      '{{ q.id }}': ''{% if not loop.last %},{% endif %}
+      {% endfor %}
+    }).as('_x_answers'),
+    details: Alpine.$persist({
+      {% for did in detail_ids %}
+      '{{ did }}': ''{% if not loop.last %},{% endif %}
+      {% endfor %}
+    }).as('_x_details'),
+    control_effectiveness: Alpine.$persist({
+      {% for risk in risks %}'{{ risk.id }}': ''{% if not loop.last %},{% endif %}
+      {% endfor %}
+    }).as('_x_control_effectiveness'),
+    residual_likelihood: Alpine.$persist({
+      {% for risk in risks %}'{{ risk.id }}': ''{% if not loop.last %},{% endif %}
+      {% endfor %}
+    }).as('_x_residual_likelihood'),
+    residual_consequence: Alpine.$persist({
+      {% for risk in risks %}'{{ risk.id }}': ''{% if not loop.last %},{% endif %}
+      {% endfor %}
+    }).as('_x_residual_consequence'),
+    justifications: Alpine.$persist({
+      {% for risk in risks %}'{{ risk.id }}': ''{% if not loop.last %},{% endif %}
+      {% endfor %}
+    }).as('_x_justifications'),
+    mandated_controls: Alpine.$persist({
+      {% for risk in risks %}
+      '{{ risk.id }}': {
+        {% for ctrl in risk.controls %}'{{ ctrl.id }}': false{% if not loop.last %},{% endif %}
+        {% endfor %}
+      }{% if not loop.last %},{% endif %}
+      {% endfor %}
+    }).as('_x_mandated_controls'),
+    mandated_comments: Alpine.$persist({
+      {% for risk in risks %}
+      '{{ risk.id }}': {
+        {% for ctrl in risk.controls %}'{{ ctrl.id }}': ''{% if not loop.last %},{% endif %}
+        {% endfor %}
+      }{% if not loop.last %},{% endif %}
+      {% endfor %}
+    }).as('_x_mandated_comments'),
+    _questionIds: [{% for q in questions %}'{{ q.id }}'{% if not loop.last %}, {% endif %}{% endfor %}],
+    _detailIds: [{% for did in detail_ids %}'{{ did }}'{% if not loop.last %}, {% endif %}{% endfor %}],
+    _riskIds: [{% for risk in risks %}'{{ risk.id }}'{% if not loop.last %}, {% endif %}{% endfor %}],
+    _controlIds: {
+      {% for risk in risks %}
+      '{{ risk.id }}': [{% for ctrl in risk.controls %}'{{ ctrl.id }}'{% if not loop.last %}, {% endif %}{% endfor %}]{% if not loop.last %},{% endif %}
+      {% endfor %}
+    },
+    _likelihoods: {{ likelihoods_js }},
+    _consequences: {{ consequences_js }},
+    _risk_matrix: {{ risk_matrix_js }},
+    _worst(results, dim, scale) {
+      const vals = results.map(r => r[dim]).filter(v => v !== null);
+      if (vals.length === 0) return null;
+      return vals.reduce((w, v) => scale.indexOf(v) > scale.indexOf(w) ? v : w);
+    },
+    _formatAnswer(val) {
+      if (Array.isArray(val)) return val.length ? val.join(', ') : 'Not answered';
+      return val || 'Not answered';
+    },
+    _downloadJson(data, filename) {
+      const blob = new Blob([JSON.stringify(data, null, 2)], {type: 'application/json'});
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = filename;
+      a.click();
+      URL.revokeObjectURL(url);
+    },
+    clearAll() {
+      if (!confirm('Clear all answers and assessments? This cannot be undone.')) return;
+      const freshAnswers = {};
+      for (const id of this._questionIds) freshAnswers[id] = '';
+      this.answers = freshAnswers;
+      const freshDetails = {};
+      for (const id of this._detailIds) freshDetails[id] = '';
+      this.details = freshDetails;
+      const freshEffectiveness = {};
+      const freshResidualL = {};
+      const freshResidualC = {};
+      const freshJustifications = {};
+      const freshMandated = {};
+      const freshComments = {};
+      for (const id of this._riskIds) {
+        freshEffectiveness[id] = '';
+        freshResidualL[id] = '';
+        freshResidualC[id] = '';
+        freshJustifications[id] = '';
+        freshMandated[id] = {};
+        freshComments[id] = {};
+        for (const ctrl of (this._controlIds[id] || [])) {
+          freshMandated[id][ctrl] = false;
+          freshComments[id][ctrl] = '';
+        }
+      }
+      this.control_effectiveness = freshEffectiveness;
+      this.residual_likelihood = freshResidualL;
+      this.residual_consequence = freshResidualC;
+      this.justifications = freshJustifications;
+      this.mandated_controls = freshMandated;
+      this.mandated_comments = freshComments;
+    },
+    exportAnswers() {
+      this._downloadJson({
+        format: 'riskformgen-answers',
+        version: 1,
+        exported_at: new Date().toISOString(),
+        question_ids: this._questionIds,
+        answers: this.answers,
+        detail_ids: this._detailIds,
+        details: this.details,
+      }, 'riskformgen-answers.json');
+    },
+    _importJson(event, {format, fileIdsKey, currentIds, label, count, apply}) {
+      const file = event.target.files[0];
+      if (!file) return;
+      event.target.value = '';
+      const reader = new FileReader();
+      reader.onload = () => {
+        let data;
+        try { data = JSON.parse(reader.result); }
+        catch { alert('Invalid JSON file.'); return; }
+        if (data.format !== format) {
+          alert(`This is not a ${label} file. Expected format: ${format}`);
+          return;
+        }
+        const fileIds = new Set(data[fileIdsKey] || []);
+        const currentIdSet = new Set(currentIds);
+        const added = currentIds.filter(id => !fileIds.has(id));
+        const removed = (data[fileIdsKey] || []).filter(id => !currentIdSet.has(id));
+        const {loaded, skippedType = 0} = count(data, currentIds);
+        const parts = [`Load ${loaded} of ${currentIds.length} ${label}?`];
+        if (added.length) parts.push(`${added.length} new since export (left at defaults).`);
+        if (removed.length) parts.push(`${removed.length} exported skipped (removed).`);
+        if (skippedType) parts.push(`${skippedType} skipped (type mismatch).`);
+        if (loaded === currentIds.length && !removed.length && !skippedType) {
+          /* no mismatches — load silently */
+        } else if (!confirm(parts.join(' '))) {
+          return;
+        }
+        apply(data, currentIds);
+      };
+      reader.readAsText(file);
+    },
+    importAnswers(event) {
+      this._importJson(event, {
+        format: 'riskformgen-answers',
+        fileIdsKey: 'question_ids',
+        currentIds: this._questionIds,
+        label: 'answers',
+        count: (data, ids) => {
+          let loaded = 0;
+          for (const id of ids) {
+            if (!(id in data.answers)) continue;
+            loaded++;
+          }
+          return {loaded};
+        },
+        apply: (data, ids) => {
+          for (const id of ids) {
+            if (!(id in data.answers)) continue;
+            this.answers[id] = data.answers[id];
+          }
+          if (data.details) {
+            for (const did of this._detailIds) {
+              if (did in data.details) this.details[did] = data.details[did];
+            }
+          }
+        },
+      });
+    },
+    exportAssessment() {
+      this._downloadJson({
+        format: 'riskformgen-assessment',
+        version: 2,
+        exported_at: new Date().toISOString(),
+        risk_ids: this._riskIds,
+        control_effectiveness: this.control_effectiveness,
+        residual_likelihood: this.residual_likelihood,
+        residual_consequence: this.residual_consequence,
+        justifications: this.justifications,
+        mandated_controls: this.mandated_controls,
+        mandated_comments: this.mandated_comments,
+      }, 'riskformgen-assessment.json');
+    },
+    importAssessment(event) {
+      this._importJson(event, {
+        format: 'riskformgen-assessment',
+        fileIdsKey: 'risk_ids',
+        currentIds: this._riskIds,
+        label: 'assessments',
+        count: (data, ids) => {
+          const hasNew = data.control_effectiveness || data.residual_likelihood || data.residual_consequence;
+          if (data.assessed_risks && !hasNew) {
+            alert('This assessment was exported from a pre-effectiveness build. Re-enter the assessments.');
+            return {loaded: 0};
+          }
+          let loaded = 0;
+          for (const id of ids) {
+            if (
+              id in (data.control_effectiveness || {}) ||
+              id in (data.residual_likelihood || {}) ||
+              id in (data.residual_consequence || {}) ||
+              id in (data.justifications || {})
+            ) loaded++;
+          }
+          return {loaded};
+        },
+        apply: (data, ids) => {
+          const hasNew = data.control_effectiveness || data.residual_likelihood || data.residual_consequence;
+          if (data.assessed_risks && !hasNew) return;
+          for (const id of ids) {
+            if (data.control_effectiveness && id in data.control_effectiveness) {
+              this.control_effectiveness[id] = data.control_effectiveness[id];
+            }
+            if (data.residual_likelihood && id in data.residual_likelihood) {
+              this.residual_likelihood[id] = data.residual_likelihood[id];
+            }
+            if (data.residual_consequence && id in data.residual_consequence) {
+              this.residual_consequence[id] = data.residual_consequence[id];
+            }
+            if (data.justifications && id in data.justifications) {
+              this.justifications[id] = data.justifications[id];
+            }
+            if (data.mandated_controls && data.mandated_controls[id]) {
+              for (const [ctrl, val] of Object.entries(data.mandated_controls[id])) {
+                if (this.mandated_controls[id] && ctrl in this.mandated_controls[id]) {
+                  this.mandated_controls[id][ctrl] = val;
+                }
+              }
+            }
+            if (data.mandated_comments && data.mandated_comments[id]) {
+              for (const [ctrl, val] of Object.entries(data.mandated_comments[id])) {
+                if (this.mandated_comments[id] && ctrl in this.mandated_comments[id]) {
+                  this.mandated_comments[id][ctrl] = val;
+                }
+              }
+            }
+          }
+        },
+      });
+    },
+    {% for prop in property_getters %}
+    get prop_{{ prop.id }}() {
+      {{ prop.js_body }}
+    },
+    {% endfor %}
+    {% for ctrl in control_getters %}
+    get ctrl_{{ ctrl.id }}() { return {{ ctrl.js }}; },
+    {% endfor %}
+    {% for risk in risks %}
+    get {{ risk.id }}() {
+      const results = [
+        {% for js in risk.rules_js %}
+        ({{ js }}),
+        {% endfor %}
+      ].filter(r => r !== null);
+      if (results.length === 0) return {likelihood: 'n/a', consequence: 'n/a', level: 'not_applicable'};
+      const likelihood = this._worst(results, 'likelihood', this._likelihoods);
+      const consequence = this._worst(results, 'consequence', this._consequences);
+      return {
+        likelihood, consequence,
+        level: (this._risk_matrix[likelihood] || {})[consequence] || 'not_applicable'
+      };
+    },
+    get {{ risk.id }}_residual() {
+      const inherent = this.{{ risk.id }};
+      if (inherent.level === 'not_applicable') return inherent;
+      const eff = this.control_effectiveness['{{ risk.id }}'] || 'ineffective';
+      if (eff === 'ineffective') return inherent;
+      if (eff === 'controlled') return {
+        likelihood: inherent.likelihood,
+        consequence: inherent.consequence,
+        level: 'controlled'
+      };
+      const rL = this.residual_likelihood['{{ risk.id }}'];
+      const rC = this.residual_consequence['{{ risk.id }}'];
+      if (!rL || !rC) return inherent;
+      return {
+        likelihood: rL,
+        consequence: rC,
+        level: (this._risk_matrix[rL] || {})[rC] || 'not_applicable'
+      };
+    },
+    {% endfor %}
+  }));
+});
