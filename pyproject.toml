@@ -13,7 +13,9 @@ dependencies = [
 dev = [
     "basedpyright>=1.38.0",
     "mini-racer>=0.12.4",
+    "playwright>=1.49.0",
     "pytest>=9.0.2",
+    "pytest-playwright>=0.7.0",
     "ruff>=0.15.1",
 ]
 editor = [
@@ -33,6 +35,9 @@ quote-style = "double"
 
 [tool.pytest.ini_options]
 pythonpath = ["."]
+markers = [
+    "e2e: end-to-end browser tests (require `uv run playwright install chromium`)",
+]
 
 [tool.basedpyright]
 pythonVersion = "3.13"

@@ -391,12 +391,15 @@ that runs `main()` into a tmpdir and asserts the expected files exist (and
 that `index.html` is non-empty) would catch breakage in the wiring.
 
 ### 5.5 ◑ Export/import roundtrip is untested
-**Status:** open
-`page.html.j2:112-230` contains substantial logic (version-gated parsing,
-added/removed ID diffs, mandate-control merging, error paths). All of it
-lives in JS. There's no Python test, and the only render-side test is
-`TestRenderFormSaveLoad` which verifies *strings appear*. A JS-behaviour test
-harness (§4.8) or a Playwright test would close this.
+**Status:** resolved (2026-04-23) — added Playwright E2E coverage in
+`tests/e2e/test_save_load_e2e.py` driving real Chromium against a built copy
+of the site. 13 tests cover the full export/import flow for both answers and
+assessment: happy-path roundtrip, silent apply when IDs align, invalid JSON,
+wrong format/version alerts, added/removed ID confirm dialogs, user-cancels
+confirm, mandated-control filtering, and download payload shape. Browser APIs
+mini-racer can't stub (FileReader, Blob, URL.createObjectURL, confirm/alert
+dialogs) now exercised against the real thing. See `tests/e2e/conftest.py`
+for fixture layout.
 
 ### 5.6 ◑ Subsection visibility dominance rule is not tested
 **Status:** resolved (2026-04-23) — added

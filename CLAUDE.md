@@ -11,6 +11,12 @@ uv run main.py
 # Run tests
 uv run pytest tests/ -v
 
+# Run only fast tests (skip browser-based E2E)
+uv run pytest tests/ -v -m "not e2e"
+
+# Run only E2E tests (needs: uv run playwright install chromium)
+uv run pytest tests/ -v -m e2e
+
 # Lint and format
 uv run ruff check .
 uv run ruff format --check .
@@ -140,12 +146,13 @@ YAML parsing boundaries lack type stubs. Files that interact heavily with these 
 
 ### Testing
 
-Two test layers coexist:
+Three test layers coexist:
 
 - **Compiler-shape tests** — `tests/test_render.py` and `tests/test_models.py` assert on the substrings emitted by `_compile_property_getter`, `ConditionMapping.to_js`, and friends. They pin the generated code's *form*.
 - **Behaviour tests** — `tests/test_js_behaviour.py` uses `tests/js_harness.py` to evaluate the real `render_app_js()` output inside an embedded V8 context (`mini-racer`). Stubs for `Alpine.data` / `Alpine.$persist` / `document.addEventListener` capture the factory so `prop_*`, `ctrl_*`, risk and residual getters can be driven against in-memory `answers` / `details` / `control_effectiveness` fixtures. They pin the generated code's *semantics*.
+- **End-to-end tests** — `tests/e2e/` uses Playwright to drive real Chromium against a built copy of the site served over `http.server`. Covers save/load (Blob downloads, FileReader imports, confirm/alert dialogs) which mini-racer can't stub. Marked `@pytest.mark.e2e`; run `uv run playwright install chromium` once after installing dev deps. Skip during tight dev loops with `-m "not e2e"`.
 
-The two layers are complementary: a refactor that preserves semantics but changes the emitted format breaks the first layer only; a refactor that preserves the format but flips a branch breaks the second only. Write new tests in whichever layer matches what you're protecting against.
+The layers are complementary: a refactor that preserves semantics but changes the emitted format breaks the first layer only; a refactor that preserves the format but flips a branch breaks the second only; a refactor to the save/load HTML wiring or browser-API usage breaks the third only. Write new tests in whichever layer matches what you're protecting against.
 
 ### Output
 

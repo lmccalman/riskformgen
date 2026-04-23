@@ -113,11 +113,5 @@ wants to surface build output.
 
 ## 5. Test coverage and correctness
 
-### 5.5 ◑ Export/import roundtrip is untested
-**Status:** open
-`page.html.j2:112-230` contains substantial logic (version-gated parsing,
-added/removed ID diffs, mandate-control merging, error paths). All of it
-lives in JS. There's no Python test, and the only render-side test is
-`TestRenderFormSaveLoad` which verifies *strings appear*. A JS-behaviour test
-harness (§4.8, now resolved — see `tests/js_harness.py`) or a Playwright
-test would close this.
+_All open items in this section have been resolved. See `AUDIT.md` for the
+historical record._
