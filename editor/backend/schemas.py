@@ -2,47 +2,53 @@
 
 from __future__ import annotations
 
-from pydantic import BaseModel
+from pydantic import BaseModel, ConfigDict
 
 
-class PropertySchema(BaseModel):
+class _StrictModel(BaseModel):
+    """Reject unknown keys so YAML typos surface at load time."""
+
+    model_config = ConfigDict(extra="forbid")
+
+
+class PropertySchema(_StrictModel):
     id: str
     description: str
     parents: list[str] = []
     activation: str = "all"
 
 
-class ConditionMappingSchema(BaseModel):
+class ConditionMappingSchema(_StrictModel):
     properties: list[str]
     mode: str = "all"
     likelihood: str
     consequence: str
 
 
-class RiskSchema(BaseModel):
+class RiskSchema(_StrictModel):
     id: str
     description: str
     conditions: list[ConditionMappingSchema]
 
 
-class ControlEffectSchema(BaseModel):
+class ControlEffectSchema(_StrictModel):
     risk_id: str
 
 
-class ControlSchema(BaseModel):
+class ControlSchema(_StrictModel):
     id: str
     description: str
     property: str
     effects: list[ControlEffectSchema]
 
 
-class DetailSchema(BaseModel):
+class DetailSchema(_StrictModel):
     id: str
     description: str
     properties: list[str]
 
 
-class QuestionSchema(BaseModel):
+class QuestionSchema(_StrictModel):
     type: str  # "binary" or "detail"
     id: str
     text: str
@@ -51,25 +57,25 @@ class QuestionSchema(BaseModel):
     detail_id: str | None = None  # only for type="detail"
 
 
-class SubSectionSchema(BaseModel):
+class SubSectionSchema(_StrictModel):
     title: str
     description: str
     questions: list[QuestionSchema]
 
 
-class SectionSchema(BaseModel):
+class SectionSchema(_StrictModel):
     id: str
     title: str
     description: str
     subsections: list[SubSectionSchema]
 
 
-class ConstantsSchema(BaseModel):
+class ConstantsSchema(_StrictModel):
     likelihoods: list[str]
     consequences: list[str]
 
 
-class SpecPayload(BaseModel):
+class SpecPayload(_StrictModel):
     properties: list[PropertySchema]
     sections: list[SectionSchema]
     risks: list[RiskSchema]
@@ -81,21 +87,21 @@ class SpecResponse(SpecPayload):
     constants: ConstantsSchema
 
 
-class ValidationErrorItem(BaseModel):
+class ValidationErrorItem(_StrictModel):
     file: str
     message: str
 
 
-class ValidationResult(BaseModel):
+class ValidationResult(_StrictModel):
     valid: bool
     errors: list[ValidationErrorItem]
 
 
-class SaveResult(BaseModel):
+class SaveResult(_StrictModel):
     ok: bool
     errors: list[ValidationErrorItem]
 
 
-class RebuildResult(BaseModel):
+class RebuildResult(_StrictModel):
     ok: bool
     message: str

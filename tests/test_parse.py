@@ -792,3 +792,78 @@ class TestValidateIdNamespaces:
         msg = str(exc_info.value)
         assert "details" in msg
         assert "unique across namespaces" in msg
+
+
+class TestUnknownKeys:
+    """Each parser should reject unknown YAML keys so typos surface at load time."""
+
+    def test_property_typo(self):
+        with pytest.raises(ValueError, match="descripton"):
+            parse_property({"id": "p1", "descripton": "typo"})
+
+    def test_detail_typo(self):
+        with pytest.raises(ValueError, match="guidelines"):
+            parse_detail({"id": "d1", "description": "ok", "guidelines": "nope"})
+
+    def test_binary_question_typo(self):
+        with pytest.raises(ValueError, match="guidelines"):
+            parse_question({"type": "binary", "id": "q1", "text": "Q", "guidelines": "nope"})
+
+    def test_detail_question_typo(self):
+        # `properties` is derived from the referenced Detail, so supplying it
+        # on the question itself is a mistake and should be flagged.
+        with pytest.raises(ValueError, match="properties"):
+            parse_question(
+                {
+                    "type": "detail",
+                    "id": "q1",
+                    "text": "Q",
+                    "detail_id": "d1",
+                    "properties": ["p1"],
+                },
+                details_by_id={"d1": Detail(id="d1", description="D", properties=("p1",))},
+            )
+
+    def test_subsection_typo(self):
+        with pytest.raises(ValueError, match="heading"):
+            parse_subsection({"heading": "oops", "description": "ok", "questions": []})
+
+    def test_section_typo(self):
+        with pytest.raises(ValueError, match="subsection"):
+            parse_section(
+                {
+                    "id": "s1",
+                    "title": "T",
+                    "description": "D",
+                    "subsection": [],  # should be "subsections"
+                }
+            )
+
+    def test_condition_mapping_typo(self):
+        with pytest.raises(ValueError, match="likelyhood"):
+            parse_condition_mapping(
+                {
+                    "properties": ["p1"],
+                    "likelyhood": "low",  # typo
+                    "consequence": "minor",
+                }
+            )
+
+    def test_risk_typo(self):
+        with pytest.raises(ValueError, match="condition"):
+            parse_risk({"id": "r1", "description": "R", "condition": []})
+
+    def test_control_effect_typo(self):
+        with pytest.raises(ValueError, match="risk"):
+            parse_control_effect({"risk": "r1"})  # should be "risk_id"
+
+    def test_control_typo(self):
+        with pytest.raises(ValueError, match="effect"):
+            parse_control(
+                {
+                    "id": "c1",
+                    "description": "C",
+                    "property": "p1",
+                    "effect": [],  # should be "effects"
+                }
+            )

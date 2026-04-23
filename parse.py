@@ -30,6 +30,22 @@ type YamlDict = dict[str, Any]
 
 
 # ---------------------------------------------------------------------------
+# Unknown-key guard
+# ---------------------------------------------------------------------------
+#
+# YAML files are hand-edited; without this check a typo like `guidelines:`
+# instead of `guidance:` would be silently dropped and produce a wrong build.
+
+
+def _check_unknown_keys(data: YamlDict, allowed: set[str], context: str) -> None:
+    extras = set(data.keys()) - allowed
+    if extras:
+        raise ValueError(
+            f"Unknown key(s) in {context}: {sorted(extras)}. Allowed: {sorted(allowed)}"
+        )
+
+
+# ---------------------------------------------------------------------------
 # ID validation
 # ---------------------------------------------------------------------------
 #
@@ -116,6 +132,7 @@ def _validate_id(value: object, *, kind: str, owner: str | None = None) -> None:
 
 def parse_detail(data: YamlDict) -> Detail:
     """Parse a detail dict into a Detail dataclass."""
+    _check_unknown_keys(data, {"id", "description", "properties"}, f"detail {data.get('id')!r}")
     _validate_id(data["id"], kind="detail")
     return Detail(
         id=data["id"],
@@ -140,6 +157,11 @@ def parse_question(data: YamlDict, details_by_id: dict[str, Detail] | None = Non
     qtype = data["type"]
     match qtype:
         case "binary":
+            _check_unknown_keys(
+                data,
+                {"type", "id", "text", "properties", "guidance"},
+                f"binary question {data.get('id')!r}",
+            )
             _validate_id(data["id"], kind="question")
             return BinaryQuestion(
                 id=data["id"],
@@ -148,6 +170,13 @@ def parse_question(data: YamlDict, details_by_id: dict[str, Detail] | None = Non
                 guidance=data.get("guidance"),
             )
         case "detail":
+            # DetailQuestions derive properties from the referenced Detail, so
+            # `properties:` on the question itself would be silently ignored.
+            _check_unknown_keys(
+                data,
+                {"type", "id", "text", "detail_id", "guidance"},
+                f"detail question {data.get('id')!r}",
+            )
             _validate_id(data["id"], kind="question")
             did = data["detail_id"]
             resolved = details_by_id or {}
@@ -174,6 +203,11 @@ def parse_question(data: YamlDict, details_by_id: dict[str, Detail] | None = Non
 
 def parse_subsection(data: YamlDict, details_by_id: dict[str, Detail] | None = None) -> SubSection:
     """Parse a sub-section dict into a SubSection dataclass."""
+    _check_unknown_keys(
+        data,
+        {"title", "description", "questions"},
+        f"subsection {data.get('title')!r}",
+    )
     return SubSection(
         title=data["title"],
         description=data["description"],
@@ -183,6 +217,11 @@ def parse_subsection(data: YamlDict, details_by_id: dict[str, Detail] | None = N
 
 def parse_section(data: YamlDict, details_by_id: dict[str, Detail] | None = None) -> Section:
     """Parse a section dict into a Section dataclass."""
+    _check_unknown_keys(
+        data,
+        {"id", "title", "description", "subsections"},
+        f"section {data.get('id')!r}",
+    )
     _validate_id(data["id"], kind="section")
     return Section(
         id=data["id"],
@@ -199,6 +238,11 @@ def parse_section(data: YamlDict, details_by_id: dict[str, Detail] | None = None
 
 def parse_condition_mapping(data: YamlDict) -> ConditionMapping:
     """Parse a condition mapping dict into a ConditionMapping dataclass."""
+    _check_unknown_keys(
+        data,
+        {"properties", "mode", "likelihood", "consequence"},
+        "condition mapping",
+    )
     return ConditionMapping(
         properties=tuple(data["properties"]),
         mode=data.get("mode", "all"),
@@ -209,6 +253,7 @@ def parse_condition_mapping(data: YamlDict) -> ConditionMapping:
 
 def parse_risk(data: YamlDict) -> Risk:
     """Parse a risk dict into a Risk dataclass."""
+    _check_unknown_keys(data, {"id", "description", "conditions"}, f"risk {data.get('id')!r}")
     _validate_id(data["id"], kind="risk")
     return Risk(
         id=data["id"],
@@ -224,11 +269,17 @@ def parse_risk(data: YamlDict) -> Risk:
 
 def parse_control_effect(data: YamlDict) -> ControlEffect:
     """Parse a control effect dict into a ControlEffect dataclass."""
+    _check_unknown_keys(data, {"risk_id"}, "control effect")
     return ControlEffect(risk_id=data["risk_id"])
 
 
 def parse_control(data: YamlDict) -> Control:
     """Parse a control dict into a Control dataclass."""
+    _check_unknown_keys(
+        data,
+        {"id", "description", "property", "effects"},
+        f"control {data.get('id')!r}",
+    )
     _validate_id(data["id"], kind="control")
     return Control(
         id=data["id"],
@@ -268,6 +319,11 @@ def load_controls(path: Path) -> list[Control]:
 
 def parse_property(data: YamlDict) -> Property:
     """Parse a property dict into a Property dataclass."""
+    _check_unknown_keys(
+        data,
+        {"id", "description", "parents", "activation"},
+        f"property {data.get('id')!r}",
+    )
     _validate_id(data["id"], kind="property")
     return Property(
         id=data["id"],

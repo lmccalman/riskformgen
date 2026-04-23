@@ -29,13 +29,6 @@ Using `typing.Literal` would catch typos at parse time without any runtime
 cost, and lets pyright/IDE help on conditional branches. Matches the pyright
 override hassle in `parse.py:1`.
 
-### 2.5 ◑ YAML fields are silently ignored if unknown
-**Status:** open
-`parse_*` functions pluck specific keys (`data["id"]`, `data.get("guidance")`,
-…). A typo like `guidelines:` instead of `guidance:` will produce a valid
-build with wrong content. A `pydantic` model or manual `unknown key` check
-at parse time would catch these.
-
 ### 2.6 · `prepare_*` functions return untyped `dict`
 **Status:** open
 `render.py` builds dicts with string-typed keys returned as `list[dict]`. A
