@@ -313,6 +313,24 @@ def _build_template_context(
         "risk_levels": list(config.RISK_LEVELS),
         "risk_level_colours": config.RISK_LEVEL_COLOURS,
         "risk_matrix_js": json.dumps(config.RISK_MATRIX),
+        "answers_init_js": json.dumps({q["id"]: "" for q in question_dicts}),
+        "details_init_js": json.dumps({did: "" for did in detail_ids}),
+        "control_effectiveness_init_js": json.dumps({r["id"]: "" for r in risk_dicts}),
+        "residual_likelihood_init_js": json.dumps({r["id"]: "" for r in risk_dicts}),
+        "residual_consequence_init_js": json.dumps({r["id"]: "" for r in risk_dicts}),
+        "justifications_init_js": json.dumps({r["id"]: "" for r in risk_dicts}),
+        "mandated_controls_init_js": json.dumps(
+            {r["id"]: {c["id"]: False for c in r.get("controls", [])} for r in risk_dicts}
+        ),
+        "mandated_comments_init_js": json.dumps(
+            {r["id"]: {c["id"]: "" for c in r.get("controls", [])} for r in risk_dicts}
+        ),
+        "question_ids_js": json.dumps([q["id"] for q in question_dicts]),
+        "detail_ids_js": json.dumps(detail_ids),
+        "risk_ids_js": json.dumps([r["id"] for r in risk_dicts]),
+        "control_ids_js": json.dumps(
+            {r["id"]: [c["id"] for c in r.get("controls", [])] for r in risk_dicts}
+        ),
     }
 
 

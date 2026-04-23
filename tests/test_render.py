@@ -439,8 +439,8 @@ class TestRenderFormMetadata:
     """Verify build-time metadata arrays are embedded in the Alpine app bundle."""
 
     def test_question_ids_present(self, binary_app_js):
-        assert "'q_bin'" in binary_app_js
-        assert "'q_bin2'" in binary_app_js
+        assert '"q_bin"' in binary_app_js
+        assert '"q_bin2"' in binary_app_js
 
     def test_risk_ids_empty(self, binary_app_js):
         assert "_riskIds: [" in binary_app_js

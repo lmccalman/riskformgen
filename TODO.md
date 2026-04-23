@@ -63,21 +63,6 @@ Likely a leftover from an older "export as Markdown" flow.
 
 ## 2. Simplicity and maintainability
 
-### 2.2 ◑ Hand-built Jinja loops for JS object literals
-**Status:** open
-`page.html.j2:22-62` has dozens of lines of the form
-```jinja
-{% for q in questions %}
-'{{ q.id }}': ''{% if not loop.last %},{% endif %}
-{% endfor %}
-```
-replicated across `answers`, `details`, `assessed_risks`, `justifications`,
-`mandated_controls`, `mandated_comments`, `_questionIds`, `_detailIds`,
-`_riskIds`, `_controlIds`. All of these are equivalent to a dict/list passed
-through `json.dumps()` in Python. `config.py`'s matrix and the scale tuples
-already do exactly this (`render.py:303-307`). Extending that pattern would
-delete ~50 lines of brittle comma-conditional Jinja.
-
 ### 2.3 ◑ `prepare_controls` mutates its argument
 **Status:** open
 `render.py:241-269` assigns `risk_dict["controls"] = []` into the caller's list

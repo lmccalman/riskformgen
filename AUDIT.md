@@ -122,7 +122,12 @@ bundle. localStorage keys preserved by explicit `Alpine.$persist(...).as('_x_<fi
 for each persisted field.
 
 ### 2.2 ◑ Hand-built Jinja loops for JS object literals
-**Status:** open
+**Status:** resolved (2026-04-23) — `_build_template_context` in `render.py`
+now emits twelve `*_js` / `*_init_js` context variables via `json.dumps()`
+(matching the pre-existing `likelihoods_js` / `risk_matrix_js` pattern), and
+`templates/app.js.j2:4-15` interpolates them directly. ~40 lines of brittle
+comma-conditional Jinja deleted. (Note: the original audit cited
+`page.html.j2:22-62`; the loops actually lived in `templates/app.js.j2`.)
 `page.html.j2:22-62` has dozens of lines of the form
 ```jinja
 {% for q in questions %}

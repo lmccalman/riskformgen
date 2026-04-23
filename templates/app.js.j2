@@ -1,56 +1,18 @@
 document.addEventListener('alpine:init', () => {
   Alpine.data('app', () => ({
     activeTab: Alpine.$persist('{{ sections[0].id }}').as('_x_activeTab'),
-    answers: Alpine.$persist({
-      {% for q in questions %}
-      '{{ q.id }}': ''{% if not loop.last %},{% endif %}
-      {% endfor %}
-    }).as('_x_answers'),
-    details: Alpine.$persist({
-      {% for did in detail_ids %}
-      '{{ did }}': ''{% if not loop.last %},{% endif %}
-      {% endfor %}
-    }).as('_x_details'),
-    control_effectiveness: Alpine.$persist({
-      {% for risk in risks %}'{{ risk.id }}': ''{% if not loop.last %},{% endif %}
-      {% endfor %}
-    }).as('_x_control_effectiveness'),
-    residual_likelihood: Alpine.$persist({
-      {% for risk in risks %}'{{ risk.id }}': ''{% if not loop.last %},{% endif %}
-      {% endfor %}
-    }).as('_x_residual_likelihood'),
-    residual_consequence: Alpine.$persist({
-      {% for risk in risks %}'{{ risk.id }}': ''{% if not loop.last %},{% endif %}
-      {% endfor %}
-    }).as('_x_residual_consequence'),
-    justifications: Alpine.$persist({
-      {% for risk in risks %}'{{ risk.id }}': ''{% if not loop.last %},{% endif %}
-      {% endfor %}
-    }).as('_x_justifications'),
-    mandated_controls: Alpine.$persist({
-      {% for risk in risks %}
-      '{{ risk.id }}': {
-        {% for ctrl in risk.controls %}'{{ ctrl.id }}': false{% if not loop.last %},{% endif %}
-        {% endfor %}
-      }{% if not loop.last %},{% endif %}
-      {% endfor %}
-    }).as('_x_mandated_controls'),
-    mandated_comments: Alpine.$persist({
-      {% for risk in risks %}
-      '{{ risk.id }}': {
-        {% for ctrl in risk.controls %}'{{ ctrl.id }}': ''{% if not loop.last %},{% endif %}
-        {% endfor %}
-      }{% if not loop.last %},{% endif %}
-      {% endfor %}
-    }).as('_x_mandated_comments'),
-    _questionIds: [{% for q in questions %}'{{ q.id }}'{% if not loop.last %}, {% endif %}{% endfor %}],
-    _detailIds: [{% for did in detail_ids %}'{{ did }}'{% if not loop.last %}, {% endif %}{% endfor %}],
-    _riskIds: [{% for risk in risks %}'{{ risk.id }}'{% if not loop.last %}, {% endif %}{% endfor %}],
-    _controlIds: {
-      {% for risk in risks %}
-      '{{ risk.id }}': [{% for ctrl in risk.controls %}'{{ ctrl.id }}'{% if not loop.last %}, {% endif %}{% endfor %}]{% if not loop.last %},{% endif %}
-      {% endfor %}
-    },
+    answers: Alpine.$persist({{ answers_init_js }}).as('_x_answers'),
+    details: Alpine.$persist({{ details_init_js }}).as('_x_details'),
+    control_effectiveness: Alpine.$persist({{ control_effectiveness_init_js }}).as('_x_control_effectiveness'),
+    residual_likelihood: Alpine.$persist({{ residual_likelihood_init_js }}).as('_x_residual_likelihood'),
+    residual_consequence: Alpine.$persist({{ residual_consequence_init_js }}).as('_x_residual_consequence'),
+    justifications: Alpine.$persist({{ justifications_init_js }}).as('_x_justifications'),
+    mandated_controls: Alpine.$persist({{ mandated_controls_init_js }}).as('_x_mandated_controls'),
+    mandated_comments: Alpine.$persist({{ mandated_comments_init_js }}).as('_x_mandated_comments'),
+    _questionIds: {{ question_ids_js }},
+    _detailIds: {{ detail_ids_js }},
+    _riskIds: {{ risk_ids_js }},
+    _controlIds: {{ control_ids_js }},
     _likelihoods: {{ likelihoods_js }},
     _consequences: {{ consequences_js }},
     _risk_matrix: {{ risk_matrix_js }},
