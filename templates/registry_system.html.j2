@@ -79,7 +79,29 @@
           No assessment has been committed for this system yet. Only the
           system card is shown above.
         </p>
-        {% elif risks %}
+        {% else %}
+        {% if aggregate_residual_level != "not_applicable" %}
+        <div class="card mb-4 aggregate-residual-card">
+          <header class="card-header">
+            <p class="card-header-title">Overall Residual Risk</p>
+          </header>
+          <div class="card-content risk-card-body">
+            <div class="risk-card-section">
+              <span class="dim-label">Assessor's aggregate</span>
+              <span class="badge badge-{{ risk_level_colours.get(aggregate_residual_level, 'gray') }}">
+                {{ aggregate_residual_level | replace("_", " ") }}
+              </span>
+            </div>
+            {% if aggregate_residual_justification %}
+            <div class="risk-card-section">
+              <span class="dim-label">Aggregate Justification</span>
+              <p class="linked-answer">{{ aggregate_residual_justification }}</p>
+            </div>
+            {% endif %}
+          </div>
+        </div>
+        {% endif %}
+        {% if risks %}
         {% for risk in risks %}
         {% with risk=risk %}
         {% include "registry_risk.html.j2" %}
@@ -90,6 +112,7 @@
           No applicable risks fired for this system based on the loaded
           questionnaire answers.
         </p>
+        {% endif %}
         {% endif %}
       </section>
     </main>

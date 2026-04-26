@@ -259,6 +259,15 @@ The risk assessor assigns an overall risk level to the system based on their
 judgement of the set of residual risk levels of the risks after all controls
 are applied. This is not nessecarily the maximum of the individual risk levels.
 
+The assessment surface offers a level picker (one of the non-`not_applicable`
+`RISK_LEVELS`) plus a justification textarea. The picker defaults to empty,
+meaning "follow the worst per-risk residual" — that worst-per-risk value is
+shown live as a `Suggested:` caption beside the picker. The assessor can
+pick any other level. Both the chosen level (or empty) and the
+justification are persisted in the assessment JSON; the registry surfaces
+the assessor's pick when set, falling back to the worst per-risk residual
+when not. The aggregate section is hidden when no risk fires.
+
 ### Questionnaire
 
 The questionnaire is divided into sections, that correspond to different

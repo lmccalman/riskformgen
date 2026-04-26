@@ -646,6 +646,95 @@ class TestResidualRisk:
         assert scope.residual("r1") == scope.risk("r1")
 
 
+class TestAggregateResidualRisk:
+    """The assessor's overall residual call: default-from-worst + override semantics."""
+
+    @pytest.fixture
+    def scope(self) -> Scope:
+        # Two firing risks: r1 -> high (likely/major), r2 -> low (rare/minor).
+        q1 = BinaryQuestion(id="q1", text="", properties=("p1",))
+        q2 = BinaryQuestion(id="q2", text="", properties=("p2",))
+        p1 = Property(id="p1", description="")
+        p2 = Property(id="p2", description="")
+        r1 = Risk(
+            id="r1",
+            description="",
+            conditions=(
+                ConditionMapping(property="p1", likelihood="likely", consequence="major"),
+            ),
+        )
+        r2 = Risk(
+            id="r2",
+            description="",
+            conditions=(ConditionMapping(property="p2", likelihood="rare", consequence="minor"),),
+        )
+        scope = _form([q1, q2], [p1, p2], risks=[r1, r2])
+        scope.set_answer("q1", "yes")
+        scope.set_answer("q2", "yes")
+        return scope
+
+    def test_default_is_worst_per_risk_residual(self, scope: Scope) -> None:
+        # r1 → high, r2 → low; worst is high.
+        assert scope.eval("scope.aggregate_residual_level_default") == "high"
+
+    def test_default_collapses_to_controlled_when_all_risks_controlled(self, scope: Scope) -> None:
+        scope.set_effectiveness("r1", "controlled")
+        scope.set_effectiveness("r2", "controlled")
+        # RISK_LEVELS = ('not_applicable', 'controlled', 'low', 'medium', 'high'),
+        # so both risks are 'controlled'; worst of {controlled, controlled} is 'controlled'.
+        assert scope.eval("scope.aggregate_residual_level_default") == "controlled"
+
+    def test_default_picks_higher_when_one_risk_uncontrolled(self, scope: Scope) -> None:
+        # r1 stays inherent high; r2 collapsed to controlled.
+        scope.set_effectiveness("r2", "controlled")
+        assert scope.eval("scope.aggregate_residual_level_default") == "high"
+
+    def test_default_is_not_applicable_when_no_risk_fires(self) -> None:
+        q = BinaryQuestion(id="q1", text="", properties=("p1",))
+        p = Property(id="p1", description="")
+        risk = Risk(
+            id="r1",
+            description="",
+            conditions=(
+                ConditionMapping(property="p1", likelihood="likely", consequence="major"),
+            ),
+        )
+        scope = _form([q], [p], risks=[risk])
+        # q1 unanswered -> r1 not_applicable
+        assert scope.eval("scope.aggregate_residual_level_default") == "not_applicable"
+
+    def test_override_persists_independently_of_default(self, scope: Scope) -> None:
+        # Default is 'high'; override to 'medium' — getter should still report
+        # the worst, leaving the override decoupled from it.
+        scope.eval("scope.aggregate_residual_level = 'medium';")
+        assert scope.eval("scope.aggregate_residual_level") == "medium"
+        assert scope.eval("scope.aggregate_residual_level_default") == "high"
+
+    def test_default_excludes_not_applicable_from_worst(self) -> None:
+        # Mix one firing risk (medium) and one not_applicable risk; the
+        # aggregate default must skip 'not_applicable' rather than treating
+        # it as the worst.
+        q = BinaryQuestion(id="q1", text="", properties=("p1",))
+        p1 = Property(id="p1", description="")
+        p2 = Property(id="p2", description="")
+        r1 = Risk(
+            id="r1",
+            description="",
+            conditions=(
+                ConditionMapping(property="p1", likelihood="possible", consequence="medium"),
+            ),
+        )
+        r2 = Risk(
+            id="r2",
+            description="",
+            conditions=(ConditionMapping(property="p2", likelihood="rare", consequence="minor"),),
+        )
+        scope = _form([q], [p1, p2], risks=[r1, r2])
+        scope.set_answer("q1", "yes")
+        # r2 has no question answering p2 → not_applicable
+        assert scope.eval("scope.aggregate_residual_level_default") == "medium"
+
+
 # ---------------------------------------------------------------------------
 # Control getters
 # ---------------------------------------------------------------------------

@@ -65,6 +65,56 @@
           {% include "risk_summary.html.j2" %}
           {% endwith %}
           {% endfor %}
+
+          <div
+            class="card mb-4 aggregate-residual-card"
+            x-show="aggregate_residual_level_default !== 'not_applicable'"
+            x-cloak
+          >
+            <header class="card-header">
+              <p class="card-header-title">Overall Residual Risk</p>
+            </header>
+            <div class="card-content risk-card-body">
+              <p class="subtitle is-6 has-text-grey">
+                Assign an overall residual risk level for the system based on
+                your judgement of the per-risk residuals above. This need not
+                be the worst per-risk level.
+              </p>
+
+              <div class="risk-card-section">
+                <span class="dim-label">Suggested (worst per-risk)</span>
+                <span
+                  class="badge"
+                  :class="'badge-' + ({ {% for level, colour in risk_level_colours.items() %}'{{ level }}': '{{ colour }}'{% if not loop.last %}, {% endif %}{% endfor %} }[aggregate_residual_level_default] || 'gray')"
+                  x-text="aggregate_residual_level_default.replace(/_/g, ' ')"
+                ></span>
+              </div>
+
+              <div class="risk-card-section">
+                <label class="dim-label" for="aggregate_residual_level">Overall Residual Risk</label>
+                <div class="select">
+                  <select id="aggregate_residual_level" x-model="aggregate_residual_level">
+                    <option value="">— Use suggested —</option>
+                    {% for level in risk_levels if level != "not_applicable" %}
+                    <option value="{{ level }}">{{ level | replace("_", " ") | title }}</option>
+                    {% endfor %}
+                  </select>
+                </div>
+              </div>
+
+              <div class="risk-card-section">
+                <label class="dim-label" for="aggregate_residual_justification">Aggregate Justification</label>
+                <textarea
+                  class="textarea"
+                  id="aggregate_residual_justification"
+                  x-model="aggregate_residual_justification"
+                  rows="3"
+                  placeholder="Explain the system-level call — why this aggregate level reflects the residual risk picture as a whole…"
+                ></textarea>
+              </div>
+            </div>
+          </div>
+
           {% with export_fn="exportAssessment", import_fn="importAssessment", import_ref="assessmentFile", file_label="assessment", clear_fn="clearAssessment", clear_label="Clear assessment" %}
           {% include "save_load.html.j2" %}
           {% endwith %}
@@ -117,6 +167,12 @@
           <pre x-text="JSON.stringify(mandated_controls, null, 2)"></pre>
           <h3 class="title is-5">Mandated Comments</h3>
           <pre x-text="JSON.stringify(mandated_comments, null, 2)"></pre>
+          <h3 class="title is-5">Aggregate Residual</h3>
+          <pre x-text="JSON.stringify({
+            level: aggregate_residual_level,
+            level_default: aggregate_residual_level_default,
+            justification: aggregate_residual_justification,
+          }, null, 2)"></pre>
           {% endif %}
         </div>
       </div>

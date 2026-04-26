@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import pytest
 
+import config
 from models import (
     BinaryQuestion,
     ConditionMapping,
@@ -349,7 +350,7 @@ def sample_record_factory(sample_questions):
             }
             assessment = {
                 "format": "riskformgen-assessment",
-                "version": 3,
+                "version": config.ASSESSMENT_VERSION,
                 "exported_at": assessment_at,
                 "risk_ids": ["r1"],
                 "property_ids": ["prop_a", "prop_b"],
@@ -361,6 +362,8 @@ def sample_record_factory(sample_questions):
                 "justifications": {"r1": ""},
                 "mandated_controls": {"r1": {"ctrl1": False}},
                 "mandated_comments": {"r1": {"ctrl1": ""}},
+                "aggregate_residual_level": "",
+                "aggregate_residual_justification": "",
             }
         return SystemRecord(
             slug=slug,

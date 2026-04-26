@@ -23,7 +23,7 @@
         <thead>
           <tr>
             <th>System</th>
-            <th>Worst residual risk</th>
+            <th>Residual risk</th>
             <th>Last assessed</th>
             <th></th>
           </tr>
@@ -39,8 +39,8 @@
             </td>
             <td>
               {% if row.has_assessment %}
-              <span class="badge badge-{{ risk_level_colours.get(row.worst_level, 'gray') }}">
-                {{ row.worst_level | replace("_", " ") }}
+              <span class="badge badge-{{ risk_level_colours.get(row.residual_level, 'gray') }}">
+                {{ row.residual_level | replace("_", " ") }}
               </span>
               {% else %}
               <span class="has-text-grey">No assessment</span>

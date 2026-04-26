@@ -28,6 +28,7 @@ from models import (
 )
 from registry import (
     SystemRecord,
+    aggregate_residual_level,
     load_registry,
     worst_residual_level,
 )
@@ -411,3 +412,75 @@ class TestWorstResidualLevel:
             effectiveness={"r1": "ineffective"},
         )
         assert worst_residual_level(rec, config.RISK_LEVELS) == "not_applicable"
+
+
+# ---------------------------------------------------------------------------
+# aggregate_residual_level
+# ---------------------------------------------------------------------------
+
+
+def _record_with_aggregate(
+    *,
+    inherent: dict[str, dict],
+    effectiveness: dict[str, str],
+    aggregate: str,
+) -> SystemRecord:
+    return SystemRecord(
+        slug="x",
+        meta=__import__("registry").SystemMeta(name="X"),
+        questionnaire={"properties": {}},
+        assessment={
+            "inherent": inherent,
+            "control_effectiveness": effectiveness,
+            "residual_likelihood": {},
+            "residual_consequence": {},
+            "aggregate_residual_level": aggregate,
+        },
+    )
+
+
+class TestAggregateResidualLevel:
+    def test_no_assessment_is_not_applicable(self) -> None:
+        rec = SystemRecord(
+            slug="x",
+            meta=__import__("registry").SystemMeta(name="X"),
+            questionnaire={},
+            assessment=None,
+        )
+        assert aggregate_residual_level(rec, config.RISK_LEVELS) == "not_applicable"
+
+    def test_empty_pick_falls_back_to_worst(self) -> None:
+        rec = _record_with_aggregate(
+            inherent={
+                "r1": {"likelihood": "likely", "consequence": "major", "level": "high"},
+            },
+            effectiveness={"r1": "ineffective"},
+            aggregate="",
+        )
+        assert aggregate_residual_level(rec, config.RISK_LEVELS) == "high"
+
+    def test_explicit_pick_overrides_worst(self) -> None:
+        # Worst would be 'high'; assessor picked 'medium'.
+        rec = _record_with_aggregate(
+            inherent={
+                "r1": {"likelihood": "likely", "consequence": "major", "level": "high"},
+            },
+            effectiveness={"r1": "ineffective"},
+            aggregate="medium",
+        )
+        assert aggregate_residual_level(rec, config.RISK_LEVELS) == "medium"
+
+    def test_missing_field_falls_back_to_worst(self) -> None:
+        # Older payload without the aggregate field at all — fallback path.
+        rec = SystemRecord(
+            slug="x",
+            meta=__import__("registry").SystemMeta(name="X"),
+            questionnaire={"properties": {}},
+            assessment={
+                "inherent": {
+                    "r1": {"likelihood": "likely", "consequence": "major", "level": "high"},
+                },
+                "control_effectiveness": {"r1": "ineffective"},
+            },
+        )
+        assert aggregate_residual_level(rec, config.RISK_LEVELS) == "high"

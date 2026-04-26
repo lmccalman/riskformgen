@@ -209,6 +209,22 @@ def load_registry(
     return records
 
 
+def aggregate_residual_level(record: SystemRecord, risk_levels: Sequence[str]) -> str:
+    """Return the assessor's aggregate pick when set, else the computed worst.
+
+    The aggregate residual level is the assessor's overall judgement for the
+    system. When they leave it empty (no override), we fall back to the
+    worst per-risk residual — the same value the assessment UI shows as
+    `Suggested:`.
+    """
+    if record.assessment is None:
+        return "not_applicable"
+    pick = record.assessment.get("aggregate_residual_level")
+    if isinstance(pick, str) and pick:
+        return pick
+    return worst_residual_level(record, risk_levels)
+
+
 def worst_residual_level(record: SystemRecord, risk_levels: Sequence[str]) -> str:
     """Highest-severity residual level across the system's risks.
 

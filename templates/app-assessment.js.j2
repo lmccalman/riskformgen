@@ -9,6 +9,8 @@ document.addEventListener('alpine:init', () => {
     justifications: Alpine.$persist({{ justifications_init_js }}).as('_x_a_justifications'),
     mandated_controls: Alpine.$persist({{ mandated_controls_init_js }}).as('_x_a_mandated_controls'),
     mandated_comments: Alpine.$persist({{ mandated_comments_init_js }}).as('_x_a_mandated_comments'),
+    aggregate_residual_level: Alpine.$persist({{ aggregate_residual_level_init_js }}).as('_x_a_aggregate_residual_level'),
+    aggregate_residual_justification: Alpine.$persist({{ aggregate_residual_justification_init_js }}).as('_x_a_aggregate_residual_justification'),
     _questionIds: {{ question_ids_js }},
     _detailIds: {{ detail_ids_js }},
     _propertyIds: {{ property_ids_js }},
@@ -17,6 +19,7 @@ document.addEventListener('alpine:init', () => {
     _riskConditions: {{ risk_conditions_js }},
     _likelihoods: {{ likelihoods_js }},
     _consequences: {{ consequences_js }},
+    _riskLevels: {{ risk_levels_js }},
     _risk_matrix: {{ risk_matrix_js }},
     init() {
       // Fill gaps when $persist restores state from a previous build that predates newly-added IDs.
@@ -38,11 +41,22 @@ document.addEventListener('alpine:init', () => {
           if (!(cid in this.mandated_comments[id])) this.mandated_comments[id][cid] = '';
         }
       }
+      if (typeof this.aggregate_residual_level !== 'string') this.aggregate_residual_level = '';
+      if (typeof this.aggregate_residual_justification !== 'string') this.aggregate_residual_justification = '';
     },
     _worst(results, dim, scale) {
       const vals = results.map(r => r[dim]).filter(v => v !== null);
       if (vals.length === 0) return null;
       return vals.reduce((w, v) => scale.indexOf(v) > scale.indexOf(w) ? v : w);
+    },
+    _worstLevel(levels, scale) {
+      const candidates = levels.filter(lvl => lvl && lvl !== 'not_applicable');
+      if (candidates.length === 0) return 'not_applicable';
+      return candidates.reduce((w, v) => scale.indexOf(v) > scale.indexOf(w) ? v : w);
+    },
+    get aggregate_residual_level_default() {
+      const levels = this._riskIds.map(id => this[`${id}_residual`].level);
+      return this._worstLevel(levels, this._riskLevels);
     },
     _downloadJson(data, filename) {
       const blob = new Blob([JSON.stringify(data, null, 2)], {type: 'application/json'});
@@ -78,6 +92,8 @@ document.addEventListener('alpine:init', () => {
       this.justifications = freshJustifications;
       this.mandated_controls = freshMandated;
       this.mandated_comments = freshComments;
+      this.aggregate_residual_level = '';
+      this.aggregate_residual_justification = '';
     },
     clearAssessment() {
       if (!confirm('Clear all risk assessments? Loaded answers will not be affected.')) return;
@@ -168,7 +184,7 @@ document.addEventListener('alpine:init', () => {
     exportAssessment() {
       this._downloadJson({
         format: 'riskformgen-assessment',
-        version: 3,
+        version: 4,
         exported_at: new Date().toISOString(),
         risk_ids: this._riskIds,
         property_ids: this._propertyIds,
@@ -180,12 +196,14 @@ document.addEventListener('alpine:init', () => {
         justifications: this.justifications,
         mandated_controls: this.mandated_controls,
         mandated_comments: this.mandated_comments,
+        aggregate_residual_level: this.aggregate_residual_level,
+        aggregate_residual_justification: this.aggregate_residual_justification,
       }, 'riskformgen-assessment.json');
     },
     importAssessment(event) {
       this._importJson(event, {
         format: 'riskformgen-assessment',
-        version: 3,
+        version: 4,
         fileIdsKey: 'risk_ids',
         currentIds: this._riskIds,
         label: 'assessments',
@@ -229,6 +247,12 @@ document.addEventListener('alpine:init', () => {
                 }
               }
             }
+          }
+          if (typeof data.aggregate_residual_level === 'string') {
+            this.aggregate_residual_level = data.aggregate_residual_level;
+          }
+          if (typeof data.aggregate_residual_justification === 'string') {
+            this.aggregate_residual_justification = data.aggregate_residual_justification;
           }
         },
       });

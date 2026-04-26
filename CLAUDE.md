@@ -108,6 +108,8 @@ The system is built around a **property DAG** that decouples questions from risk
 
 - **Residual risk** (assessor input at runtime) — For every risk where inherent level is not `not_applicable`, the assessor picks a **control effectiveness**: `ineffective` (default — residual equals inherent), `partial` (assessor picks residual likelihood and consequence independently; level is computed from the matrix), or `controlled` (residual level is the dedicated `controlled` level). A single "Residual Risk Justification" textarea captures the reasoning. State lives in `control_effectiveness`, `residual_likelihood`, `residual_consequence`, `justifications`, `mandated_controls`, and `mandated_comments` on the Alpine scope and is included in the assessment export.
 
+- **Aggregate residual risk** (assessor input at runtime) — In addition to the per-risk residual call, the assessor records an overall residual level for the system as a whole. State lives in `aggregate_residual_level` (string, `''` = follow the suggested worst per-risk; otherwise one of `RISK_LEVELS \ {not_applicable}`) and `aggregate_residual_justification` (string) on the Alpine scope. Both fields are persisted, exported in the assessment JSON, and surfaced on the registry. The `aggregate_residual_level_default` getter computes the suggested worst-per-risk value used as the live `Suggested:` caption beside the picker. Server-side, `registry.aggregate_residual_level(record, ...)` returns the assessor's pick when set, else falls back to `worst_residual_level()`.
+
 The data flow is: **Questions → Properties → Risks / Controls / Details**.
 
 ### Key files

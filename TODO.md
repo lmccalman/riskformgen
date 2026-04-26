@@ -14,31 +14,6 @@ that completes the work — git history is the record.
 
 ---
 
-## Aggregate residual risk — **large**
-
-**Spec ref:** §Concepts → Aggregate residual risk.
-
-**Context:** "The risk assessor assigns an overall risk level to the system
-based on their judgement of the set of residual risk levels of the risks
-after all controls are applied. This is not necessarily the maximum of the
-individual risk levels."
-
-Currently the code has per-risk residual levels but no UI for the assessor
-to pick an aggregate level for the whole system, and no field for it in the
-assessment JSON.
-
-**To do:**
-- Add an aggregate-residual-risk picker (one of `RISK_LEVELS`, probably
-  excluding `not_applicable`) to the assessment surface. Default: the worst
-  per-risk residual level, but freely overridable by the assessor.
-- Add a justification textarea for the aggregate decision (separate from
-  per-risk justifications).
-- Include both fields in the assessment JSON export (and load them back on
-  import). Bump the assessment-format version and add migration code so old
-  assessment JSONs (without the aggregate field) still import cleanly.
-
----
-
 ## Versioning across form evolution — **large**, **needs design**
 
 **Spec ref:** §Key design goals → "Risks, controls, questionnaire questions

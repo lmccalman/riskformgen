@@ -18,7 +18,7 @@ from models import (
     SubSection,
     all_questions,
 )
-from registry import SystemRecord, worst_residual_level
+from registry import SystemRecord, aggregate_residual_level
 
 
 def create_environment() -> Environment:
@@ -338,6 +338,7 @@ def _build_template_context(
         "likelihoods_js": json.dumps(list(config.LIKELIHOODS)),
         "consequences_js": json.dumps(list(config.CONSEQUENCES)),
         "risk_levels": list(config.RISK_LEVELS),
+        "risk_levels_js": json.dumps(list(config.RISK_LEVELS)),
         "risk_level_colours": config.RISK_LEVEL_COLOURS,
         "risk_matrix_js": json.dumps(config.RISK_MATRIX),
         "answers_init_js": json.dumps({q.id: "" for q in question_views}),
@@ -346,6 +347,8 @@ def _build_template_context(
         "residual_likelihood_init_js": json.dumps({r.id: "" for r in risk_views}),
         "residual_consequence_init_js": json.dumps({r.id: "" for r in risk_views}),
         "justifications_init_js": json.dumps({r.id: "" for r in risk_views}),
+        "aggregate_residual_level_init_js": json.dumps(""),
+        "aggregate_residual_justification_init_js": json.dumps(""),
         "mandated_controls_init_js": json.dumps(
             {r.id: {c.id: False for c in r.controls} for r in risk_views}
         ),
@@ -443,7 +446,7 @@ def _build_registry_row(record: SystemRecord) -> dict[str, Any]:
     level = (
         "not_applicable"
         if record.assessment is None
-        else worst_residual_level(record, config.RISK_LEVELS)
+        else aggregate_residual_level(record, config.RISK_LEVELS)
     )
     return {
         "slug": record.slug,
@@ -451,7 +454,7 @@ def _build_registry_row(record: SystemRecord) -> dict[str, Any]:
         "owner": record.meta.owner,
         "last_assessed": _format_date(record.exported_at),
         "has_assessment": record.assessment is not None,
-        "worst_level": level,
+        "residual_level": level,
     }
 
 
@@ -713,6 +716,15 @@ def _build_registry_system_view(
     )
     risk_views = _build_registry_risk_views(risks, controls, details, record)
 
+    if record.assessment is None:
+        aggregate_level = "not_applicable"
+        aggregate_justification = ""
+    else:
+        aggregate_level = aggregate_residual_level(record, config.RISK_LEVELS)
+        aggregate_justification = str(
+            record.assessment.get("aggregate_residual_justification", "") or ""
+        )
+
     return {
         "record": record,
         "meta": record.meta,
@@ -721,6 +733,8 @@ def _build_registry_system_view(
         "sections": section_views,
         "risks": risk_views,
         "has_assessment": record.assessment is not None,
+        "aggregate_residual_level": aggregate_level,
+        "aggregate_residual_justification": aggregate_justification,
     }
 
 

@@ -285,6 +285,8 @@ class TestAssessmentRoundtrip:
                 f"scope.residual_likelihood[{json.dumps(target)}] = 'rare';"
                 f"scope.residual_consequence[{json.dumps(target)}] = 'minor';"
                 f"scope.justifications[{json.dumps(target)}] = 'looks fine';"
+                "scope.aggregate_residual_level = 'medium';"
+                "scope.aggregate_residual_justification = 'overall manageable';"
             ),
             scope=ASSESSMENT,
         )
@@ -293,11 +295,13 @@ class TestAssessmentRoundtrip:
             assessment_page, "Save assessment", "riskformgen-assessment.json"
         )
         assert payload["format"] == "riskformgen-assessment"
-        assert payload["version"] == 3
+        assert payload["version"] == 4
         assert payload["control_effectiveness"][target] == "partial"
         assert payload["residual_likelihood"][target] == "rare"
         assert payload["residual_consequence"][target] == "minor"
         assert payload["justifications"][target] == "looks fine"
+        assert payload["aggregate_residual_level"] == "medium"
+        assert payload["aggregate_residual_justification"] == "overall manageable"
         # Inherent block carries baked-in values for the registry to render.
         assert "inherent" in payload
         assert payload["inherent"][target]["level"] in (
@@ -315,7 +319,9 @@ class TestAssessmentRoundtrip:
             "  scope.residual_likelihood[id] = '';"
             "  scope.residual_consequence[id] = '';"
             "  scope.justifications[id] = '';"
-            "}",
+            "}"
+            "scope.aggregate_residual_level = '';"
+            "scope.aggregate_residual_justification = '';",
             scope=ASSESSMENT,
         )
 
@@ -347,6 +353,14 @@ class TestAssessmentRoundtrip:
             )
             == "looks fine"
         )
+        assert (
+            get_scope_field(assessment_page, "aggregate_residual_level", scope=ASSESSMENT)
+            == "medium"
+        )
+        assert (
+            get_scope_field(assessment_page, "aggregate_residual_justification", scope=ASSESSMENT)
+            == "overall manageable"
+        )
         assert recorder.confirms() == []
 
     def test_mandated_controls_filtered_to_current_build(self, assessment_page: Page) -> None:
@@ -360,7 +374,7 @@ class TestAssessmentRoundtrip:
 
         payload = {
             "format": "riskformgen-assessment",
-            "version": 3,
+            "version": 4,
             "exported_at": "2025-01-01T00:00:00.000Z",
             "risk_ids": list(risk_ids),
             "property_ids": [],
@@ -372,6 +386,8 @@ class TestAssessmentRoundtrip:
             "justifications": {r: "" for r in risk_ids},
             "mandated_controls": {target: {real_ctrl: True, ghost_ctrl: True}},
             "mandated_comments": {target: {real_ctrl: "real", ghost_ctrl: "ghost"}},
+            "aggregate_residual_level": "",
+            "aggregate_residual_justification": "",
         }
 
         recorder = DialogRecorder(assessment_page)
@@ -411,7 +427,7 @@ class TestAssessmentRoundtrip:
         recorder.wait_for_alerts()
         msg = recorder.alerts()[0]["message"]
         assert "got 1" in msg
-        assert "expected 3" in msg
+        assert "expected 4" in msg
 
 
 class TestDownloadShape:
@@ -436,7 +452,7 @@ class TestDownloadShape:
             assessment_page, "Save assessment", "riskformgen-assessment.json"
         )
         assert payload["format"] == "riskformgen-assessment"
-        assert payload["version"] == 3
+        assert payload["version"] == 4
         for key in (
             "risk_ids",
             "property_ids",
@@ -448,6 +464,8 @@ class TestDownloadShape:
             "justifications",
             "mandated_controls",
             "mandated_comments",
+            "aggregate_residual_level",
+            "aggregate_residual_justification",
         ):
             assert key in payload, f"missing {key} in payload"
         datetime.fromisoformat(payload["exported_at"].replace("Z", "+00:00"))
