@@ -51,14 +51,7 @@ document.addEventListener('alpine:init', () => {
       a.click();
       URL.revokeObjectURL(url);
     },
-    clearAll() {
-      if (!confirm('Clear all answers and assessments? This cannot be undone.')) return;
-      const freshAnswers = {};
-      for (const id of this._questionIds) freshAnswers[id] = '';
-      this.answers = freshAnswers;
-      const freshDetails = {};
-      for (const id of this._detailIds) freshDetails[id] = '';
-      this.details = freshDetails;
+    _freshAssessment() {
       const freshEffectiveness = {};
       const freshResidualL = {};
       const freshResidualC = {};
@@ -83,6 +76,20 @@ document.addEventListener('alpine:init', () => {
       this.justifications = freshJustifications;
       this.mandated_controls = freshMandated;
       this.mandated_comments = freshComments;
+    },
+    clearAnswers() {
+      if (!confirm('Clear all answers and assessments? This cannot be undone.')) return;
+      const freshAnswers = {};
+      for (const id of this._questionIds) freshAnswers[id] = '';
+      this.answers = freshAnswers;
+      const freshDetails = {};
+      for (const id of this._detailIds) freshDetails[id] = '';
+      this.details = freshDetails;
+      this._freshAssessment();
+    },
+    clearAssessment() {
+      if (!confirm('Clear all risk assessments? Your answers will not be affected.')) return;
+      this._freshAssessment();
     },
     exportAnswers() {
       this._downloadJson({

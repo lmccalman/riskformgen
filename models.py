@@ -3,6 +3,7 @@ from __future__ import annotations
 import json
 from collections.abc import Sequence
 from dataclasses import dataclass, field
+from typing import Literal
 
 # ---------------------------------------------------------------------------
 # Questions
@@ -17,7 +18,7 @@ class BinaryQuestion:
     text: str
     properties: tuple[str, ...]
     guidance: str | None = None
-    type: str = field(default="binary", init=False)
+    type: Literal["binary"] = field(default="binary", init=False)
 
 
 @dataclass(frozen=True)
@@ -33,7 +34,7 @@ class DetailQuestion:
     detail_id: str
     properties: tuple[str, ...]  # copied from Detail.properties at parse time
     guidance: str | None = None
-    type: str = field(default="detail", init=False)
+    type: Literal["detail"] = field(default="detail", init=False)
 
 
 Question = BinaryQuestion | DetailQuestion
@@ -83,7 +84,7 @@ class ConditionMapping:
     """Maps a set of properties to a {likelihood, consequence} result."""
 
     properties: tuple[str, ...]
-    mode: str  # "any" or "all"
+    mode: Literal["all", "any"]
     likelihood: str
     consequence: str
 
@@ -156,4 +157,4 @@ class Property:
     id: str
     description: str
     parents: tuple[str, ...] = ()
-    activation: str = "all"  # "all" or "any"
+    activation: Literal["all", "any"] = "all"

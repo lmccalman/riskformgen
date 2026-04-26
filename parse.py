@@ -6,7 +6,7 @@ from __future__ import annotations
 import re
 from collections.abc import Sequence
 from pathlib import Path
-from typing import Any
+from typing import Any, Literal, cast
 
 import yaml
 
@@ -43,6 +43,22 @@ def _check_unknown_keys(data: YamlDict, allowed: set[str], context: str) -> None
         raise ValueError(
             f"Unknown key(s) in {context}: {sorted(extras)}. Allowed: {sorted(allowed)}"
         )
+
+
+# ---------------------------------------------------------------------------
+# Combinator validation
+# ---------------------------------------------------------------------------
+#
+# `activation` (Property) and `mode` (ConditionMapping) both take the boolean
+# combinators "all" / "any". Validating here — rather than relying on downstream
+# code silently treating unknown values as "any" (see render.py `== "all"`
+# checks) — catches YAML typos like `activation: al` at parse time.
+
+
+def _parse_combinator(value: object, *, field_name: str, owner: str) -> Literal["all", "any"]:
+    if value not in ("all", "any"):
+        raise ValueError(f"Invalid {field_name} on {owner}: {value!r} — must be 'all' or 'any'")
+    return cast(Literal["all", "any"], value)
 
 
 # ---------------------------------------------------------------------------
@@ -99,7 +115,8 @@ _ALPINE_RESERVED: frozenset[str] = frozenset(
         "_worst",
         "_downloadJson",
         "_importJson",
-        "clearAll",
+        "clearAnswers",
+        "clearAssessment",
         "exportAnswers",
         "importAnswers",
         "exportAssessment",
@@ -245,7 +262,9 @@ def parse_condition_mapping(data: YamlDict) -> ConditionMapping:
     )
     return ConditionMapping(
         properties=tuple(data["properties"]),
-        mode=data.get("mode", "all"),
+        mode=_parse_combinator(
+            data.get("mode", "all"), field_name="mode", owner="condition mapping"
+        ),
         likelihood=data["likelihood"],
         consequence=data["consequence"],
     )
@@ -329,7 +348,11 @@ def parse_property(data: YamlDict) -> Property:
         id=data["id"],
         description=data["description"],
         parents=tuple(data.get("parents", [])),
-        activation=data.get("activation", "all"),
+        activation=_parse_combinator(
+            data.get("activation", "all"),
+            field_name="activation",
+            owner=f"property {data.get('id')!r}",
+        ),
     )
 
 
