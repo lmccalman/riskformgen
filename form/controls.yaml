@@ -1,24 +1,67 @@
-- id: outdoor_access
-  description: Access to outdoor spaces
-  property: outdoors_oriented
-  effects:
-  - risk_id: burnout_risk
-  - risk_id: sedentary_risk
-- id: regular_exercise
+- id: regular_exercise_routine
   description: Regular exercise programme
   property: exercises_frequently
   effects:
-  - risk_id: sedentary_risk
-  - risk_id: burnout_risk
-- id: group_participation
-  description: Group activity participation
-  property: group_participant
+  - risk_id: cardiovascular_risk
+  - risk_id: metabolic_risk
+  - risk_id: mental_health_risk
+  - risk_id: musculoskeletal_risk
+- id: balanced_strength_cardio
+  description: Balanced strength and cardio training
+  property: well_rounded_fitness
   effects:
-  - risk_id: isolation_risk
-  - risk_id: burnout_risk
-- id: team_sports
+  - risk_id: cardiovascular_risk
+  - risk_id: metabolic_risk
+  - risk_id: musculoskeletal_risk
+- id: team_sport_engagement
   description: Team sport involvement
   property: team_sport_player
   effects:
-  - risk_id: isolation_risk
-  - risk_id: sedentary_risk
+  - risk_id: mental_health_risk
+  - risk_id: cardiovascular_risk
+- id: nutrient_dense_diet
+  description: Nutrient-dense diet
+  property: eats_balanced_diet
+  effects:
+  - risk_id: cardiovascular_risk
+  - risk_id: metabolic_risk
+- id: daily_vegetable_intake
+  description: Daily vegetable intake
+  property: eats_vegetables_daily
+  effects:
+  - risk_id: cardiovascular_risk
+  - risk_id: metabolic_risk
+- id: restorative_sleep
+  description: Consistent sleep schedule
+  property: keeps_consistent_sleep_schedule
+  effects:
+  - risk_id: mental_health_risk
+- id: stress_management_practice
+  description: Active stress management practice
+  property: practices_stress_management
+  effects:
+  - risk_id: mental_health_risk
+  - risk_id: cardiovascular_risk
+  - risk_id: musculoskeletal_risk
+- id: active_social_connection
+  description: Active social connection
+  property: socially_connected
+  effects:
+  - risk_id: mental_health_risk
+- id: sun_protection
+  description: Sun protection practice
+  property: uses_sun_protection
+  effects:
+  - risk_id: skin_cancer_risk
+- id: ergonomic_workspace
+  description: Ergonomic workspace
+  property: has_ergonomic_setup
+  effects:
+  - risk_id: musculoskeletal_risk
+- id: regular_health_checkups
+  description: Regular preventive health checkups
+  property: attends_regular_checkups
+  effects:
+  - risk_id: cardiovascular_risk
+  - risk_id: metabolic_risk
+  - risk_id: preventive_care_gap_risk

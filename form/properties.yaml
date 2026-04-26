@@ -3,16 +3,76 @@
   parents: []
   activation: all
 - id: exercises_frequently
-  description: The person exercises at least a few times per week.
+  description: The person exercises at least three times per week.
   parents:
   - physically_active
   activation: all
-- id: outdoors_oriented
-  description: The person spends meaningful time outdoors.
+- id: does_strength_training
+  description: The person includes resistance or strength training in their routine.
+  parents:
+  - exercises_frequently
+  activation: all
+- id: does_cardio_training
+  description: The person includes sustained cardiovascular exercise in their routine.
+  parents:
+  - exercises_frequently
+  activation: all
+- id: well_rounded_fitness
+  description: The person sustains both strength and cardio components week to week.
+  parents:
+  - does_strength_training
+  - does_cardio_training
+  activation: all
+- id: desk_bound_job
+  description: The person works primarily seated at a desk.
+  parents: []
+  activation: all
+- id: has_ergonomic_setup
+  description: The person's workspace is ergonomically set up.
+  parents: []
+  activation: all
+- id: eats_balanced_diet
+  description: The person's meals usually include adequate protein.
+  parents: []
+  activation: all
+- id: eats_vegetables_daily
+  description: The person eats several servings of vegetables each day.
+  parents: []
+  activation: all
+- id: consumes_processed_food_often
+  description: The person frequently eats highly processed foods or sugary drinks.
+  parents: []
+  activation: all
+- id: drinks_alcohol_daily
+  description: The person drinks alcohol on most days of the week.
+  parents: []
+  activation: all
+- id: smokes_or_vapes
+  description: The person smokes tobacco or vapes regularly.
+  parents: []
+  activation: all
+- id: sleeps_well
+  description: The person generally wakes up feeling rested.
+  parents: []
+  activation: all
+- id: keeps_consistent_sleep_schedule
+  description: The person goes to bed and wakes at consistent times.
+  parents: []
+  activation: all
+- id: feels_chronic_stress
+  description: The person feels persistently stressed or anxious.
+  parents: []
+  activation: all
+- id: practices_stress_management
+  description: The person regularly practices a form of stress management.
   parents: []
   activation: all
 - id: socially_connected
-  description: The person has regular social interaction.
+  description: The person has regular meaningful social interaction.
+  parents: []
+  activation: all
+- id: feels_lonely
+  description: The person frequently feels lonely.
   parents: []
   activation: all
 - id: group_participant
@@ -24,9 +84,29 @@
   description: The person plays team sports.
   parents:
   - group_participant
-  - physically_active
+  - exercises_frequently
   activation: any
-- id: indoor_sedentary
-  description: The person's leisure time is predominantly indoor and sedentary.
+- id: outdoors_oriented
+  description: The person spends meaningful time outdoors.
+  parents: []
+  activation: all
+- id: uses_sun_protection
+  description: The person uses sunscreen or protective clothing when outdoors.
+  parents: []
+  activation: all
+- id: has_sensitive_skin
+  description: The person has fair or sun-sensitive skin that burns easily.
+  parents: []
+  activation: all
+- id: has_chronic_condition
+  description: The person has a chronic medical condition.
+  parents: []
+  activation: all
+- id: has_family_cardiac_history
+  description: A close relative has had heart disease at a relatively young age.
+  parents: []
+  activation: all
+- id: attends_regular_checkups
+  description: The person has had a comprehensive medical checkup within the past year.
   parents: []
   activation: all

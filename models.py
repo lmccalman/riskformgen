@@ -99,6 +99,7 @@ class Risk:
     id: str
     description: str
     conditions: tuple[ConditionMapping, ...]
+    guidance: str | None = None
 
     @property
     def rules_js(self) -> tuple[str, ...]:

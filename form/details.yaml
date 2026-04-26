@@ -1,9 +1,21 @@
-- id: outdoor_context
-  description: Outdoor activity context
+- id: substance_context
+  description: Substance use context
   properties:
-  - outdoors_oriented
-- id: social_context
-  description: Social engagement context
+  - drinks_alcohol_daily
+  - smokes_or_vapes
+- id: stress_context
+  description: Stress and connection context
   properties:
-  - socially_connected
-  - group_participant
+  - feels_chronic_stress
+  - feels_lonely
+  - practices_stress_management
+- id: chronic_condition_context
+  description: Medical history context
+  properties:
+  - has_chronic_condition
+  - has_family_cardiac_history
+  - attends_regular_checkups
+- id: cardiac_history_context
+  description: Family cardiac history context
+  properties:
+  - has_family_cardiac_history

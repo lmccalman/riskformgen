@@ -1,39 +1,94 @@
-- id: sedentary_risk
-  description: Risk of an overly sedentary lifestyle based on activity patterns.
+- id: cardiovascular_risk
+  description: Risk of cardiovascular disease — heart attack, stroke, or related conditions.
   conditions:
-  - property: indoor_sedentary
-    likelihood: likely
-    consequence: medium
-  - property: physically_active
-    likelihood: unlikely
-    consequence: minor
-  - property: exercises_frequently
-    likelihood: rare
-    consequence: minor
-- id: burnout_risk
-  description: Risk of burnout from an indoor-heavy, solitary lifestyle.
-  conditions:
-  - property: indoor_sedentary
+  - property: has_family_cardiac_history
     likelihood: possible
-    consequence: medium
-  - property: outdoors_oriented
-    likelihood: unlikely
-    consequence: minor
-  - property: socially_connected
-    likelihood: unlikely
-    consequence: minor
-- id: isolation_risk
-  description: Risk of social isolation based on social connections.
-  conditions:
-  - property: socially_connected
-    likelihood: unlikely
-    consequence: minor
-  - property: group_participant
-    likelihood: rare
-    consequence: minor
-  - property: indoor_sedentary
+    consequence: major
+  - property: has_chronic_condition
+    likelihood: possible
+    consequence: major
+  - property: smokes_or_vapes
     likelihood: likely
     consequence: major
-  - property: team_sport_player
-    likelihood: rare
+  - property: drinks_alcohol_daily
+    likelihood: possible
+    consequence: medium
+  - property: consumes_processed_food_often
+    likelihood: likely
+    consequence: medium
+  - property: feels_chronic_stress
+    likelihood: possible
+    consequence: medium
+  - property: desk_bound_job
+    likelihood: unlikely
+    consequence: medium
+- id: metabolic_risk
+  description: Risk of type 2 diabetes or other metabolic disorders.
+  conditions:
+  - property: consumes_processed_food_often
+    likelihood: likely
+    consequence: major
+  - property: drinks_alcohol_daily
+    likelihood: possible
+    consequence: medium
+  - property: desk_bound_job
+    likelihood: possible
+    consequence: medium
+  - property: has_chronic_condition
+    likelihood: likely
+    consequence: major
+- id: mental_health_risk
+  description: Risk of depression, anxiety, or burnout.
+  conditions:
+  - property: feels_chronic_stress
+    likelihood: likely
+    consequence: major
+  - property: feels_lonely
+    likelihood: almost_certain
+    consequence: major
+  - property: has_chronic_condition
+    likelihood: possible
+    consequence: medium
+- id: musculoskeletal_risk
+  description: Risk of posture-related back, neck, or joint pain.
+  conditions:
+  - property: desk_bound_job
+    likelihood: likely
+    consequence: medium
+  - property: feels_chronic_stress
+    likelihood: unlikely
     consequence: minor
+- id: skin_cancer_risk
+  description: Risk of skin cancer from cumulative sun exposure.
+  conditions:
+  - property: outdoors_oriented
+    likelihood: possible
+    consequence: major
+  - property: has_sensitive_skin
+    likelihood: likely
+    consequence: medium
+- id: substance_misuse_risk
+  description: Risk of harmful substance use or dependence.
+  conditions:
+  - property: drinks_alcohol_daily
+    likelihood: likely
+    consequence: major
+  - property: smokes_or_vapes
+    likelihood: likely
+    consequence: major
+  - property: feels_chronic_stress
+    likelihood: possible
+    consequence: medium
+  - property: feels_lonely
+    likelihood: rare
+    consequence: medium
+- id: preventive_care_gap_risk
+  description: Risk of undetected or undertreated health issues from inadequate preventive
+    care.
+  conditions:
+  - property: has_chronic_condition
+    likelihood: likely
+    consequence: major
+  - property: has_family_cardiac_history
+    likelihood: possible
+    consequence: medium

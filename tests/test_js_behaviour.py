@@ -118,6 +118,67 @@ class TestPropertyCascadeAllMode:
 # ---------------------------------------------------------------------------
 
 
+class TestDerivedPropertyWithoutQuestion:
+    """A property with parents and no question is a pure computed truth — true
+    when its parent activation is satisfied, false when forced false by parent
+    cascade, null otherwise. No question is required (or visible) for it."""
+
+    def test_all_mode_true_when_all_parents_true(self) -> None:
+        q1 = BinaryQuestion(id="q1", text="", properties=("p1",))
+        q2 = BinaryQuestion(id="q2", text="", properties=("p2",))
+        p1 = Property(id="p1", description="")
+        p2 = Property(id="p2", description="")
+        derived = Property(id="derived", description="", parents=("p1", "p2"), activation="all")
+        scope = _form([q1, q2], [p1, p2, derived])
+        scope.set_answer("q1", "yes")
+        scope.set_answer("q2", "yes")
+        assert scope.prop("derived") is True
+
+    def test_all_mode_false_when_any_parent_false(self) -> None:
+        q1 = BinaryQuestion(id="q1", text="", properties=("p1",))
+        q2 = BinaryQuestion(id="q2", text="", properties=("p2",))
+        p1 = Property(id="p1", description="")
+        p2 = Property(id="p2", description="")
+        derived = Property(id="derived", description="", parents=("p1", "p2"), activation="all")
+        scope = _form([q1, q2], [p1, p2, derived])
+        scope.set_answer("q1", "yes")
+        scope.set_answer("q2", "no")
+        assert scope.prop("derived") is False
+
+    def test_all_mode_null_when_any_parent_unanswered(self) -> None:
+        q1 = BinaryQuestion(id="q1", text="", properties=("p1",))
+        q2 = BinaryQuestion(id="q2", text="", properties=("p2",))
+        p1 = Property(id="p1", description="")
+        p2 = Property(id="p2", description="")
+        derived = Property(id="derived", description="", parents=("p1", "p2"), activation="all")
+        scope = _form([q1, q2], [p1, p2, derived])
+        scope.set_answer("q1", "yes")
+        # q2 unanswered → p2 null → derived null
+        assert scope.prop("derived") is None
+
+    def test_any_mode_true_when_one_parent_true(self) -> None:
+        q1 = BinaryQuestion(id="q1", text="", properties=("p1",))
+        q2 = BinaryQuestion(id="q2", text="", properties=("p2",))
+        p1 = Property(id="p1", description="")
+        p2 = Property(id="p2", description="")
+        derived = Property(id="derived", description="", parents=("p1", "p2"), activation="any")
+        scope = _form([q1, q2], [p1, p2, derived])
+        scope.set_answer("q1", "yes")
+        scope.set_answer("q2", "no")
+        assert scope.prop("derived") is True
+
+    def test_any_mode_false_when_all_parents_false(self) -> None:
+        q1 = BinaryQuestion(id="q1", text="", properties=("p1",))
+        q2 = BinaryQuestion(id="q2", text="", properties=("p2",))
+        p1 = Property(id="p1", description="")
+        p2 = Property(id="p2", description="")
+        derived = Property(id="derived", description="", parents=("p1", "p2"), activation="any")
+        scope = _form([q1, q2], [p1, p2, derived])
+        scope.set_answer("q1", "no")
+        scope.set_answer("q2", "no")
+        assert scope.prop("derived") is False
+
+
 class TestPropertyCascadeAnyMode:
     @pytest.fixture
     def scope(self) -> Scope:

@@ -10,6 +10,7 @@ from typing import Any, Literal, cast
 
 import yaml
 
+import config
 from models import (
     BinaryQuestion,
     ConditionMapping,
@@ -260,21 +261,39 @@ def parse_condition_mapping(data: YamlDict) -> ConditionMapping:
         {"property", "likelihood", "consequence"},
         "condition mapping",
     )
+    likelihood = data["likelihood"]
+    consequence = data["consequence"]
+    prop = data.get("property")
+    if likelihood not in config.LIKELIHOODS:
+        raise ValueError(
+            f"Invalid likelihood {likelihood!r} on condition for property {prop!r} "
+            f"— must be one of {list(config.LIKELIHOODS)}"
+        )
+    if consequence not in config.CONSEQUENCES:
+        raise ValueError(
+            f"Invalid consequence {consequence!r} on condition for property {prop!r} "
+            f"— must be one of {list(config.CONSEQUENCES)}"
+        )
     return ConditionMapping(
         property=data["property"],
-        likelihood=data["likelihood"],
-        consequence=data["consequence"],
+        likelihood=likelihood,
+        consequence=consequence,
     )
 
 
 def parse_risk(data: YamlDict) -> Risk:
     """Parse a risk dict into a Risk dataclass."""
-    _check_unknown_keys(data, {"id", "description", "conditions"}, f"risk {data.get('id')!r}")
+    _check_unknown_keys(
+        data,
+        {"id", "description", "conditions", "guidance"},
+        f"risk {data.get('id')!r}",
+    )
     _validate_id(data["id"], kind="risk")
     return Risk(
         id=data["id"],
         description=data["description"],
         conditions=tuple(parse_condition_mapping(c) for c in data["conditions"]),
+        guidance=data.get("guidance"),
     )
 
 

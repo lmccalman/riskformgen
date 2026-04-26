@@ -153,6 +153,18 @@ class TestParseConditionMapping:
                 }
             )
 
+    def test_invalid_likelihood_raises(self):
+        with pytest.raises(ValueError, match="Invalid likelihood 'liekly'"):
+            parse_condition_mapping(
+                {"property": "p1", "likelihood": "liekly", "consequence": "major"}
+            )
+
+    def test_invalid_consequence_raises(self):
+        with pytest.raises(ValueError, match="Invalid consequence 'sever'"):
+            parse_condition_mapping(
+                {"property": "p1", "likelihood": "likely", "consequence": "sever"}
+            )
+
 
 class TestParseRisk:
     def test_happy_path(self):
@@ -188,6 +200,21 @@ class TestParseRisk:
         assert len(r.conditions) == 2
         assert r.conditions[0].property == "p1"
         assert r.conditions[1].property == "p2"
+
+    def test_guidance(self):
+        r = parse_risk(
+            {
+                "id": "r1",
+                "description": "D",
+                "conditions": [],
+                "guidance": "Discuss this with the risk manager.",
+            }
+        )
+        assert r.guidance == "Discuss this with the risk manager."
+
+    def test_guidance_optional(self):
+        r = parse_risk({"id": "r1", "description": "D", "conditions": []})
+        assert r.guidance is None
 
 
 # ---------------------------------------------------------------------------

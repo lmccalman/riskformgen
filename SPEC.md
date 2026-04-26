@@ -85,11 +85,20 @@ For nodes with a single parent, if the parent is absent then
 the child and all its decendents are automatically absent. If the parent is
 present, the value of the child is unset unless specified by the user directly.
 
-Properties are never automatically present: they are either absent due to the
-condition of their parents or they need to be set. Example: is_hatchback is the
+Properties with an attached question are never automatically present: they are
+either absent due to the condition of their parents, or they need to be answered
+by the user. Example: is_hatchback is the
 child of is_car -- if is_car is false, is_hatchback must be false. But if
 is_car is true, the car may or may not be a hatchback so the property will be
 unset unless specified directly as present or absent.
+
+Some properties name a pure aggregation over their parents and have no
+question attached. Such properties are *derived*: they are automatically
+present when their parent activation is satisfied (and absent when forced
+absent by the cascade), with no separate user input. This lets a property
+express e.g. `well_rounded_fitness = does_strength_training AND
+does_cardio_training` directly in the DAG, without forcing the user to
+answer the conjunction.
 
 To deal with children that have multiple parent properties, properties are
 either "all_depends" or "any_depends": for all_depends children, they are

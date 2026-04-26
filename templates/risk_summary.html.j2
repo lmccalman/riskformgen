@@ -6,6 +6,9 @@
 
   <div class="card-content risk-card-body">
     <p class="subtitle is-6 has-text-grey">{{ risk.description }}</p>
+    {% if risk.guidance %}
+    <p class="help"><em>{{ risk.guidance }}</em></p>
+    {% endif %}
 
     {# ── Modelled risk: likelihood × consequence → level ── #}
     <div class="risk-card-section">

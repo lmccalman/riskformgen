@@ -96,6 +96,7 @@ class DetailView:
 class RiskView:
     id: str
     description: str
+    guidance: str | None
     rules_js: tuple[str, ...]
     controls: tuple[Control, ...]
     relevant_details: tuple[DetailView, ...]
@@ -114,6 +115,11 @@ def _compile_property_getter(
 
     The getter handles parent cascade (based on activation mode) then direct
     question state. Returns a JS expression body (without the `get` wrapper).
+
+    A property with parents and no question is treated as a pure computed
+    truth: once the parent cascade is satisfied (all-of / any-of), the
+    property is true. This lets a property name an AND/OR over its parents
+    without forcing a redundant question on the user.
     """
     lines: list[str] = []
 
@@ -138,7 +144,11 @@ def _compile_property_getter(
             f"return this.answers[{qid}] === 'yes' ? true"
             f" : this.answers[{qid}] === 'no' ? false : null;"
         )
+    elif prop.parents:
+        # No question — parent cascade already satisfied means the property holds.
+        lines.append("return true;")
     else:
+        # No parents and no question — property is unreachable.
         lines.append("return null;")
 
     return "\n".join(lines)
@@ -261,6 +271,7 @@ def _build_risk_views(
             RiskView(
                 id=risk.id,
                 description=risk.description,
+                guidance=risk.guidance,
                 rules_js=risk.rules_js,
                 controls=tuple(controls_by_risk[risk.id]),
                 relevant_details=relevant,

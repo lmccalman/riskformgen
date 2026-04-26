@@ -43,6 +43,26 @@ class TestCompilePropertyGetter:
         body = _compile_property_getter(prop, {})
         assert body == "return null;"
 
+    def test_derived_without_question_all_mode(self):
+        # No question targets this property; once parents (all-mode) are satisfied,
+        # the property is true — a pure computed AND-of-parents.
+        prop = Property(id="derived", description="Derived", parents=("p1", "p2"))
+        body = _compile_property_getter(prop, {})
+        assert "this.prop_p1 === false" in body
+        assert "this.prop_p2 === false" in body
+        assert body.rstrip().endswith("return true;")
+        assert "this.answers[" not in body
+
+    def test_derived_without_question_any_mode(self):
+        prop = Property(
+            id="derived", description="Derived", parents=("p1", "p2"), activation="any"
+        )
+        body = _compile_property_getter(prop, {})
+        assert "parents.every(p => p === false)" in body
+        assert "parents.some(p => p === true)" in body
+        assert body.rstrip().endswith("return true;")
+        assert "this.answers[" not in body
+
     def test_child_all_mode(self):
         prop = Property(id="child", description="Child", parents=("p1", "p2"))
         q = BinaryQuestion(id="q1", text="Q", properties=("child",))
@@ -234,6 +254,28 @@ class TestRenderForm:
         # is filtered out of this risk's card
         assert "Something else" not in html
         assert "details['det_unrelated']" not in html
+
+    def test_risk_guidance_rendered(self, sample_sections, sample_properties):
+        risk = Risk(
+            id="r1",
+            description="Test risk",
+            conditions=(
+                ConditionMapping(property="prop_a", likelihood="likely", consequence="major"),
+            ),
+            guidance="Talk to the risk manager about the next steps.",
+        )
+        html = render_form(sample_sections, [risk], properties=sample_properties)
+        assert "Talk to the risk manager about the next steps." in html
+
+    def test_risk_no_guidance_renders_no_help_block(
+        self, sample_sections, sample_properties, sample_risk
+    ):
+        # sample_risk has no guidance — verify no orphan <p class="help"> from the
+        # risk card sneaks in (the question template uses the same class so we
+        # check for the wrapping <em> idiom specific to guidance copy).
+        html = render_form(sample_sections, [sample_risk], properties=sample_properties)
+        # The risk card body shouldn't contain an empty guidance paragraph.
+        assert '<p class="help"><em></em></p>' not in html
 
     def test_detail_question_guidance_rendered(self, sample_properties, sample_detail):
         dq = DetailQuestion(

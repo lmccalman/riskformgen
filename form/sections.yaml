@@ -1,81 +1,218 @@
-- id: personal
-  title: Personal
-  description: Tell us a bit about yourself — who you are and what makes you tick.
+- id: activity
+  title: Activity & Movement
+  description: Your relationship with physical activity, exercise, and how you spend
+    your working day.
   subsections:
-  - title: Activity Level
-    description: Your general relationship with physical activity.
+  - title: General Activity
+    description: Your baseline level of movement.
     questions:
     - type: binary
-      id: is_active
+      id: q_is_active
       text: Do you engage in regular physical activity?
       properties:
       - physically_active
-      guidance: This includes structured exercise, walking, cycling, or any regular
-        movement.
+      guidance: This includes structured exercise, brisk walking, cycling, or any other
+        regular movement.
     - type: binary
-      id: exercises_often
-      text: Do you exercise at least a few times per week?
+      id: q_exercises_often
+      text: Do you exercise at least three times per week?
       properties:
       - exercises_frequently
-  - title: Outdoor Life
-    description: Your connection with the outdoors.
+  - title: Training Components
+    description: The structure of your exercise routine.
     questions:
     - type: binary
-      id: spends_time_outdoors
-      text: Do you spend meaningful time outdoors?
+      id: q_does_strength
+      text: Does your routine include resistance or strength training?
       properties:
-      - outdoors_oriented
-      guidance: Regular walks, gardening, outdoor sports, or simply spending time
-        in nature.
-    - type: detail
-      id: outdoor_context_detail
-      text: Describe your outdoor activities.
-      detail_id: outdoor_context
-      guidance: What kinds of outdoor activities do you typically do, and how often?
-- id: social
-  title: Social
-  description: How you connect and interact with the people around you.
-  subsections:
-  - title: Social Connections
-    description: Your social life and group involvement.
+      - does_strength_training
+      guidance: Free weights, resistance machines, body-weight exercises, or similar.
+    - type: binary
+      id: q_does_cardio
+      text: Does your routine include sustained cardiovascular exercise?
+      properties:
+      - does_cardio_training
+      guidance: Running, cycling, swimming, rowing, or any sustained aerobic activity.
+  - title: Work Posture
+    description: Your sitting time and workspace setup.
     questions:
     - type: binary
-      id: is_social
-      text: Do you have regular social interaction?
+      id: q_desk_bound
+      text: Is your work primarily seated at a desk for most of the day?
+      properties:
+      - desk_bound_job
+    - type: binary
+      id: q_ergonomic_setup
+      text: Is your workspace properly ergonomically set up — chair, desk, and screen
+        height adjusted?
+      properties:
+      - has_ergonomic_setup
+- id: nutrition
+  title: Nutrition & Substances
+  description: Your eating habits and use of alcohol or tobacco.
+  subsections:
+  - title: Eating Habits
+    description: What your meals typically look like.
+    questions:
+    - type: binary
+      id: q_balanced_meals
+      text: Do your meals typically include both adequate protein and several servings
+        of vegetables?
+      properties:
+      - eats_balanced_diet
+      - eats_vegetables_daily
+      guidance: Both must apply — answer "yes" only if both protein and a variety of
+        vegetables feature in most of your meals.
+    - type: binary
+      id: q_processed_food
+      text: Do you frequently eat highly processed foods or sugary drinks?
+      properties:
+      - consumes_processed_food_often
+      guidance: Includes packaged snacks, fast food, soft drinks, and sweetened products.
+  - title: Substances
+    description: Your relationship with alcohol and tobacco/nicotine.
+    questions:
+    - type: binary
+      id: q_drinks_alcohol
+      text: Do you drink alcohol on most days of the week?
+      properties:
+      - drinks_alcohol_daily
+    - type: binary
+      id: q_smokes_or_vapes
+      text: Do you smoke tobacco or vape regularly?
+      properties:
+      - smokes_or_vapes
+    - type: detail
+      id: q_substance_context_detail
+      text: Describe your alcohol and/or tobacco use.
+      detail_id: substance_context
+      guidance: How much, how often, and how you'd describe your relationship with
+        these substances.
+- id: sleep_stress
+  title: Sleep & Stress
+  description: How you sleep and how you cope with day-to-day pressure.
+  subsections:
+  - title: Sleep Quality
+    description: How rested and consistent your sleep is.
+    questions:
+    - type: binary
+      id: q_sleeps_well
+      text: Do you generally wake up feeling rested?
+      properties:
+      - sleeps_well
+    - type: binary
+      id: q_consistent_sleep
+      text: Do you go to bed and wake up at consistent times most days?
+      properties:
+      - keeps_consistent_sleep_schedule
+  - title: Stress
+    description: How chronic stress affects you and what you do about it.
+    questions:
+    - type: binary
+      id: q_feels_stress
+      text: Do you feel persistently stressed or anxious in your day-to-day life?
+      properties:
+      - feels_chronic_stress
+    - type: binary
+      id: q_manages_stress
+      text: Do you regularly practice some form of stress management?
+      properties:
+      - practices_stress_management
+      guidance: Meditation, journalling, therapy, structured breathing exercises, or
+        similar.
+    - type: detail
+      id: q_stress_context_detail
+      text: Describe how you currently manage stress and emotional wellbeing.
+      detail_id: stress_context
+      guidance: What's been weighing on you, how you cope, and how connected you feel
+        to others.
+- id: social_outdoor
+  title: Social & Outdoor Life
+  description: Your social connections, group involvement, and time spent outdoors.
+  subsections:
+  - title: Social Connection
+    description: How you connect with the people in your life.
+    questions:
+    - type: binary
+      id: q_is_social
+      text: Do you have regular meaningful social interaction?
       properties:
       - socially_connected
     - type: binary
-      id: joins_groups
+      id: q_feels_lonely
+      text: Do you frequently feel lonely?
+      properties:
+      - feels_lonely
+    - type: binary
+      id: q_joins_groups
       text: Do you participate in organised group activities?
       properties:
       - group_participant
-      guidance: Clubs, classes, volunteering, team sports, or other structured group
-        activities.
-    - type: detail
-      id: social_context_detail
-      text: Describe your social connections and activities.
-      detail_id: social_context
-      guidance: How often do you interact socially, and what kinds of groups or activities
-        are you involved in?
+      guidance: Clubs, classes, volunteering, religious or community groups, etc.
   - title: Team Sports
-    description: Your involvement in competitive team activities.
+    description: Your involvement in team sport.
     questions:
     - type: binary
-      id: plays_team_sports
+      id: q_team_sports
       text: Do you play team sports?
       properties:
       - team_sport_player
-- id: lifestyle
-  title: Lifestyle
-  description: Your daily habits and how you spend your downtime.
-  subsections:
-  - title: Sedentary Habits
-    description: Your indoor and sedentary tendencies.
+  - title: Outdoor Life
+    description: Your time outdoors and how you protect yourself from the sun.
     questions:
     - type: binary
-      id: mostly_sedentary
-      text: Is your leisure time predominantly indoor and sedentary?
+      id: q_outdoors_oriented
+      text: Do you spend meaningful time outdoors?
       properties:
-      - indoor_sedentary
-      guidance: Mostly screen time, reading, or other sit-down activities during free
-        time.
+      - outdoors_oriented
+      guidance: Walks, gardening, outdoor sports, or other regular time in the open
+        air.
+    - type: binary
+      id: q_uses_sunscreen
+      text: Do you typically use sunscreen or protective clothing when outdoors for
+        extended periods?
+      properties:
+      - uses_sun_protection
+    - type: binary
+      id: q_sensitive_skin
+      text: Do you have fair or sun-sensitive skin (i.e. you burn easily)?
+      properties:
+      - has_sensitive_skin
+- id: medical
+  title: Medical Background
+  description: Your medical conditions, family history, and engagement with preventive
+    care.
+  subsections:
+  - title: Medical Conditions
+    description: Your existing conditions and family medical history.
+    questions:
+    - type: binary
+      id: q_chronic_condition
+      text: Do you have a chronic medical condition (e.g. diabetes, hypertension, asthma)?
+      properties:
+      - has_chronic_condition
+    - type: binary
+      id: q_family_cardiac
+      text: Has a close blood relative had heart disease before age 60?
+      properties:
+      - has_family_cardiac_history
+    - type: detail
+      id: q_chronic_condition_context_detail
+      text: Describe your relevant medical history.
+      detail_id: chronic_condition_context
+      guidance: List any chronic conditions you manage and any close family history
+        of significant illness.
+    - type: detail
+      id: q_cardiac_history_context_detail
+      text: Describe the family history of heart disease.
+      detail_id: cardiac_history_context
+      guidance: Which relatives, what age of onset, and any details that may be relevant.
+  - title: Preventive Care
+    description: How regularly you engage with healthcare professionals.
+    questions:
+    - type: binary
+      id: q_attends_checkups
+      text: Have you had a comprehensive medical checkup in the past 12 months?
+      properties:
+      - attends_regular_checkups
+      guidance: A general check-up that included blood work or relevant screenings.
