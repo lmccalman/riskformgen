@@ -125,10 +125,9 @@ class TestRisks:
     def test_all_condition_property_refs_exist(self, risks, property_ids):
         for risk in risks:
             for cond in risk.conditions:
-                for pid in cond.properties:
-                    assert pid in property_ids, (
-                        f"Risk {risk.id!r} references unknown property {pid!r}"
-                    )
+                assert cond.property in property_ids, (
+                    f"Risk {risk.id!r} references unknown property {cond.property!r}"
+                )
 
 
 # ---------------------------------------------------------------------------

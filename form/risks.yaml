@@ -1,59 +1,39 @@
 - id: sedentary_risk
   description: Risk of an overly sedentary lifestyle based on activity patterns.
   conditions:
-  - properties:
-    - indoor_sedentary
-    mode: all
+  - property: indoor_sedentary
     likelihood: likely
     consequence: medium
-  - properties:
-    - physically_active
-    mode: all
+  - property: physically_active
     likelihood: unlikely
     consequence: minor
-  - properties:
-    - exercises_frequently
-    mode: all
+  - property: exercises_frequently
     likelihood: rare
     consequence: minor
 - id: burnout_risk
   description: Risk of burnout from an indoor-heavy, solitary lifestyle.
   conditions:
-  - properties:
-    - indoor_sedentary
-    mode: all
+  - property: indoor_sedentary
     likelihood: possible
     consequence: medium
-  - properties:
-    - outdoors_oriented
-    mode: all
+  - property: outdoors_oriented
     likelihood: unlikely
     consequence: minor
-  - properties:
-    - socially_connected
-    mode: all
+  - property: socially_connected
     likelihood: unlikely
     consequence: minor
 - id: isolation_risk
   description: Risk of social isolation based on social connections.
   conditions:
-  - properties:
-    - socially_connected
-    mode: all
+  - property: socially_connected
     likelihood: unlikely
     consequence: minor
-  - properties:
-    - group_participant
-    mode: all
+  - property: group_participant
     likelihood: rare
     consequence: minor
-  - properties:
-    - indoor_sedentary
-    mode: all
+  - property: indoor_sedentary
     likelihood: likely
     consequence: major
-  - properties:
-    - team_sport_player
-    mode: all
+  - property: team_sport_player
     likelihood: rare
     consequence: minor

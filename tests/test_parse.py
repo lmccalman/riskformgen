@@ -131,23 +131,26 @@ class TestParseConditionMapping:
     def test_basic(self):
         cond = parse_condition_mapping(
             {
-                "properties": ["p1", "p2"],
-                "mode": "any",
+                "property": "p1",
                 "likelihood": "likely",
                 "consequence": "major",
             }
         )
         assert isinstance(cond, ConditionMapping)
-        assert cond.properties == ("p1", "p2")
-        assert cond.mode == "any"
+        assert cond.property == "p1"
         assert cond.likelihood == "likely"
         assert cond.consequence == "major"
 
-    def test_mode_defaults_to_all(self):
-        cond = parse_condition_mapping(
-            {"properties": ["p1"], "likelihood": "rare", "consequence": "minor"}
-        )
-        assert cond.mode == "all"
+    def test_rejects_legacy_multi_property_shape(self):
+        with pytest.raises(ValueError):
+            parse_condition_mapping(
+                {
+                    "properties": ["p1", "p2"],
+                    "mode": "any",
+                    "likelihood": "likely",
+                    "consequence": "major",
+                }
+            )
 
 
 class TestParseRisk:
@@ -158,8 +161,7 @@ class TestParseRisk:
                 "description": "Data breach risk",
                 "conditions": [
                     {
-                        "properties": ["p1"],
-                        "mode": "all",
+                        "property": "p1",
                         "likelihood": "likely",
                         "consequence": "major",
                     }
@@ -177,18 +179,14 @@ class TestParseRisk:
                 "id": "r1",
                 "description": "D",
                 "conditions": [
-                    {"properties": ["p1"], "likelihood": "likely", "consequence": "major"},
-                    {
-                        "properties": ["p2", "p3"],
-                        "mode": "any",
-                        "likelihood": "rare",
-                        "consequence": "minor",
-                    },
+                    {"property": "p1", "likelihood": "likely", "consequence": "major"},
+                    {"property": "p2", "likelihood": "rare", "consequence": "minor"},
                 ],
             }
         )
         assert len(r.conditions) == 2
-        assert r.conditions[1].mode == "any"
+        assert r.conditions[0].property == "p1"
+        assert r.conditions[1].property == "p2"
 
 
 # ---------------------------------------------------------------------------
@@ -451,9 +449,7 @@ class TestValidateRiskProperties:
                 id="r1",
                 description="D",
                 conditions=(
-                    ConditionMapping(
-                        properties=("p1",), mode="all", likelihood="rare", consequence="minor"
-                    ),
+                    ConditionMapping(property="p1", likelihood="rare", consequence="minor"),
                 ),
             )
         ]
@@ -467,8 +463,7 @@ class TestValidateRiskProperties:
                 description="D",
                 conditions=(
                     ConditionMapping(
-                        properties=("p_missing",),
-                        mode="all",
+                        property="p_missing",
                         likelihood="rare",
                         consequence="minor",
                     ),
@@ -485,12 +480,8 @@ class TestValidateRiskProperties:
                 id="r1",
                 description="D",
                 conditions=(
-                    ConditionMapping(
-                        properties=("bad1",), mode="all", likelihood="rare", consequence="minor"
-                    ),
-                    ConditionMapping(
-                        properties=("bad2",), mode="all", likelihood="rare", consequence="minor"
-                    ),
+                    ConditionMapping(property="bad1", likelihood="rare", consequence="minor"),
+                    ConditionMapping(property="bad2", likelihood="rare", consequence="minor"),
                 ),
             )
         ]
@@ -562,9 +553,7 @@ class TestValidateControlRiskIds:
                 id="r1",
                 description="D",
                 conditions=(
-                    ConditionMapping(
-                        properties=("p1",), mode="all", likelihood="rare", consequence="minor"
-                    ),
+                    ConditionMapping(property="p1", likelihood="rare", consequence="minor"),
                 ),
             )
         ]
@@ -584,9 +573,7 @@ class TestValidateControlRiskIds:
                 id="r1",
                 description="D",
                 conditions=(
-                    ConditionMapping(
-                        properties=("p1",), mode="all", likelihood="rare", consequence="minor"
-                    ),
+                    ConditionMapping(property="p1", likelihood="rare", consequence="minor"),
                 ),
             )
         ]
@@ -702,11 +689,7 @@ def _risk(rid: str) -> Risk:
     return Risk(
         id=rid,
         description="D",
-        conditions=(
-            ConditionMapping(
-                properties=("p1",), mode="all", likelihood="rare", consequence="minor"
-            ),
-        ),
+        conditions=(ConditionMapping(property="p1", likelihood="rare", consequence="minor"),),
     )
 
 
@@ -843,7 +826,7 @@ class TestUnknownKeys:
         with pytest.raises(ValueError, match="likelyhood"):
             parse_condition_mapping(
                 {
-                    "properties": ["p1"],
+                    "property": "p1",
                     "likelyhood": "low",  # typo
                     "consequence": "minor",
                 }

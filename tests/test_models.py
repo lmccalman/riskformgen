@@ -83,38 +83,20 @@ class TestJsResult:
 
 
 class TestConditionMapping:
-    def test_to_js_any_mode(self):
-        cond = ConditionMapping(
-            properties=("p1", "p2"), mode="any", likelihood="likely", consequence="major"
-        )
+    def test_to_js_emits_single_property_check(self):
+        cond = ConditionMapping(property="p1", likelihood="likely", consequence="major")
         js = cond.to_js()
-        assert "this.prop_p1" in js
-        assert "this.prop_p2" in js
-        assert ".some(" in js
+        assert "this.prop_p1 === true" in js
         assert "likely" in js
         assert "major" in js
-
-    def test_to_js_all_mode(self):
-        cond = ConditionMapping(
-            properties=("p1",), mode="all", likelihood="rare", consequence="minor"
-        )
-        js = cond.to_js()
-        assert ".every(" in js
-        assert "this.prop_p1" in js
-
-    def test_to_js_returns_null_on_miss(self):
-        cond = ConditionMapping(
-            properties=("p1",), mode="all", likelihood="rare", consequence="minor"
-        )
-        js = cond.to_js()
         assert "null" in js
+        assert ".some(" not in js
+        assert ".every(" not in js
 
     def test_frozen(self):
-        cond = ConditionMapping(
-            properties=("p1",), mode="all", likelihood="rare", consequence="minor"
-        )
+        cond = ConditionMapping(property="p1", likelihood="rare", consequence="minor")
         with pytest.raises(AttributeError):
-            cond.mode = "any"  # type: ignore[misc]
+            cond.property = "p2"  # type: ignore[misc]
 
 
 # ---------------------------------------------------------------------------

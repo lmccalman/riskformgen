@@ -215,8 +215,7 @@ class TestRiskAggregation:
         scope = self._build(
             (
                 ConditionMapping(
-                    properties=("p1",),
-                    mode="all",
+                    property="p1",
                     likelihood="likely",
                     consequence="major",
                 ),
@@ -233,8 +232,7 @@ class TestRiskAggregation:
         scope = self._build(
             (
                 ConditionMapping(
-                    properties=("p1",),
-                    mode="all",
+                    property="p1",
                     likelihood="possible",
                     consequence="medium",
                 ),
@@ -254,14 +252,12 @@ class TestRiskAggregation:
         scope = self._build(
             (
                 ConditionMapping(
-                    properties=("p1",),
-                    mode="all",
+                    property="p1",
                     likelihood="likely",
                     consequence="minor",
                 ),
                 ConditionMapping(
-                    properties=("p2",),
-                    mode="all",
+                    property="p2",
                     likelihood="rare",
                     consequence="major",
                 ),
@@ -299,8 +295,7 @@ class TestRiskMatrixLookup:
             description="",
             conditions=(
                 ConditionMapping(
-                    properties=("p1",),
-                    mode="all",
+                    property="p1",
                     likelihood=likelihood,
                     consequence=consequence,
                 ),
@@ -326,8 +321,7 @@ class TestResidualRisk:
             description="",
             conditions=(
                 ConditionMapping(
-                    properties=("p1",),
-                    mode="all",
+                    property="p1",
                     likelihood="likely",
                     consequence="major",
                 ),
@@ -346,8 +340,7 @@ class TestResidualRisk:
             description="",
             conditions=(
                 ConditionMapping(
-                    properties=("p1",),
-                    mode="all",
+                    property="p1",
                     likelihood="likely",
                     consequence="major",
                 ),
@@ -403,8 +396,7 @@ class TestControlGetters:
             description="",
             conditions=(
                 ConditionMapping(
-                    properties=("p1",),
-                    mode="all",
+                    property="p1",
                     likelihood="likely",
                     consequence="major",
                 ),
@@ -445,8 +437,7 @@ class TestDetailShow:
             description="",
             conditions=(
                 ConditionMapping(
-                    properties=("p1",),
-                    mode="all",
+                    property="p1",
                     likelihood="likely",
                     consequence="major",
                 ),
@@ -488,8 +479,7 @@ class TestSchemaMigration:
             description="",
             conditions=(
                 ConditionMapping(
-                    properties=(prop_id,),
-                    mode="all",
+                    property=prop_id,
                     likelihood="likely",
                     consequence="major",
                 ),

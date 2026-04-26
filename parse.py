@@ -257,14 +257,11 @@ def parse_condition_mapping(data: YamlDict) -> ConditionMapping:
     """Parse a condition mapping dict into a ConditionMapping dataclass."""
     _check_unknown_keys(
         data,
-        {"properties", "mode", "likelihood", "consequence"},
+        {"property", "likelihood", "consequence"},
         "condition mapping",
     )
     return ConditionMapping(
-        properties=tuple(data["properties"]),
-        mode=_parse_combinator(
-            data.get("mode", "all"), field_name="mode", owner="condition mapping"
-        ),
+        property=data["property"],
         likelihood=data["likelihood"],
         consequence=data["consequence"],
     )
@@ -448,11 +445,10 @@ def validate_risk_properties(risks: list[Risk], properties: list[Property]) -> N
     errors: list[str] = []
     for risk in risks:
         for cond in risk.conditions:
-            for pid in cond.properties:
-                if pid not in prop_ids:
-                    errors.append(
-                        f"Risk {risk.id!r} condition references unknown property {pid!r}"
-                    )
+            if cond.property not in prop_ids:
+                errors.append(
+                    f"Risk {risk.id!r} condition references unknown property {cond.property!r}"
+                )
     if errors:
         raise ValueError("Invalid risk→property references:\n  " + "\n  ".join(errors))
 

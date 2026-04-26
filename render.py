@@ -251,7 +251,7 @@ def _build_risk_views(
 
     result: list[RiskView] = []
     for risk in risks:
-        risk_prop_ids = {pid for cond in risk.conditions for pid in cond.properties}
+        risk_prop_ids = {cond.property for cond in risk.conditions}
         relevant = tuple(
             DetailView(id=d.id, description=d.description, show_js=_detail_show_js(d.properties))
             for d in details

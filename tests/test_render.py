@@ -164,8 +164,7 @@ class TestRenderForm:
             description="Test risk",
             conditions=(
                 ConditionMapping(
-                    properties=("prop_a",),
-                    mode="all",
+                    property="prop_a",
                     likelihood="likely",
                     consequence="major",
                 ),
@@ -181,8 +180,7 @@ class TestRenderForm:
             description="D",
             conditions=(
                 ConditionMapping(
-                    properties=("prop_a",),
-                    mode="all",
+                    property="prop_a",
                     likelihood="likely",
                     consequence="major",
                 ),
@@ -206,8 +204,7 @@ class TestRenderForm:
             description="Risk tied to prop_a",
             conditions=(
                 ConditionMapping(
-                    properties=("prop_a",),
-                    mode="all",
+                    property="prop_a",
                     likelihood="likely",
                     consequence="major",
                 ),

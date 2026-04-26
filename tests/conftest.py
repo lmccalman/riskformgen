@@ -72,14 +72,12 @@ def sample_risk():
         description="Risk of data leakage",
         conditions=(
             ConditionMapping(
-                properties=("prop_a",),
-                mode="all",
+                property="prop_a",
                 likelihood="likely",
                 consequence="major",
             ),
             ConditionMapping(
-                properties=("prop_a", "prop_b"),
-                mode="any",
+                property="prop_b",
                 likelihood="possible",
                 consequence="medium",
             ),

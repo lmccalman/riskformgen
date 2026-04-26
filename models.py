@@ -81,18 +81,15 @@ def _js_result(likelihood: str, consequence: str) -> str:
 
 @dataclass(frozen=True)
 class ConditionMapping:
-    """Maps a set of properties to a {likelihood, consequence} result."""
+    """Maps a single property to a {likelihood, consequence} result."""
 
-    properties: tuple[str, ...]
-    mode: Literal["all", "any"]
+    property: str
     likelihood: str
     consequence: str
 
     def to_js(self) -> str:
-        props = ", ".join(f"this.prop_{pid}" for pid in self.properties)
-        check = "some" if self.mode == "any" else "every"
         result = _js_result(self.likelihood, self.consequence)
-        return f"[{props}].{check}(p => p === true) ? {result} : null"
+        return f"this.prop_{self.property} === true ? {result} : null"
 
 
 @dataclass(frozen=True)
