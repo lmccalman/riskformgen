@@ -24,18 +24,11 @@ uv run ruff format --check .
 # Type check
 uv run basedpyright
 
-# Type check editor frontend
-cd editor/frontend && npx tsc --noEmit
-
 # Serve locally at http://localhost:8000
 python -m http.server -d output
 
 # Add a dependency
 uv add <package>
-
-# Run the spec editor (two terminals)
-cd /path/to/riskformgen && uv run python run_editor.py   # Backend on :8000
-cd editor/frontend && npm run dev                          # Frontend on :5173
 ```
 
 **After any code change, run all four checks before considering work complete:**
@@ -59,7 +52,7 @@ The build pipeline has three phases:
 
 2. **CSS (build time)** — `bulma.min.css` provides class-based styling (layout, typography, form controls, cards, tabs). `input.css` contains custom CSS for app-specific components (badges, risk grid, spacing stacks, etc.). Both are copied directly to `output/` — no compilation step needed.
 
-3. **Alpine.js (runtime)** — The Alpine component is rendered from `templates/app.js.j2` into `output/app.js` (alongside `index.html`), which registers a factory via `Alpine.data('app', () => ({...}))` on the `alpine:init` event. The HTML carries only `<div x-data="app">`. The factory holds reactive `answers` state, computed property getters (`prop_*`), control getters (`ctrl_*`), and risk getters — all compiled from Python at build time. Each section renders as its own `<form>` shown/hidden via `x-show`. Question visibility is driven by the property DAG (questions are shown when their target properties are reachable). Risk getters re-evaluate automatically as answers change. Persisted state uses `Alpine.$persist(initial).as('_x_<field>')` so localStorage keys are stable across the component definition form.
+3. **Alpine.js (runtime)** — The Alpine component is rendered from `templates/app.js.j2` into `output/app.js` (alongside `index.html`), which registers a factory via `Alpine.data('app', () => ({...}))` on the `alpine:init` event. The HTML carries only `<div x-data="app">`. The factory holds reactive `answers` / `details` / assessment state, computed property getters (`prop_*`), control getters (`ctrl_*`), and per-risk inherent and `<id>_residual` getters — all compiled from Python at build time. Each section renders as its own `<form>` shown/hidden via `x-show`. Question visibility is driven by the property DAG (questions are shown when their target properties are reachable). Risk getters re-evaluate automatically as answers change. Persisted state uses `Alpine.$persist(initial).as('_x_<field>')` so localStorage keys are stable across the component definition form. The factory's `init()` hook back-fills any newly-added question/detail/risk/control IDs whose persisted state predates them.
 
 ### Core domain model
 
@@ -67,43 +60,49 @@ The system is built around a **property DAG** that decouples questions from risk
 
 - **Properties** (`form/properties.yaml`) — Boolean nodes forming a DAG. Each has an `id`, `description`, optional `parents`, and an `activation` mode (`"all"` or `"any"`). A property is `true` when its question is answered "yes" **and** its parent conditions are met. Properties with no parents are root nodes.
 
-- **Questions** (`form/sections.yaml`) — Currently all `binary` (yes/no). Each question sets one or more properties via its `properties` field. Question visibility is derived automatically from the property DAG — a question is shown when at least one of its target properties is reachable (i.e. the property's parents satisfy the activation mode).
+- **Questions** (`form/sections.yaml`) — Two types are supported. **Binary** questions (yes/no) set one or more properties via their `properties` field. **Detail** questions (`type: detail`) reference a `Detail` by `detail_id` and store free-text input in `details[detail_id]` — they don't set property state, but their visibility tracks the referenced detail's properties (copied at parse time). Question visibility is derived automatically from the property DAG — a question is shown when at least one of its target properties is reachable (i.e. the property's parents satisfy the activation mode).
+
+- **Details** (`form/details.yaml`) — Contextual topics keyed by id, each linked to one or more properties. A `DetailQuestion` writes the user's free-text input to `details[detail_id]`; the value is then surfaced in any risk card whose conditions touch one of the detail's properties (under the "Context" section), so contextual notes follow the property graph rather than being hard-wired to a specific risk.
 
 - **Risks** (`form/risks.yaml`) — Each risk has `conditions` (a list of `ConditionMapping`). Each condition checks a set of properties (via `mode: "any"` or `"all"`) and contributes a `{likelihood, consequence}` pair when the check passes. When multiple conditions fire, **worst-case-wins** per dimension independently. When no conditions fire, the risk level is `"not_applicable"`. Conditions are compiled to JS expressions at build time via `to_js()`.
 
-- **Controls** (`form/controls.yaml`) — Safeguards linked to a single property. A control is "present" when its property is `true`. Each control has `effects` listing which risks it addresses (via `risk_id`). Controls do **not** automatically reduce risk — the assessor judges their collective effectiveness per risk at assessment time (see "Residual risk" below).
+- **Controls** (`form/controls.yaml`) — Safeguards linked to a single property. A control is "present" when its property is `true`. Each control has `effects` listing which risks it addresses (via `risk_id`). Controls do **not** automatically reduce risk — the assessor judges their collective effectiveness per risk at assessment time (see "Residual risk" below). For risks where a control is *not* currently present, the risk card surfaces a "Mandate Controls" checkbox and free-text comment so the assessor can record that the control should be implemented and how.
 
-- **Residual risk** (assessor input at runtime) — For every risk where inherent level is not `not_applicable`, the assessor picks a **control effectiveness**: `ineffective` (default — residual equals inherent), `partial` (assessor picks residual likelihood and consequence independently; level is computed from the matrix), or `controlled` (residual level is the dedicated `controlled` level). A single "Residual Risk Justification" textarea captures the reasoning. State lives in `control_effectiveness`, `residual_likelihood`, `residual_consequence`, and `justifications` on the Alpine scope and is included in the assessment export.
+- **Residual risk** (assessor input at runtime) — For every risk where inherent level is not `not_applicable`, the assessor picks a **control effectiveness**: `ineffective` (default — residual equals inherent), `partial` (assessor picks residual likelihood and consequence independently; level is computed from the matrix), or `controlled` (residual level is the dedicated `controlled` level). A single "Residual Risk Justification" textarea captures the reasoning. State lives in `control_effectiveness`, `residual_likelihood`, `residual_consequence`, `justifications`, `mandated_controls`, and `mandated_comments` on the Alpine scope and is included in the assessment export.
 
-The data flow is: **Questions → Properties → Risks / Controls**.
+The data flow is: **Questions → Properties → Risks / Controls / Details**.
 
 ### Key files
 
 | File | Purpose |
 |---|---|
-| `config.py` | Project paths, risk scales (`LIKELIHOODS`, `CONSEQUENCES`, `RISK_LEVELS`), and `RISK_MATRIX` lookup table |
-| `models.py` | Frozen dataclasses: `BinaryQuestion`, `Property`, `ConditionMapping`, `Risk`, `Control`, `ControlEffect`, `Section`, `SubSection` |
-| `parse.py` | YAML → dataclass parsing (one `load_*` function per YAML file) plus validation functions |
-| `render.py` | Jinja2 environment, `prepare_properties()`, `prepare_sections()`, `prepare_risks()`, `prepare_controls()`, `render_form()`, and `render_app_js()` |
+| `config.py` | Project paths, risk scales (`LIKELIHOODS`, `CONSEQUENCES`, `RISK_LEVELS`), `RISK_LEVEL_COLOURS`, and `RISK_MATRIX` lookup table |
+| `models.py` | Frozen dataclasses: `BinaryQuestion`, `DetailQuestion`, `Property`, `ConditionMapping`, `Risk`, `Control`, `ControlEffect`, `Detail`, `Section`, `SubSection` |
+| `parse.py` | YAML → dataclass parsing (one `load_*` function per YAML file), id/combinator validation, and `validate_all()` orchestrator |
+| `render.py` | Jinja2 environment, view dataclasses (`SectionView`, `RiskView`, `DetailView`, …), `_compile_property_getter`, `_compile_question_visibility`, `_build_template_context`, `render_form()`, and `render_app_js()` |
 | `main.py` | Build orchestrator — loads YAML, validates, renders HTML + `app.js`, copies assets |
-| `form/*.yaml` | Form definitions: `sections.yaml`, `properties.yaml`, `risks.yaml`, `controls.yaml` |
-| `templates/page.html.j2` | Page skeleton with tab navigation and Alpine bindings (`x-data="app"`, `x-show`, `x-model`); no component body |
-| `templates/app.js.j2` | Alpine factory: `Alpine.data('app', () => ({...}))` with state, methods, and compiled property/control/risk getters |
+| `form/*.yaml` | Form definitions: `sections.yaml`, `properties.yaml`, `risks.yaml`, `controls.yaml`, `details.yaml` |
+| `templates/page.html.j2` | Page skeleton with tab navigation (sections + Risk Analysis + Debug), Alpine bindings (`x-data="app"`, `x-show`, `x-model`); no component body |
+| `templates/app.js.j2` | Alpine factory: `Alpine.data('app', () => ({...}))` with state, save/load helpers, `init()` migration pass, and compiled property/control/risk getters |
 | `templates/subsection.html.j2` | Sub-section partial — heading + question loop |
 | `templates/question.html.j2` | Dispatcher — includes `questions/{type}.html.j2` |
 | `templates/questions/binary.html.j2` | Binary (yes/no) question partial |
-| `templates/risk_summary.html.j2` | Risk card partial with colour-coded level badge |
+| `templates/questions/detail.html.j2` | Free-text question partial (binds to `details[detail_id]`) |
+| `templates/risk_summary.html.j2` | Risk card partial with colour-coded level badge, controls, mandated-control checkboxes, context, and residual-risk inputs |
 | `templates/save_load.html.j2` | Reusable save/load button bar partial |
 | `input.css` | Custom CSS: tabs, badges, risk grid, spacing stacks, etc. |
 
 ### Adding a new question type
 
-1. **`models.py`** — Add a frozen dataclass with `id: str`, `text: str`, `properties: tuple[str, ...]`, any type-specific fields, and a `type: str = field(default="my_type", init=False)` discriminator. Add the class to the `Question` union type alias.
-2. **`parse.py`** — Add a `case` branch in `parse_question()` to construct the new dataclass from YAML dicts.
-3. **`templates/questions/my_type.html.j2`** — Create a Jinja2 partial for the new type. Use `x-model="answers.{{ question.id }}"` to bind to Alpine.js state.
-4. **`templates/app.js.j2`** — If the new type needs a non-string default (like `[]` for arrays), adjust the `answers` seed loop in the factory.
+The existing `binary` and `detail` question types illustrate the pattern; use them as references.
 
-No changes needed to `question.html.j2`, `subsection.html.j2`, `render.py`, or the build pipeline — the dispatcher and renderer work generically.
+1. **`models.py`** — Add a frozen dataclass with `id: str`, `text: str`, `properties: tuple[str, ...]`, any type-specific fields, and a `type: Literal["my_type"] = field(default="my_type", init=False)` discriminator. Add the class to the `Question` union type alias.
+2. **`parse.py`** — Add a `case` branch in `parse_question()` (with an `_check_unknown_keys` guard listing the allowed YAML keys) to construct the new dataclass.
+3. **`templates/questions/my_type.html.j2`** — Create a Jinja2 partial for the new type. Bind to whatever Alpine state the type writes (`answers.<id>` for binary-style, `details[<detail_id>]` for the detail type, etc.).
+4. **`render.py`** — If the new type carries fields the templates need beyond `id`/`text`/`type`/`guidance`, add them to `QuestionView` and `_build_question_view`. Also extend `_build_template_context` if the type contributes to property state (see how `BinaryQuestion` is filtered into `question_for_prop`).
+5. **`templates/app.js.j2`** — If the new type needs a non-string default or a separate state map (like `details`), seed it in the factory and back-fill it in `init()`.
+
+No changes needed to `question.html.j2` or `subsection.html.j2` — the dispatcher works generically off the question's `type` field.
 
 ### Adding a new risk or control
 
@@ -117,9 +116,13 @@ New risks and controls automatically appear in the Risk Analysis tab — no code
 
 Add an entry to `form/properties.yaml` with `id`, `description`, and optionally `parents` (list of property IDs) and `activation` (`"all"` or `"any"`, default `"all"`). Then create a question in `form/sections.yaml` whose `properties` field includes the new property ID.
 
+### Adding a new detail
+
+Add an entry to `form/details.yaml` with `id`, `description`, and `properties` (list of property IDs that gate when the detail is shown in risk cards). Then add a `type: detail` question to `form/sections.yaml` referencing it via `detail_id`.
+
 ### Form structure
 
-Forms are organised into **Sections** (rendered as tabs) and **SubSections** (visual groupings within a section), defined in `form/sections.yaml`. Section `id` values are used as Alpine.js tab identifiers — keep them as simple slugs. The Risk Analysis tab (red accent, right-aligned) is always present and not defined in the sections list.
+Forms are organised into **Sections** (rendered as tabs) and **SubSections** (visual groupings within a section), defined in `form/sections.yaml`. Section `id` values are used as Alpine.js tab identifiers — keep them as simple slugs. The Risk Analysis tab (right-aligned) and Debug tab are always present and not defined in the sections list.
 
 ### Bulma CSS conventions
 
@@ -158,23 +161,6 @@ The layers are complementary: a refactor that preserves semantics but changes th
 
 All generated files go to `output/` (gitignored): `index.html`, `app.js`, `bulma.min.css`, `input.css`, `alpine3.15.8.min.js`, `alpine-persist.min.js`.
 
-### Spec Editor
+### Spec editor (removed)
 
-The spec editor (`editor/`) is a separate GUI tool for creating and editing the YAML specification files. It is a React + TypeScript frontend backed by a FastAPI Python backend.
-
-| Directory | Purpose |
-|---|---|
-| `editor/backend/` | FastAPI API: reads/writes YAML, runs validation via `parse.py`, triggers rebuilds via `main.py` |
-| `editor/frontend/` | React + TypeScript + Vite app with shadcn/ui and @xyflow/react for DAG visualisation |
-| `run_editor.py` | Entry point — starts the uvicorn backend on port 8000 |
-
-**API endpoints** (all under `/api`):
-- `GET /spec` — load entire spec as JSON
-- `PUT /spec` — validate then write YAML (rejects if invalid)
-- `POST /validate` — validate without writing (used for real-time feedback)
-- `POST /rebuild` — rebuild the static site
-
-**Key design decisions**:
-- All domain validation stays in Python — the backend wraps the existing `parse.py` validators. No client-side validation logic duplication.
-- The entire spec is sent/received as a single JSON payload (bulk API) since cross-file references make per-entity validation meaningless.
-- The DAG page uses `@xyflow/react` with `dagre` for auto-layout. It is read-only; clicking a node navigates to its edit form.
+There is an `editor/` directory and a `run_editor.py` shim left over from a previous spec-editor experiment, but the editor's source files (FastAPI backend and React frontend) have been removed. `run_editor.py` will not run as-is. Treat the directory as dormant; YAML is currently hand-edited.
