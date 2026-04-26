@@ -1,0 +1,46 @@
+{# Read-only summary of the loaded questionnaire answers.
+   Walks the same SectionView tree as the questionnaire, but renders each
+   visible question as a "Q / A" pair. Visibility expressions match the
+   questionnaire so empty / hidden branches collapse identically. #}
+<div class="answers-summary">
+  {% for section in sections %}
+  {% set always_visible_subs = section.subsections | selectattr("visibility_js", "equalto", "true") | list %}
+  <section
+    class="answers-summary-section"
+    {% if not always_visible_subs and section.subsections %}
+    x-show="{% for sub in section.subsections %}({{ sub.visibility_js }}){% if not loop.last %} || {% endif %}{% endfor %}"
+    {% endif %}
+  >
+    <h3 class="title is-5">{{ section.title }}</h3>
+    {% for sub in section.subsections %}
+    <div
+      class="answers-summary-subsection"
+      {% if sub.visibility_js != "true" %}x-show="{{ sub.visibility_js }}"{% endif %}
+    >
+      <h4 class="title is-6">{{ sub.title }}</h4>
+      <dl class="answers-summary-list">
+        {% for q in sub.questions %}
+        <div
+          class="answers-summary-row"
+          {% if q.visibility_js != "true" %}x-show="{{ q.visibility_js }}"{% endif %}
+        >
+          <dt class="answers-summary-q">{{ q.text }}</dt>
+          {% if q.type == "binary" %}
+          <dd class="answers-summary-a">
+            <span x-text="answers['{{ q.id }}'] === 'yes' ? 'Yes' : answers['{{ q.id }}'] === 'no' ? 'No' : '—'"
+                  :class="answers['{{ q.id }}'] ? '' : 'answer-missing'"></span>
+          </dd>
+          {% elif q.type == "detail" %}
+          <dd class="answers-summary-a">
+            <span x-show="!details['{{ q.detail_id }}']" class="answer-missing">—</span>
+            <span x-show="details['{{ q.detail_id }}']" x-text="details['{{ q.detail_id }}']" class="answers-summary-detail"></span>
+          </dd>
+          {% endif %}
+        </div>
+        {% endfor %}
+      </dl>
+    </div>
+    {% endfor %}
+  </section>
+  {% endfor %}
+</div>

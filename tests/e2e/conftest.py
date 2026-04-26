@@ -48,8 +48,31 @@ def browser_context_args(browser_context_args: dict) -> dict:
     return {**browser_context_args, "accept_downloads": True}
 
 
+def _wait_for_factory(page: Page, name: str) -> None:
+    page.wait_for_function(f"() => !!document.querySelector('[x-data={name}]')?._x_dataStack?.[0]")
+
+
 @pytest.fixture
-def app_page(page: Page, site_url: str) -> Page:
-    page.goto(site_url)
-    page.wait_for_function("() => !!document.querySelector('[x-data=app]')?._x_dataStack?.[0]")
+def landing_page(page: Page, site_url: str) -> Page:
+    page.goto(f"{site_url}/index.html")
+    return page
+
+
+@pytest.fixture
+def questionnaire_page(page: Page, site_url: str) -> Page:
+    page.goto(f"{site_url}/questionnaire.html")
+    _wait_for_factory(page, "questionnaire")
+    return page
+
+
+@pytest.fixture
+def assessment_page(page: Page, site_url: str) -> Page:
+    page.goto(f"{site_url}/assessment.html")
+    _wait_for_factory(page, "assessment")
+    return page
+
+
+@pytest.fixture
+def registry_page(page: Page, site_url: str) -> Page:
+    page.goto(f"{site_url}/registry.html")
     return page

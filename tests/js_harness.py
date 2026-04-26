@@ -1,28 +1,30 @@
 # pyright: reportReturnType=false, reportCallIssue=false, reportArgumentType=false
-"""Test harness that evaluates the compiled Alpine factory in-process.
+"""Test harness that evaluates a compiled Alpine factory in-process.
 
-`render_app_js()` emits a standalone JS file that registers the Alpine
-component factory via `Alpine.data('app', factory)` inside an `alpine:init`
-event listener. This harness stubs `Alpine` and `document.addEventListener`
-so the factory is captured, then invokes it to obtain a plain scope object
-whose `prop_*`, `ctrl_*`, and risk getters can be exercised directly against
-the `answers` / `details` / `control_effectiveness` state.
+`render_questionnaire_app_js()` and `render_assessment_app_js()` each emit a
+standalone JS file that registers a factory via `Alpine.data(name, factory)`
+inside an `alpine:init` event listener. This harness stubs `Alpine` and
+`document.addEventListener` so the factory is captured, then invokes it to
+obtain a plain scope object.
 
-The substring-based tests in `test_render.py` and `test_models.py` pin the
-compiler shape; this module lets tests assert on what the compiled code
-*does* at runtime.
+The questionnaire factory exposes `prop_*` getters and answers/details state.
+The assessment factory exposes those plus `ctrl_*`, risk, and residual
+getters and the assessment state (`control_effectiveness`, residual_*,
+justifications, mandated_*). Tests choose the factory whose surface they
+want to drive.
 """
 
 from __future__ import annotations
 
 import json
 import re
+from collections.abc import Callable
 from typing import Any
 
 from py_mini_racer import MiniRacer
 
 from models import Control, Detail, Property, Risk, Section
-from render import render_app_js
+from render import render_assessment_app_js, render_questionnaire_app_js
 
 _BOOTSTRAP_JS = """
 const __state = { factory: null };
@@ -99,22 +101,11 @@ class Scope:
         return self._ctx.eval(expr)
 
 
-def build_scope(
-    sections: list[Section],
-    properties: list[Property],
-    risks: list[Risk],
-    controls: list[Control] | None = None,
-    details: list[Detail] | None = None,
-    persisted_state: dict[str, object] | None = None,
+def _build(
+    render: Callable[[], str],
+    persisted_state: dict[str, object] | None,
 ) -> Scope:
-    """Compile the Alpine factory for the given form and return a live Scope.
-
-    `persisted_state` maps `$persist` keys (e.g. `'_x_answers'`) to the value
-    that would be restored from `localStorage`. Unset keys fall back to the
-    factory seed. After the scope is constructed, `scope.init()` is invoked
-    so the post-hydration migration pass runs before readers see state.
-    """
-    app_js = render_app_js(sections, risks, controls, properties, details)
+    app_js = render()
     ctx = MiniRacer()
     ctx.eval(_BOOTSTRAP_JS)
     if persisted_state is not None:
@@ -123,3 +114,42 @@ def build_scope(
     ctx.eval("var scope = __state.factory();")
     ctx.eval("if (typeof scope.init === 'function') scope.init();")
     return Scope(ctx)
+
+
+def build_questionnaire_scope(
+    sections: list[Section],
+    properties: list[Property],
+    details: list[Detail] | None = None,
+    persisted_state: dict[str, object] | None = None,
+) -> Scope:
+    """Compile the questionnaire Alpine factory and return a live Scope.
+
+    `persisted_state` maps `$persist` keys (e.g. `'_x_q_answers'`) to the
+    value that would be restored from `localStorage`. Unset keys fall back
+    to the factory seed. After the scope is constructed, `scope.init()` is
+    invoked so the post-hydration migration pass runs before readers see
+    state.
+    """
+    return _build(
+        lambda: render_questionnaire_app_js(sections, properties=properties, details=details),
+        persisted_state,
+    )
+
+
+def build_assessment_scope(
+    sections: list[Section],
+    properties: list[Property],
+    risks: list[Risk] | None = None,
+    controls: list[Control] | None = None,
+    details: list[Detail] | None = None,
+    persisted_state: dict[str, object] | None = None,
+) -> Scope:
+    """Compile the assessment Alpine factory and return a live Scope.
+
+    Persistence keys for the assessment factory are prefixed `_x_a_*`
+    (e.g. `_x_a_answers`, `_x_a_control_effectiveness`).
+    """
+    return _build(
+        lambda: render_assessment_app_js(sections, risks or [], controls, properties, details),
+        persisted_state,
+    )

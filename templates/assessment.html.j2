@@ -3,64 +3,91 @@
   <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
-    <title>FormGen</title>
+    <title>Assessment — FormGen</title>
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
     <link href="https://fonts.googleapis.com/css2?family=Lora:ital,wght@0,400;0,600;0,700;1,400&family=Source+Sans+3:wght@300;400;500;600&display=swap" rel="stylesheet" />
     <link rel="stylesheet" href="bulma.min.css" />
     <link rel="stylesheet" href="input.css" />
     <script defer src="alpine-persist.min.js"></script>
-    <script defer src="app.js"></script>
+    <script defer src="app-assessment.js"></script>
     <script defer src="alpine3.15.8.min.js"></script>
   </head>
-  <body>
+  <body class="persona-assessment">
     <main class="container">
-      <h1 class="title is-3">FormGen</h1>
+      <header class="page-header">
+        <p class="page-eyebrow"><a href="index.html">← FormGen</a></p>
+        <h1 class="title is-3">Assessment</h1>
+        <p class="subtitle is-5">For risk assessors. Judge the risks.</p>
+      </header>
 
-      <div x-data="app">
+      <div x-data="assessment">
         {# ── Tab navigation ── #}
         <div class="tabs is-boxed">
           <ul>
-            {% for section in sections %}
-            <li :class="activeTab === '{{ section.id }}' && 'is-active'">
-              <a @click="activeTab = '{{ section.id }}'">{{ section.title }}</a>
-            </li>
-            {% endfor %}
-            <li class="tab-spacer"></li>
-            <li class="tab-risk" :class="activeTab === 'risks' && 'is-active'">
+            <li :class="activeTab === 'risks' && 'is-active'">
               <a @click="activeTab = 'risks'">Risk Analysis</a>
             </li>
+            <li :class="activeTab === 'answers' && 'is-active'">
+              <a @click="activeTab = 'answers'">Loaded Answers</a>
+            </li>
+            <li class="tab-spacer"></li>
             <li class="tab-debug" :class="activeTab === 'debug' && 'is-active'">
               <a @click="activeTab = 'debug'">Debug</a>
             </li>
           </ul>
         </div>
 
-        {# ── Section tabs ── #}
-        {% for section in sections %}
-        <form x-show="activeTab === '{{ section.id }}'" class="stack-lg">
-          <p class="has-text-grey">{{ section.description }}</p>
-          {% for subsection in section.subsections %}
-          {% with subsection=subsection %}
-          {% include "subsection.html.j2" %}
+        {# ── Risks tab ── #}
+        <div x-show="activeTab === 'risks'" class="stack-md">
+          <div class="load-questionnaire-bar">
+            <p class="has-text-grey">
+              Load a questionnaire JSON exported by a system owner to populate
+              the risks below.
+            </p>
+            <div class="save-load-bar save-load-bar-import-only">
+              <button type="button" class="button is-light is-small" @click="$refs.answersFile.click()">
+                Load questionnaire
+              </button>
+              <input
+                type="file"
+                accept=".json"
+                x-ref="answersFile"
+                @change="importAnswers($event)"
+                hidden
+              />
+            </div>
+          </div>
+
+          {% if risks %}
+          {% for risk in risks %}
+          {% with risk=risk %}
+          {% include "risk_summary.html.j2" %}
           {% endwith %}
           {% endfor %}
-        </form>
-        {% endfor %}
-
-        {# ── Answers save/load (shared across all section tabs) ── #}
-        <div x-show="activeTab !== 'risks' && activeTab !== 'debug'">
-          {% with export_fn="exportAnswers", import_fn="importAnswers", import_ref="answersFile", file_label="answers", clear_fn="clearAnswers", clear_label="Clear all" %}
+          {% with export_fn="exportAssessment", import_fn="importAssessment", import_ref="assessmentFile", file_label="assessment", clear_fn="clearAssessment", clear_label="Clear assessment" %}
           {% include "save_load.html.j2" %}
           {% endwith %}
+          {% else %}
+          <p>No risks defined.</p>
+          {% endif %}
+        </div>
+
+        {# ── Loaded answers (read-only summary) ── #}
+        <div x-show="activeTab === 'answers'" class="stack-md">
+          <p class="has-text-grey">
+            The system owner's answers, as loaded from their questionnaire
+            JSON. Read-only.
+          </p>
+          {% include "answers_summary.html.j2" %}
         </div>
 
         {# ── Debug tab ── #}
         <div x-show="activeTab === 'debug'" class="debug-panel stack-md">
-          <h3 class="title is-5">Current Answers</h3>
+          <h3 class="title is-5">Loaded Answers</h3>
           <pre x-text="JSON.stringify(answers, null, 2)"></pre>
           {% if detail_ids %}
-          <h3 class="title is-5">Details</h3>
+          <h3 class="title is-5">Loaded Details</h3>
           <pre x-text="JSON.stringify(details, null, 2)"></pre>
           {% endif %}
           {% if property_getters %}
@@ -90,22 +117,6 @@
           <pre x-text="JSON.stringify(mandated_controls, null, 2)"></pre>
           <h3 class="title is-5">Mandated Comments</h3>
           <pre x-text="JSON.stringify(mandated_comments, null, 2)"></pre>
-          {% endif %}
-        </div>
-
-        {# ── Risks tab ── #}
-        <div x-show="activeTab === 'risks'" class="stack-md">
-          {% if risks %}
-          {% for risk in risks %}
-          {% with risk=risk %}
-          {% include "risk_summary.html.j2" %}
-          {% endwith %}
-          {% endfor %}
-          {% with export_fn="exportAssessment", import_fn="importAssessment", import_ref="assessmentFile", file_label="assessment", clear_fn="clearAssessment", clear_label="Clear assessment" %}
-          {% include "save_load.html.j2" %}
-          {% endwith %}
-          {% else %}
-          <p>No risks defined.</p>
           {% endif %}
         </div>
       </div>

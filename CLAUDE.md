@@ -82,11 +82,15 @@ If no status label is present, the item is approved and ready to work on.
 
 The build pipeline has three phases:
 
-1. **Python/Jinja2 (build time)** — `main.py` orchestrates the build. Form structure is defined in YAML files under `form/`, parsed by `parse.py` into frozen dataclasses from `models.py`. `render.py` converts them to dicts and renders `templates/page.html.j2` into static HTML.
+1. **Python/Jinja2 (build time)** — `main.py` orchestrates the build. Form structure is defined in YAML files under `form/`, parsed by `parse.py` into frozen dataclasses from `models.py`. `render.py` produces six output files: a landing page (`index.html`), three per-tool pages (`questionnaire.html`, `assessment.html`, `registry.html`), and two Alpine factories (`app-questionnaire.js`, `app-assessment.js`). The landing page links to the three tools but has no Alpine; the registry is a placeholder for now.
 
-2. **CSS (build time)** — `bulma.min.css` provides class-based styling (layout, typography, form controls, cards, tabs). `input.css` contains custom CSS for app-specific components (badges, risk grid, spacing stacks, etc.). Both are copied directly to `output/` — no compilation step needed.
+2. **CSS (build time)** — `bulma.min.css` provides class-based styling (layout, typography, form controls, cards, tabs). `input.css` contains custom CSS for app-specific components (badges, risk grid, spacing stacks, persona accents, landing-page tool cards, read-only answers summary). Both are copied directly to `output/` — no compilation step needed.
 
-3. **Alpine.js (runtime)** — The Alpine component is rendered from `templates/app.js.j2` into `output/app.js` (alongside `index.html`), which registers a factory via `Alpine.data('app', () => ({...}))` on the `alpine:init` event. The HTML carries only `<div x-data="app">`. The factory holds reactive `answers` / `details` / assessment state, computed property getters (`prop_*`), control getters (`ctrl_*`), and per-risk inherent and `<id>_residual` getters — all compiled from Python at build time. Each section renders as its own `<form>` shown/hidden via `x-show`. Question visibility is driven by the property DAG (questions are shown when their target properties are reachable). Risk getters re-evaluate automatically as answers change. Persisted state uses `Alpine.$persist(initial).as('_x_<field>')` so localStorage keys are stable across the component definition form. The factory's `init()` hook back-fills any newly-added question/detail/risk/control IDs whose persisted state predates them.
+3. **Alpine.js (runtime)** — Two Alpine factories are emitted, each registering a separate component via `Alpine.data(name, () => ({...}))` on the `alpine:init` event:
+   - **`app-questionnaire.js`** registers `'questionnaire'`. Carries `answers`, `details`, `activeTab`, and `prop_*` getters (for question visibility cascade). Persisted state lives under `_x_q_*` keys (e.g. `_x_q_answers`).
+   - **`app-assessment.js`** registers `'assessment'`. Carries `answers` + `details` (loaded from a questionnaire JSON), the assessment state (`control_effectiveness`, `residual_*`, `justifications`, `mandated_*`), plus `prop_*`, `ctrl_*`, risk, and residual getters. Persisted state lives under `_x_a_*` keys (e.g. `_x_a_control_effectiveness`).
+
+   The per-tool prefixes guarantee that questionnaire and assessment state never collide in the same browser. Each factory's `init()` hook back-fills any newly-added question/detail/risk/control IDs whose persisted state predates them. Risk getters re-evaluate automatically as answers change. Each section in the questionnaire renders as its own `<form>` shown/hidden via `x-show`; question visibility is driven by the property DAG.
 
 ### Core domain model
 
@@ -113,18 +117,23 @@ The data flow is: **Questions → Properties → Risks / Controls / Details**.
 | `config.py` | Project paths, risk scales (`LIKELIHOODS`, `CONSEQUENCES`, `RISK_LEVELS`), `RISK_LEVEL_COLOURS`, and `RISK_MATRIX` lookup table |
 | `models.py` | Frozen dataclasses: `BinaryQuestion`, `DetailQuestion`, `Property`, `ConditionMapping`, `Risk`, `Control`, `ControlEffect`, `Detail`, `Section`, `SubSection` |
 | `parse.py` | YAML → dataclass parsing (one `load_*` function per YAML file), id/combinator validation, and `validate_all()` orchestrator |
-| `render.py` | Jinja2 environment, view dataclasses (`SectionView`, `RiskView`, `DetailView`, …), `_compile_property_getter`, `_compile_question_visibility`, `_build_template_context`, `render_form()`, and `render_app_js()` |
-| `main.py` | Build orchestrator — loads YAML, validates, renders HTML + `app.js`, copies assets |
+| `render.py` | Jinja2 environment, view dataclasses (`SectionView`, `RiskView`, `DetailView`, …), `_compile_property_getter`, `_compile_question_visibility`, `_build_template_context`, and the per-tool render functions: `render_landing()`, `render_questionnaire()`, `render_assessment()`, `render_registry()`, `render_questionnaire_app_js()`, `render_assessment_app_js()` |
+| `main.py` | Build orchestrator — loads YAML, validates, renders the four pages and two factories, copies assets |
 | `form/*.yaml` | Form definitions: `sections.yaml`, `properties.yaml`, `risks.yaml`, `controls.yaml`, `details.yaml` |
-| `templates/page.html.j2` | Page skeleton with tab navigation (sections + Risk Analysis + Debug), Alpine bindings (`x-data="app"`, `x-show`, `x-model`); no component body |
-| `templates/app.js.j2` | Alpine factory: `Alpine.data('app', () => ({...}))` with state, save/load helpers, `init()` migration pass, and compiled property/control/risk getters |
+| `templates/landing.html.j2` | Landing page (`index.html`): intro copy plus three tool cards. No Alpine. |
+| `templates/questionnaire.html.j2` | Questionnaire page skeleton with section tabs + Debug. `x-data="questionnaire"`. |
+| `templates/assessment.html.j2` | Assessment page skeleton: load-questionnaire bar, risk cards, read-only answers summary, Debug. `x-data="assessment"`. |
+| `templates/registry.html.j2` | Registry placeholder page — no Alpine, no form data. |
+| `templates/answers_summary.html.j2` | Read-only walk over the section/subsection/question tree, used inside the assessment page to surface the loaded answers. Inherits visibility from the questionnaire. |
+| `templates/app-questionnaire.js.j2` | Alpine factory for the questionnaire view: state, save/load helpers, `init()` migration pass, and compiled `prop_*` getters. |
+| `templates/app-assessment.js.j2` | Alpine factory for the assessment view: questionnaire state plus assessment state, save/load helpers, and `prop_*` / `ctrl_*` / risk / residual getters. |
 | `templates/subsection.html.j2` | Sub-section partial — heading + question loop |
 | `templates/question.html.j2` | Dispatcher — includes `questions/{type}.html.j2` |
 | `templates/questions/binary.html.j2` | Binary (yes/no) question partial |
 | `templates/questions/detail.html.j2` | Free-text question partial (binds to `details[detail_id]`) |
 | `templates/risk_summary.html.j2` | Risk card partial with colour-coded level badge, controls, mandated-control checkboxes, context, and residual-risk inputs |
 | `templates/save_load.html.j2` | Reusable save/load button bar partial |
-| `input.css` | Custom CSS: tabs, badges, risk grid, spacing stacks, etc. |
+| `input.css` | Custom CSS: tabs, badges, risk grid, spacing stacks, persona accents, landing-page tool cards, answers-summary list. |
 
 ### Adding a new question type
 
@@ -134,7 +143,8 @@ The existing `binary` and `detail` question types illustrate the pattern; use th
 2. **`parse.py`** — Add a `case` branch in `parse_question()` (with an `_check_unknown_keys` guard listing the allowed YAML keys) to construct the new dataclass.
 3. **`templates/questions/my_type.html.j2`** — Create a Jinja2 partial for the new type. Bind to whatever Alpine state the type writes (`answers.<id>` for binary-style, `details[<detail_id>]` for the detail type, etc.).
 4. **`render.py`** — If the new type carries fields the templates need beyond `id`/`text`/`type`/`guidance`, add them to `QuestionView` and `_build_question_view`. Also extend `_build_template_context` if the type contributes to property state (see how `BinaryQuestion` is filtered into `question_for_prop`).
-5. **`templates/app.js.j2`** — If the new type needs a non-string default or a separate state map (like `details`), seed it in the factory and back-fill it in `init()`.
+5. **`templates/app-questionnaire.js.j2` and `templates/app-assessment.js.j2`** — If the new type needs a non-string default or a separate state map (like `details`), seed it in both factories and back-fill it in their `init()` hooks. Both factories carry `answers` and `details`, so type-specific seeding usually applies to both.
+6. **`templates/answers_summary.html.j2`** — Add a branch to display the new question type's answer (read-only) inside the assessment view's loaded-answers panel. The existing `binary` and `detail` branches show the pattern.
 
 No changes needed to `question.html.j2` or `subsection.html.j2` — the dispatcher works generically off the question's `type` field.
 
@@ -144,7 +154,7 @@ To add a new **risk**, add an entry to `form/risks.yaml` with `id`, `description
 
 To add a new **control**, add an entry to `form/controls.yaml` with `id`, `description`, `property` (the property ID that activates it), and `effects` (the list of risks this control addresses, each as `{risk_id: ...}`).
 
-New risks and controls automatically appear in the Risk Analysis tab — no code changes needed.
+New risks and controls automatically appear in the assessment view — no code changes needed.
 
 ### Adding a new property
 
@@ -156,7 +166,7 @@ Add an entry to `form/details.yaml` with `id`, `description`, and `properties` (
 
 ### Form structure
 
-Forms are organised into **Sections** (rendered as tabs) and **SubSections** (visual groupings within a section), defined in `form/sections.yaml`. Section `id` values are used as Alpine.js tab identifiers — keep them as simple slugs. The Risk Analysis tab (right-aligned) and Debug tab are always present and not defined in the sections list.
+Forms are organised into **Sections** (rendered as tabs in the questionnaire view) and **SubSections** (visual groupings within a section), defined in `form/sections.yaml`. Section `id` values are used as Alpine.js tab identifiers — keep them as simple slugs. The Debug tab is always present in the questionnaire and assessment views and is not defined in the sections list. Risk content lives on the assessment view, not as a tab inside the questionnaire.
 
 ### Bulma CSS conventions
 
@@ -169,11 +179,11 @@ Templates use Bulma's class-based styling:
 - `.button.is-primary` / `.button.is-light` for action buttons
 - `.title` / `.subtitle` / `.has-text-grey` for typography
 
-Custom classes in `input.css` handle app-specific components: `.badge-{color}`, `.risk-grid`, `.control-row`, `.stack-{lg,md,sm}`, `.options-{row,col}`, `.assessed-row`, `.linked-answer`, `.debug-panel`.
+Custom classes in `input.css` handle app-specific components: `.badge-{color}`, `.risk-grid`, `.control-row`, `.stack-{lg,md,sm}`, `.options-{row,col}`, `.assessed-row`, `.linked-answer`, `.debug-panel`, `.tool-card`, `.persona-{landing,questionnaire,assessment,registry}`, `.answers-summary*`, `.load-questionnaire-bar`.
 
 ### Gotcha: Jinja2 autoescape and JS templates
 
-`create_environment()` in `render.py` enables autoescape for `.html` / `.html.j2` / `.htm` / `.xml` templates and disables it everywhere else (including `.js.j2`). This lets `app.js.j2` emit compiled JS directly without HTML entities creeping in. If you ever inline JS expressions back into an HTML attribute (anywhere outside `app.js.j2`), you still cannot use `|tojson` / `|safe` there — pre-serialise with `json.dumps()` in Python and pass as plain string context variables, same pattern as `likelihoods_js` in `render.py`.
+`create_environment()` in `render.py` enables autoescape for `.html` / `.html.j2` / `.htm` / `.xml` templates and disables it everywhere else (including `.js.j2`). This lets the `app-questionnaire.js.j2` and `app-assessment.js.j2` templates emit compiled JS directly without HTML entities creeping in. If you ever inline JS expressions back into an HTML attribute (anywhere outside the `.js.j2` templates), you still cannot use `|tojson` / `|safe` there — pre-serialise with `json.dumps()` in Python and pass as plain string context variables, same pattern as `likelihoods_js` in `render.py`.
 
 ### Gotcha: pyright and untyped libraries
 
@@ -186,14 +196,14 @@ YAML parsing boundaries lack type stubs. Files that interact heavily with these 
 Three test layers coexist:
 
 - **Compiler-shape tests** — `tests/test_render.py` and `tests/test_models.py` assert on the substrings emitted by `_compile_property_getter`, `ConditionMapping.to_js`, and friends. They pin the generated code's *form*.
-- **Behaviour tests** — `tests/test_js_behaviour.py` uses `tests/js_harness.py` to evaluate the real `render_app_js()` output inside an embedded V8 context (`mini-racer`). Stubs for `Alpine.data` / `Alpine.$persist` / `document.addEventListener` capture the factory so `prop_*`, `ctrl_*`, risk and residual getters can be driven against in-memory `answers` / `details` / `control_effectiveness` fixtures. They pin the generated code's *semantics*.
-- **End-to-end tests** — `tests/e2e/` uses Playwright to drive real Chromium against a built copy of the site served over `http.server`. Covers save/load (Blob downloads, FileReader imports, confirm/alert dialogs) which mini-racer can't stub. Marked `@pytest.mark.e2e`; run `uv run playwright install chromium` once after installing dev deps. Skip during tight dev loops with `-m "not e2e"`.
+- **Behaviour tests** — `tests/test_js_behaviour.py` uses `tests/js_harness.py` to evaluate the real `render_questionnaire_app_js()` / `render_assessment_app_js()` output inside an embedded V8 context (`mini-racer`). Stubs for `Alpine.data` / `Alpine.$persist` / `document.addEventListener` capture either factory so `prop_*`, `ctrl_*`, risk and residual getters can be driven against in-memory `answers` / `details` / `control_effectiveness` fixtures. The harness exposes `build_questionnaire_scope()` and `build_assessment_scope()`; tests pick whichever surface they need (the assessment factory is a strict superset). They pin the generated code's *semantics*.
+- **End-to-end tests** — `tests/e2e/` uses Playwright to drive real Chromium against a built copy of the site served over `http.server`. Each per-tool page has its own fixture (`landing_page`, `questionnaire_page`, `assessment_page`, `registry_page`); `scope_selector("questionnaire" | "assessment")` returns the JS expression that picks the live Alpine scope on whichever page the test is currently driving. Covers save/load (Blob downloads, FileReader imports, confirm/alert dialogs) and landing → tool navigation, which mini-racer can't stub. Marked `@pytest.mark.e2e`; run `uv run playwright install chromium` once after installing dev deps. Skip during tight dev loops with `-m "not e2e"`.
 
 The layers are complementary: a refactor that preserves semantics but changes the emitted format breaks the first layer only; a refactor that preserves the format but flips a branch breaks the second only; a refactor to the save/load HTML wiring or browser-API usage breaks the third only. Write new tests in whichever layer matches what you're protecting against.
 
 ### Output
 
-All generated files go to `output/` (gitignored): `index.html`, `app.js`, `bulma.min.css`, `input.css`, `alpine3.15.8.min.js`, `alpine-persist.min.js`.
+All generated files go to `output/` (gitignored): `index.html` (landing), `questionnaire.html`, `assessment.html`, `registry.html`, `app-questionnaire.js`, `app-assessment.js`, `bulma.min.css`, `input.css`, `alpine3.15.8.min.js`, `alpine-persist.min.js`.
 
 ### Spec editor (removed)
 

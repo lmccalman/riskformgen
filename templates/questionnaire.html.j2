@@ -1,0 +1,79 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Questionnaire — FormGen</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link href="https://fonts.googleapis.com/css2?family=Lora:ital,wght@0,400;0,600;0,700;1,400&family=Source+Sans+3:wght@300;400;500;600&display=swap" rel="stylesheet" />
+    <link rel="stylesheet" href="bulma.min.css" />
+    <link rel="stylesheet" href="input.css" />
+    <script defer src="alpine-persist.min.js"></script>
+    <script defer src="app-questionnaire.js"></script>
+    <script defer src="alpine3.15.8.min.js"></script>
+  </head>
+  <body class="persona-questionnaire">
+    <main class="container">
+      <header class="page-header">
+        <p class="page-eyebrow"><a href="index.html">← FormGen</a></p>
+        <h1 class="title is-3">Questionnaire</h1>
+        <p class="subtitle is-5">For system owners. Describe your system.</p>
+      </header>
+
+      <div x-data="questionnaire">
+        {# ── Tab navigation ── #}
+        <div class="tabs is-boxed">
+          <ul>
+            {% for section in sections %}
+            <li :class="activeTab === '{{ section.id }}' && 'is-active'">
+              <a @click="activeTab = '{{ section.id }}'">{{ section.title }}</a>
+            </li>
+            {% endfor %}
+            <li class="tab-spacer"></li>
+            <li class="tab-debug" :class="activeTab === 'debug' && 'is-active'">
+              <a @click="activeTab = 'debug'">Debug</a>
+            </li>
+          </ul>
+        </div>
+
+        {# ── Section tabs ── #}
+        {% for section in sections %}
+        <form x-show="activeTab === '{{ section.id }}'" class="stack-lg">
+          <p class="has-text-grey">{{ section.description }}</p>
+          {% for subsection in section.subsections %}
+          {% with subsection=subsection %}
+          {% include "subsection.html.j2" %}
+          {% endwith %}
+          {% endfor %}
+        </form>
+        {% endfor %}
+
+        {# ── Answers save/load (shared across all section tabs) ── #}
+        <div x-show="activeTab !== 'debug'">
+          {% with export_fn="exportAnswers", import_fn="importAnswers", import_ref="answersFile", file_label="answers", clear_fn="clearAnswers", clear_label="Clear all" %}
+          {% include "save_load.html.j2" %}
+          {% endwith %}
+        </div>
+
+        {# ── Debug tab ── #}
+        <div x-show="activeTab === 'debug'" class="debug-panel stack-md">
+          <h3 class="title is-5">Current Answers</h3>
+          <pre x-text="JSON.stringify(answers, null, 2)"></pre>
+          {% if detail_ids %}
+          <h3 class="title is-5">Details</h3>
+          <pre x-text="JSON.stringify(details, null, 2)"></pre>
+          {% endif %}
+          {% if property_getters %}
+          <h3 class="title is-5">Property States</h3>
+          <pre x-text="JSON.stringify({
+            {% for prop in property_getters %}
+            '{{ prop.id }}': prop_{{ prop.id }}{% if not loop.last %},{% endif %}
+            {% endfor %}
+          }, null, 2)"></pre>
+          {% endif %}
+        </div>
+      </div>
+    </main>
+  </body>
+</html>

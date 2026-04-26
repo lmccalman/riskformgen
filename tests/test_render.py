@@ -18,8 +18,12 @@ from render import (
     _compile_property_getter,
     _compile_question_visibility,
     _detail_show_js,
-    render_app_js,
-    render_form,
+    render_assessment,
+    render_assessment_app_js,
+    render_landing,
+    render_questionnaire,
+    render_questionnaire_app_js,
+    render_registry,
 )
 
 # ---------------------------------------------------------------------------
@@ -154,31 +158,97 @@ class TestDetailShowJs:
 
 
 # ---------------------------------------------------------------------------
-# render_form / render_app_js — integration
+# Landing & registry pages — small, no Alpine
 # ---------------------------------------------------------------------------
 
 
-class TestRenderForm:
+class TestRenderLanding:
+    def test_returns_html(self):
+        html = render_landing()
+        assert isinstance(html, str)
+        assert len(html) > 0
+
+    def test_links_to_each_tool(self):
+        html = render_landing()
+        assert 'href="questionnaire.html"' in html
+        assert 'href="assessment.html"' in html
+        assert 'href="registry.html"' in html
+
+    def test_no_alpine(self):
+        html = render_landing()
+        assert "x-data" not in html
+
+
+class TestRenderRegistry:
+    def test_returns_html(self):
+        html = render_registry()
+        assert isinstance(html, str)
+        assert "Registry" in html
+
+    def test_no_alpine(self):
+        html = render_registry()
+        assert "x-data" not in html
+
+
+# ---------------------------------------------------------------------------
+# Questionnaire page integration
+# ---------------------------------------------------------------------------
+
+
+class TestRenderQuestionnaire:
     def test_returns_html(self, sample_sections, sample_properties):
-        html = render_form(sample_sections, [], properties=sample_properties)
+        html = render_questionnaire(sample_sections, properties=sample_properties)
         assert isinstance(html, str)
         assert len(html) > 0
 
     def test_contains_alpine_xdata(self, sample_sections, sample_properties):
-        html = render_form(sample_sections, [], properties=sample_properties)
-        assert 'x-data="app"' in html
+        html = render_questionnaire(sample_sections, properties=sample_properties)
+        assert 'x-data="questionnaire"' in html
+
+    def test_no_risk_analysis_tab(self, sample_sections, sample_properties):
+        # The questionnaire view must not surface risk content; that lives on
+        # the assessment page now.
+        html = render_questionnaire(sample_sections, properties=sample_properties)
+        assert "Risk Analysis" not in html
 
     def test_sections_appear_as_tabs(self, sample_sections, sample_properties):
-        html = render_form(sample_sections, [], properties=sample_properties)
+        html = render_questionnaire(sample_sections, properties=sample_properties)
         assert "sec1" in html
         assert "Section One" in html
 
-    def test_property_getters_in_html(self, sample_sections, sample_properties):
-        html = render_form(sample_sections, [], properties=sample_properties)
-        assert "prop_prop_a" in html
-        assert "prop_prop_b" in html
+    def test_property_getters_referenced(self, sample_sections, sample_properties):
+        # The questionnaire page references prop_* via x-show; the factory
+        # defines them.
+        js = render_questionnaire_app_js(sample_sections, properties=sample_properties)
+        assert "prop_prop_a" in js
+        assert "prop_prop_b" in js
 
-    def test_with_risks(self, sample_sections, sample_properties):
+    def test_back_link_to_landing(self, sample_sections, sample_properties):
+        html = render_questionnaire(sample_sections, properties=sample_properties)
+        assert 'href="index.html"' in html
+
+
+# ---------------------------------------------------------------------------
+# Assessment page integration
+# ---------------------------------------------------------------------------
+
+
+class TestRenderAssessment:
+    def test_returns_html(self, sample_sections, sample_properties, sample_risk):
+        html = render_assessment(sample_sections, [sample_risk], properties=sample_properties)
+        assert isinstance(html, str)
+        assert len(html) > 0
+
+    def test_contains_alpine_xdata(self, sample_sections, sample_properties):
+        html = render_assessment(sample_sections, [], properties=sample_properties)
+        assert 'x-data="assessment"' in html
+
+    def test_load_questionnaire_button(self, sample_sections, sample_properties):
+        html = render_assessment(sample_sections, [], properties=sample_properties)
+        assert "Load questionnaire" in html
+        assert 'x-ref="answersFile"' in html
+
+    def test_renders_risks(self, sample_sections, sample_properties):
         risk = Risk(
             id="r1",
             description="Test risk",
@@ -190,11 +260,11 @@ class TestRenderForm:
                 ),
             ),
         )
-        html = render_form(sample_sections, [risk], properties=sample_properties)
+        html = render_assessment(sample_sections, [risk], properties=sample_properties)
         assert "r1" in html
         assert "Test risk" in html
 
-    def test_with_controls(self, sample_sections, sample_control, sample_properties):
+    def test_renders_controls(self, sample_sections, sample_control, sample_properties):
         risk = Risk(
             id="r1",
             description="D",
@@ -206,17 +276,10 @@ class TestRenderForm:
                 ),
             ),
         )
-        html = render_form(sample_sections, [risk], [sample_control], sample_properties)
-        js = render_app_js(sample_sections, [risk], [sample_control], sample_properties)
+        html = render_assessment(sample_sections, [risk], [sample_control], sample_properties)
+        js = render_assessment_app_js(sample_sections, [risk], [sample_control], sample_properties)
         assert "Encryption enabled" in html
         assert "this.prop_prop_a === true" in js
-
-    def test_with_details(self, sample_sections, sample_properties, sample_detail):
-        js = render_app_js(
-            sample_sections, [], properties=sample_properties, details=[sample_detail]
-        )
-        assert "details:" in js
-        assert "det1" in js
 
     def test_detail_rendered_beside_relevant_risk(self, sample_sections, sample_properties):
         risk = Risk(
@@ -240,7 +303,7 @@ class TestRenderForm:
             description="Something else",
             properties=("prop_b",),
         )
-        html = render_form(
+        html = render_assessment(
             sample_sections,
             [risk],
             properties=sample_properties,
@@ -264,19 +327,81 @@ class TestRenderForm:
             ),
             guidance="Talk to the risk manager about the next steps.",
         )
-        html = render_form(sample_sections, [risk], properties=sample_properties)
+        html = render_assessment(sample_sections, [risk], properties=sample_properties)
         assert "Talk to the risk manager about the next steps." in html
 
     def test_risk_no_guidance_renders_no_help_block(
         self, sample_sections, sample_properties, sample_risk
     ):
         # sample_risk has no guidance — verify no orphan <p class="help"> from the
-        # risk card sneaks in (the question template uses the same class so we
-        # check for the wrapping <em> idiom specific to guidance copy).
-        html = render_form(sample_sections, [sample_risk], properties=sample_properties)
-        # The risk card body shouldn't contain an empty guidance paragraph.
+        # risk card sneaks in.
+        html = render_assessment(sample_sections, [sample_risk], properties=sample_properties)
         assert '<p class="help"><em></em></p>' not in html
 
+    def test_answers_summary_rendered(self, sample_sections, sample_properties, sample_risk):
+        # The assessment page includes a read-only summary of the loaded answers.
+        html = render_assessment(sample_sections, [sample_risk], properties=sample_properties)
+        assert "answers-summary" in html
+        # Question text from the section appears in the summary
+        assert "Is it risky?" in html
+
+
+# ---------------------------------------------------------------------------
+# Read-only answers summary — visibility wiring
+# ---------------------------------------------------------------------------
+
+
+class TestAnswersSummary:
+    def test_binary_question_renders_yes_no_dispatch(
+        self, sample_sections, sample_properties, sample_risk
+    ):
+        html = render_assessment(sample_sections, [sample_risk], properties=sample_properties)
+        # The summary should switch on the answer value, defaulting to '—'.
+        assert "answers['q_bin'] === 'yes'" in html
+        assert "Yes" in html
+        assert "No" in html
+
+    def test_detail_question_renders_detail_text(
+        self, sample_properties, sample_detail, detail_question
+    ):
+        sub = SubSection(title="Context", description="", questions=(detail_question,))
+        sec = Section(id="ctx", title="Context", description="", subsections=(sub,))
+        html = render_assessment([sec], [], properties=sample_properties, details=[sample_detail])
+        # Free-text answer comes from details[detail_id]
+        assert "details['det1']" in html
+
+    def test_subsection_visibility_propagates_to_summary(self):
+        # A subsection containing only a conditional question gets an x-show
+        # in the summary mirroring the questionnaire's gating.
+        props = [
+            Property(id="root", description="Root"),
+            Property(id="child", description="Child", parents=("root",)),
+        ]
+        q_root = BinaryQuestion(id="q_root", text="Root q", properties=("root",))
+        q_child = BinaryQuestion(id="q_child", text="Child q", properties=("child",))
+        sub = SubSection(title="Conditional", description="", questions=(q_child,))
+        always_sub = SubSection(title="Always", description="", questions=(q_root,))
+        sec = Section(id="s", title="S", description="", subsections=(always_sub, sub))
+        risk = Risk(
+            id="r1",
+            description="",
+            conditions=(
+                ConditionMapping(property="root", likelihood="rare", consequence="minor"),
+            ),
+        )
+        html = render_assessment([sec], [risk], properties=props)
+        # The conditional sub's wrapper inside the summary inherits the
+        # question-level visibility expression.
+        assert 'class="answers-summary-subsection"' in html
+        assert "prop_root === true" in html
+
+
+# ---------------------------------------------------------------------------
+# Detail-question guidance
+# ---------------------------------------------------------------------------
+
+
+class TestDetailQuestionGuidance:
     def test_detail_question_guidance_rendered(self, sample_properties, sample_detail):
         dq = DetailQuestion(
             id="q_det",
@@ -287,7 +412,7 @@ class TestRenderForm:
         )
         sub = SubSection(title="Context", description="", questions=(dq,))
         sec = Section(id="ctx", title="Context", description="", subsections=(sub,))
-        html = render_form([sec], [], properties=sample_properties, details=[sample_detail])
+        html = render_questionnaire([sec], properties=sample_properties, details=[sample_detail])
         assert "Describe the context." in html
         assert "Be specific about locations." in html
         assert "details['det1']" in html
@@ -305,7 +430,7 @@ class TestRenderedVisibility:
         q = BinaryQuestion(id="q1", text="Always", properties=("root",))
         sub = SubSection(title="S", description="", questions=(q,))
         sec = Section(id="s", title="S", description="", subsections=(sub,))
-        html = render_form([sec], [], properties=[root])
+        html = render_questionnaire([sec], properties=[root])
         # No conditional x-show wrapping an unconditional question.
         assert 'x-show="true"' not in html
 
@@ -315,7 +440,7 @@ class TestRenderedVisibility:
         q = BinaryQuestion(id="q1", text="Conditional", properties=("child",))
         sub = SubSection(title="S", description="", questions=(q,))
         sec = Section(id="s", title="S", description="", subsections=(sub,))
-        html = render_form([sec], [], properties=[root, child])
+        html = render_questionnaire([sec], properties=[root, child])
         assert 'x-show="(prop_root === true)"' in html
 
     def test_subsection_always_visible_when_any_question_is(self):
@@ -330,7 +455,7 @@ class TestRenderedVisibility:
         q_gc = BinaryQuestion(id="q_gc", text="Q grandchild", properties=("gc",))
         sub = SubSection(title="Mixed", description="", questions=(q_root, q_gc))
         sec = Section(id="s", title="S", description="", subsections=(sub,))
-        html = render_form([sec], [], properties=props)
+        html = render_questionnaire([sec], properties=props)
         # The subsection's opening <div class="box stack-md"> should have no x-show.
         assert '<div class="box stack-md">' in html
 
@@ -342,13 +467,13 @@ class TestRenderedVisibility:
         q = BinaryQuestion(id="q1", text="Q", properties=("child",))
         sub = SubSection(title="Conditional", description="", questions=(q,))
         sec = Section(id="s", title="S", description="", subsections=(sub,))
-        html = render_form([sec], [], properties=props)
+        html = render_questionnaire([sec], properties=props)
         # The subsection's <div class="box"> inherits the OR of its questions' conditions.
         assert '<div class="box stack-md" x-show="(prop_root === true)">' in html
 
 
 # ---------------------------------------------------------------------------
-# render_form — save/load export/import
+# render_questionnaire — save/load wiring
 # ---------------------------------------------------------------------------
 
 
@@ -370,110 +495,180 @@ def binary_properties():
 
 
 @pytest.fixture
-def binary_html(binary_sections, binary_properties):
-    return render_form(binary_sections, [], properties=binary_properties)
+def binary_questionnaire_html(binary_sections, binary_properties):
+    return render_questionnaire(binary_sections, properties=binary_properties)
 
 
 @pytest.fixture
-def binary_app_js(binary_sections, binary_properties):
-    return render_app_js(binary_sections, [], properties=binary_properties)
+def binary_questionnaire_js(binary_sections, binary_properties):
+    return render_questionnaire_app_js(binary_sections, properties=binary_properties)
 
 
-class TestRenderFormMetadata:
-    """Verify build-time metadata arrays are embedded in the Alpine app bundle."""
-
-    def test_question_ids_present(self, binary_app_js):
-        assert '_questionIds: ["q_bin", "q_bin2"]' in binary_app_js
-
-    def test_risk_ids_empty(self, binary_app_js):
-        assert "_riskIds: []" in binary_app_js
-
-    def test_control_ids_empty(self, binary_app_js):
-        assert "_controlIds: {}" in binary_app_js
+@pytest.fixture
+def binary_assessment_html(binary_sections, binary_properties):
+    return render_assessment(binary_sections, [], properties=binary_properties)
 
 
-class TestRenderFormSaveLoad:
+@pytest.fixture
+def binary_assessment_js(binary_sections, binary_properties):
+    return render_assessment_app_js(binary_sections, [], properties=binary_properties)
+
+
+class TestQuestionnaireMetadata:
+    """Build-time metadata arrays embedded in the questionnaire factory."""
+
+    def test_question_ids_present(self, binary_questionnaire_js):
+        assert '_questionIds: ["q_bin", "q_bin2"]' in binary_questionnaire_js
+
+    def test_no_risk_metadata(self, binary_questionnaire_js):
+        # The questionnaire factory must not carry risk-only state.
+        assert "_riskIds" not in binary_questionnaire_js
+        assert "control_effectiveness" not in binary_questionnaire_js
+
+
+class TestAssessmentMetadata:
+    """Build-time metadata arrays embedded in the assessment factory."""
+
+    def test_question_ids_present(self, binary_assessment_js):
+        assert '_questionIds: ["q_bin", "q_bin2"]' in binary_assessment_js
+
+    def test_risk_ids_empty(self, binary_assessment_js):
+        assert "_riskIds: []" in binary_assessment_js
+
+    def test_control_ids_empty(self, binary_assessment_js):
+        assert "_controlIds: {}" in binary_assessment_js
+
+
+class TestQuestionnaireSaveLoad:
     """Verify save/load buttons and file inputs are rendered."""
 
-    def test_answers_save_button_in_section(self, binary_html):
-        assert "exportAnswers()" in binary_html
-        assert "Save answers" in binary_html
+    def test_answers_save_button_in_section(self, binary_questionnaire_html):
+        assert "exportAnswers()" in binary_questionnaire_html
+        assert "Save answers" in binary_questionnaire_html
 
-    def test_answers_load_button_in_section(self, binary_html):
-        assert "importAnswers($event)" in binary_html
-        assert "Load answers" in binary_html
+    def test_answers_load_button_in_section(self, binary_questionnaire_html):
+        assert "importAnswers($event)" in binary_questionnaire_html
+        assert "Load answers" in binary_questionnaire_html
 
-    def test_no_assessment_buttons_without_risks(self, binary_sections, binary_properties):
-        html = render_form(binary_sections, [], properties=binary_properties)
-        assert "Save assessment" not in html
-        assert "Load assessment" not in html
+    def test_no_assessment_buttons(self, binary_questionnaire_html):
+        # Assessment-only buttons must not leak into the questionnaire surface.
+        assert "Save assessment" not in binary_questionnaire_html
+        assert "Load assessment" not in binary_questionnaire_html
 
-    def test_hidden_file_inputs_present(self, binary_html):
-        assert 'type="file"' in binary_html
-        assert 'accept=".json"' in binary_html
+    def test_hidden_file_inputs_present(self, binary_questionnaire_html):
+        assert 'type="file"' in binary_questionnaire_html
+        assert 'accept=".json"' in binary_questionnaire_html
 
 
-class TestRenderFormResidual:
+class TestAssessmentSaveLoad:
+    """The assessment view exports/imports assessment JSON, not answers JSON.
+    It does still import questionnaire JSON via a Load-questionnaire button."""
+
+    def test_assessment_export_button(self, sample_sections, sample_properties, sample_risk):
+        html = render_assessment(sample_sections, [sample_risk], properties=sample_properties)
+        assert "exportAssessment()" in html
+        assert "Save assessment" in html
+
+    def test_assessment_import_button(self, sample_sections, sample_properties, sample_risk):
+        html = render_assessment(sample_sections, [sample_risk], properties=sample_properties)
+        assert "importAssessment($event)" in html
+
+    def test_load_questionnaire_button(self, sample_sections, sample_properties, sample_risk):
+        html = render_assessment(sample_sections, [sample_risk], properties=sample_properties)
+        assert "importAnswers($event)" in html
+
+    def test_no_export_answers_button(self, sample_sections, sample_properties, sample_risk):
+        # The assessor doesn't export answers — that's the system owner's job.
+        html = render_assessment(sample_sections, [sample_risk], properties=sample_properties)
+        assert "exportAnswers" not in html
+
+
+class TestAssessmentResidual:
     """Verify the control-effectiveness / residual-risk wiring is emitted."""
 
     @pytest.fixture
     def risk_html(self, sample_sections, sample_properties, sample_risk):
-        return render_form(sample_sections, [sample_risk], properties=sample_properties)
+        return render_assessment(sample_sections, [sample_risk], properties=sample_properties)
 
     @pytest.fixture
-    def risk_app_js(self, sample_sections, sample_properties, sample_risk):
-        return render_app_js(sample_sections, [sample_risk], properties=sample_properties)
+    def risk_js(self, sample_sections, sample_properties, sample_risk):
+        return render_assessment_app_js(
+            sample_sections, [sample_risk], properties=sample_properties
+        )
 
-    def test_residual_getter_emitted_per_risk(self, risk_app_js):
-        assert "get r1_residual()" in risk_app_js
+    def test_residual_getter_emitted_per_risk(self, risk_js):
+        assert "get r1_residual()" in risk_js
 
     def test_controlled_level_in_colour_map(self, risk_html):
         assert "'controlled':" in risk_html
 
-    def test_effectiveness_state_seeded(self, risk_app_js):
-        assert "control_effectiveness: Alpine.$persist({" in risk_app_js
-        assert "residual_likelihood: Alpine.$persist({" in risk_app_js
-        assert "residual_consequence: Alpine.$persist({" in risk_app_js
-
-    def test_assessed_risks_state_removed(self, risk_html, risk_app_js):
-        assert "assessed_risks: Alpine.$persist" not in risk_app_js
-        assert "this.assessed_risks" not in risk_html
-        assert "this.assessed_risks" not in risk_app_js
+    def test_effectiveness_state_seeded(self, risk_js):
+        assert "control_effectiveness: Alpine.$persist({" in risk_js
+        assert "residual_likelihood: Alpine.$persist({" in risk_js
+        assert "residual_consequence: Alpine.$persist({" in risk_js
 
 
-class TestRenderAppJs:
-    """Smoke tests for render_app_js — the Alpine factory module."""
+# ---------------------------------------------------------------------------
+# render_*_app_js — factory smoke tests
+# ---------------------------------------------------------------------------
 
-    def test_registers_alpine_component(self, binary_app_js):
-        assert "alpine:init" in binary_app_js
-        assert "Alpine.data('app'" in binary_app_js
 
-    def test_no_html_autoescape_leaks(self, binary_app_js):
+class TestQuestionnaireAppJs:
+    def test_registers_alpine_component(self, binary_questionnaire_js):
+        assert "alpine:init" in binary_questionnaire_js
+        assert "Alpine.data('questionnaire'" in binary_questionnaire_js
+
+    def test_no_html_autoescape_leaks(self, binary_questionnaire_js):
         for entity in ("&#34;", "&#39;", "&quot;", "&amp;", "&gt;", "&lt;"):
-            assert entity not in binary_app_js, f"autoescape leak: {entity} in app.js"
+            assert entity not in binary_questionnaire_js, (
+                f"autoescape leak: {entity} in app-questionnaire.js"
+            )
 
-    def test_persist_keys_explicit(self, binary_app_js):
-        assert ".as('_x_activeTab')" in binary_app_js
-        assert ".as('_x_answers')" in binary_app_js
+    def test_persist_keys_prefixed(self, binary_questionnaire_js):
+        assert ".as('_x_q_activeTab')" in binary_questionnaire_js
+        assert ".as('_x_q_answers')" in binary_questionnaire_js
+        # Must not bleed into the unprefixed namespace
+        assert ".as('_x_answers')" not in binary_questionnaire_js
 
-    def test_property_getter_emitted(self, binary_app_js):
-        assert "get prop_p1()" in binary_app_js
-        assert "get prop_p2()" in binary_app_js
+    def test_property_getter_emitted(self, binary_questionnaire_js):
+        assert "get prop_p1()" in binary_questionnaire_js
+        assert "get prop_p2()" in binary_questionnaire_js
+
+
+class TestAssessmentAppJs:
+    def test_registers_alpine_component(self, binary_assessment_js):
+        assert "alpine:init" in binary_assessment_js
+        assert "Alpine.data('assessment'" in binary_assessment_js
+
+    def test_no_html_autoescape_leaks(self, binary_assessment_js):
+        for entity in ("&#34;", "&#39;", "&quot;", "&amp;", "&gt;", "&lt;"):
+            assert entity not in binary_assessment_js, (
+                f"autoescape leak: {entity} in app-assessment.js"
+            )
+
+    def test_persist_keys_prefixed(self, binary_assessment_js):
+        assert ".as('_x_a_activeTab')" in binary_assessment_js
+        assert ".as('_x_a_answers')" in binary_assessment_js
+        assert ".as('_x_a_control_effectiveness')" in binary_assessment_js
+        # Must not bleed into the questionnaire's namespace
+        assert ".as('_x_q_answers')" not in binary_assessment_js
 
     def test_risk_getter_emitted(self, sample_sections, sample_properties, sample_risk):
-        js = render_app_js(sample_sections, [sample_risk], properties=sample_properties)
+        js = render_assessment_app_js(sample_sections, [sample_risk], properties=sample_properties)
         assert "get r1()" in js
         assert "get r1_residual()" in js
 
     def test_control_getter_emitted(
         self, sample_sections, sample_properties, sample_risk, sample_control
     ):
-        js = render_app_js(sample_sections, [sample_risk], [sample_control], sample_properties)
+        js = render_assessment_app_js(
+            sample_sections, [sample_risk], [sample_control], sample_properties
+        )
         assert "get ctrl_ctrl1()" in js
         assert "this.prop_prop_a === true" in js
 
     def test_risk_rules_js_from_property(self, sample_sections, sample_properties, sample_risk):
         # Risk.rules_js (@property) drives the rules array in each risk getter.
-        js = render_app_js(sample_sections, [sample_risk], properties=sample_properties)
+        js = render_assessment_app_js(sample_sections, [sample_risk], properties=sample_properties)
         # sample_risk has two conditions → two rule expressions.
         assert js.count("? {likelihood:") >= 2

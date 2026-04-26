@@ -14,30 +14,6 @@ that completes the work — git history is the record.
 
 ---
 
-## Differentiate the three tools (questionnaire / assessment / registry) within one site — **large**, **needs design**
-
-**Spec ref:** §Workflow.
-
-**Context:** The spec describes three distinct roles — questionnaire (system
-owner), assessment (assessor / risk manager), registry (executive) — and we
-agreed all three live in one static site. The current site only has a
-questionnaire and an assessment surface, both in the same Alpine component,
-distinguished only by the tab labels "Personal / Social / Lifestyle / …" vs.
-"Risk Analysis."
-
-**To do:**
-- Make the assessment view feel like a clearly separate tool from the
-  questionnaire (e.g. distinct page header, distinct save/load section,
-  possibly a top-level mode switch rather than just a tab — design TBD).
-- Stub or scaffold the registry view as a third surface (probably read-only,
-  loading questionnaire + assessment JSONs and showing a "system card" + the
-  associated assessment).
-- Coordinate with "Aggregate residual risk" and "Versioning across form
-  evolution" below, which both naturally land in either the assessment or
-  registry surfaces.
-
----
-
 ## Aggregate residual risk — **large**
 
 **Spec ref:** §Concepts → Aggregate residual risk.

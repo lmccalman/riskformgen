@@ -1,9 +1,15 @@
-"""Behaviour tests for the JS emitted by `render_app_js()`.
+"""Behaviour tests for the JS emitted by the per-tool factory renderers.
 
-Each test builds a minimal form, compiles the Alpine factory, and asserts on
-what the compiled `prop_*` / risk / residual / `ctrl_*` getters *return* as
-answers change. The substring tests in `test_render.py` / `test_models.py`
-pin the compiler's output shape; these tests pin the runtime semantics.
+Each test builds a minimal form, compiles one of the Alpine factories
+(questionnaire or assessment), and asserts on what the compiled `prop_*` /
+risk / residual / `ctrl_*` getters *return* as answers change. The substring
+tests in `test_render.py` / `test_models.py` pin the compiler's output
+shape; these tests pin the runtime semantics.
+
+Most tests run against the assessment factory because it carries the full
+surface (answers, details, prop_, ctrl_, risk, residual, control_effectiveness,
+mandated_*). The questionnaire factory is exercised separately for the
+clearAnswers / `_x_q_*` migration semantics that are unique to it.
 """
 
 from __future__ import annotations
@@ -22,7 +28,7 @@ from models import (
     SubSection,
 )
 from render import _compile_question_visibility, _detail_show_js
-from tests.js_harness import Scope, build_scope
+from tests.js_harness import Scope, build_assessment_scope, build_questionnaire_scope
 
 
 def _form(
@@ -34,11 +40,30 @@ def _form(
     *,
     persisted_state: dict[str, object] | None = None,
 ) -> Scope:
+    """Build an assessment scope — full surface (prop_, ctrl_, risk, residual)."""
     sub = SubSection(title="t", description="", questions=tuple(questions))
     sec = Section(id="s1", title="S", description="", subsections=(sub,))
-    return build_scope(
-        [sec], properties, risks or [], controls, details, persisted_state=persisted_state
+    return build_assessment_scope(
+        [sec],
+        properties,
+        risks or [],
+        controls,
+        details,
+        persisted_state=persisted_state,
     )
+
+
+def _questionnaire_form(
+    questions: list[BinaryQuestion],
+    properties: list[Property],
+    details: list[Detail] | None = None,
+    *,
+    persisted_state: dict[str, object] | None = None,
+) -> Scope:
+    """Build a questionnaire scope — answers, details, and prop_ only."""
+    sub = SubSection(title="t", description="", questions=tuple(questions))
+    sec = Section(id="s1", title="S", description="", subsections=(sub,))
+    return build_questionnaire_scope([sec], properties, details, persisted_state=persisted_state)
 
 
 # ---------------------------------------------------------------------------
@@ -261,7 +286,7 @@ class TestQuestionVisibility:
 class TestQuestionVisibilityAnyMode:
     """For an `activation: any` child property, the child question is visible
     when *any* of its parents is explicitly `true`. Pins the OR branch in
-    `_compile_question_visibility` (render.py:171)."""
+    `_compile_question_visibility`."""
 
     @pytest.fixture
     def scope_and_expr(self) -> tuple[Scope, str]:
@@ -705,9 +730,8 @@ class TestDetailShow:
 
 class TestDetailShowMultiProperty:
     """A detail with multiple properties is shown when *any* one of them is
-    `true`. Pins the OR semantics in `_detail_show_js` (render.py:184)
-    against mixed parent state, where the single-property tests above
-    cannot."""
+    `true`. Pins the OR semantics in `_detail_show_js` against mixed
+    parent state, where the single-property tests above cannot."""
 
     @pytest.fixture
     def scope_and_expr(self) -> tuple[Scope, str]:
@@ -758,14 +782,17 @@ class TestDetailShowMultiProperty:
 
 
 # ---------------------------------------------------------------------------
-# Schema migration — init() fills keys missing from $persist-restored state
+# Schema migration — assessment factory init() seeds missing keys
 # ---------------------------------------------------------------------------
 
 
-class TestSchemaMigration:
-    """Pins §1.3's fix: on component init, any ID present in the current build
-    but absent from the localStorage-restored object is seeded with its default
-    (empty string for most fields, `false` for mandated-control checkboxes)."""
+class TestAssessmentSchemaMigration:
+    """Assessment factory's init() fills any ID present in the current build
+    but absent from the localStorage-restored object with its default (empty
+    string for most fields, `false` for mandated-control checkboxes).
+
+    Persisted keys are prefixed `_x_a_*` (questionnaire factory uses
+    `_x_q_*`)."""
 
     def _risk(self, rid: str, prop_id: str = "p1") -> Risk:
         return Risk(
@@ -785,7 +812,7 @@ class TestSchemaMigration:
         q2 = BinaryQuestion(id="q2", text="", properties=("p2",))
         p1 = Property(id="p1", description="")
         p2 = Property(id="p2", description="")
-        scope = _form([q1, q2], [p1, p2], persisted_state={"_x_answers": {"q1": "yes"}})
+        scope = _form([q1, q2], [p1, p2], persisted_state={"_x_a_answers": {"q1": "yes"}})
         assert scope.eval("scope.answers") == {"q1": "yes", "q2": ""}
 
     def test_details_missing_key_gets_default(self) -> None:
@@ -797,17 +824,17 @@ class TestSchemaMigration:
             [q],
             [p],
             details=[d1, d2],
-            persisted_state={"_x_details": {"d1": "prior note"}},
+            persisted_state={"_x_a_details": {"d1": "prior note"}},
         )
         assert scope.eval("scope.details") == {"d1": "prior note", "d2": ""}
 
     @pytest.mark.parametrize(
         "persist_key,field_name",
         [
-            ("_x_justifications", "justifications"),
-            ("_x_control_effectiveness", "control_effectiveness"),
-            ("_x_residual_likelihood", "residual_likelihood"),
-            ("_x_residual_consequence", "residual_consequence"),
+            ("_x_a_justifications", "justifications"),
+            ("_x_a_control_effectiveness", "control_effectiveness"),
+            ("_x_a_residual_likelihood", "residual_likelihood"),
+            ("_x_a_residual_consequence", "residual_consequence"),
         ],
     )
     def test_risk_keyed_field_seeds_missing_risk(self, persist_key: str, field_name: str) -> None:
@@ -837,7 +864,7 @@ class TestSchemaMigration:
             [p],
             risks=[r1, r2],
             controls=[c1],
-            persisted_state={"_x_mandated_controls": {"r1": {}}},
+            persisted_state={"_x_a_mandated_controls": {"r1": {}}},
         )
         assert scope.eval("scope.mandated_controls") == {"r1": {}, "r2": {"c1": False}}
 
@@ -862,7 +889,7 @@ class TestSchemaMigration:
             [p],
             risks=[r1],
             controls=[c1, c2],
-            persisted_state={"_x_mandated_controls": {"r1": {"c1": True}}},
+            persisted_state={"_x_a_mandated_controls": {"r1": {"c1": True}}},
         )
         assert scope.eval("scope.mandated_controls") == {"r1": {"c1": True, "c2": False}}
 
@@ -882,7 +909,7 @@ class TestSchemaMigration:
             [p],
             risks=[r1, r2],
             controls=[c1],
-            persisted_state={"_x_mandated_comments": {"r1": {}}},
+            persisted_state={"_x_a_mandated_comments": {"r1": {}}},
         )
         assert scope.eval("scope.mandated_comments") == {"r1": {}, "r2": {"c1": ""}}
 
@@ -907,7 +934,7 @@ class TestSchemaMigration:
             [p],
             risks=[r1],
             controls=[c1, c2],
-            persisted_state={"_x_mandated_comments": {"r1": {"c1": "prior note"}}},
+            persisted_state={"_x_a_mandated_comments": {"r1": {"c1": "prior note"}}},
         )
         assert scope.eval("scope.mandated_comments") == {"r1": {"c1": "prior note", "c2": ""}}
 
@@ -923,9 +950,9 @@ class TestSchemaMigration:
             [p1, p2],
             risks=[r1],
             persisted_state={
-                "_x_answers": {"q1": "yes", "q2": "no"},
-                "_x_control_effectiveness": {"r1": "controlled"},
-                "_x_justifications": {"r1": "prior justification"},
+                "_x_a_answers": {"q1": "yes", "q2": "no"},
+                "_x_a_control_effectiveness": {"r1": "controlled"},
+                "_x_a_justifications": {"r1": "prior justification"},
             },
         )
         assert scope.eval("scope.answers") == {"q1": "yes", "q2": "no"}
@@ -964,16 +991,14 @@ class TestSchemaMigration:
             property="p1",
             effects=(ControlEffect(risk_id="r1"),),
         )
-        # Inject partial persisted state so init() actually does work on the
-        # first call — exercising the migration path, not just the no-op seed.
         scope = _form(
             [q1, q2],
             [p1, p2],
             risks=[r1],
             controls=[c1],
             persisted_state={
-                "_x_answers": {"q1": "yes"},
-                "_x_mandated_controls": {"r1": {"c1": True}},
+                "_x_a_answers": {"q1": "yes"},
+                "_x_a_mandated_controls": {"r1": {"c1": True}},
             },
         )
         snapshot_keys = (
@@ -992,17 +1017,78 @@ class TestSchemaMigration:
         assert before == after
 
 
+class TestQuestionnaireSchemaMigration:
+    """Questionnaire factory has a smaller surface — only answers and details
+    persist (under `_x_q_*`). Pins that the questionnaire's init() fills
+    those gaps."""
+
+    def test_answers_missing_key_gets_default(self) -> None:
+        q1 = BinaryQuestion(id="q1", text="", properties=("p1",))
+        q2 = BinaryQuestion(id="q2", text="", properties=("p2",))
+        p1 = Property(id="p1", description="")
+        p2 = Property(id="p2", description="")
+        scope = _questionnaire_form(
+            [q1, q2],
+            [p1, p2],
+            persisted_state={"_x_q_answers": {"q1": "yes"}},
+        )
+        assert scope.eval("scope.answers") == {"q1": "yes", "q2": ""}
+
+    def test_details_missing_key_gets_default(self) -> None:
+        q = BinaryQuestion(id="q1", text="", properties=("p1",))
+        p = Property(id="p1", description="")
+        d1 = Detail(id="d1", description="", properties=("p1",))
+        d2 = Detail(id="d2", description="", properties=("p1",))
+        scope = _questionnaire_form(
+            [q],
+            [p],
+            details=[d1, d2],
+            persisted_state={"_x_q_details": {"d1": "prior note"}},
+        )
+        assert scope.eval("scope.details") == {"d1": "prior note", "d2": ""}
+
+
 # ---------------------------------------------------------------------------
 # clearAnswers / clearAssessment
 # ---------------------------------------------------------------------------
 
 
-class TestClearMethods:
-    """Both clear methods gate on a `confirm()` dialog. Accept ⇒ state is
-    reset to the build-time seed; cancel ⇒ no change. clearAssessment must
-    leave answers and details untouched; clearAnswers wipes both groups."""
+class TestQuestionnaireClearAnswers:
+    """The questionnaire's clearAnswers wipes answers + details only — the
+    questionnaire factory has no assessment state to wipe."""
 
-    def _populated_scope(self) -> Scope:
+    def _populate(self) -> Scope:
+        q1 = BinaryQuestion(id="q1", text="", properties=("p1",))
+        q2 = BinaryQuestion(id="q2", text="", properties=("p2",))
+        p1 = Property(id="p1", description="")
+        p2 = Property(id="p2", description="")
+        d = Detail(id="d1", description="", properties=("p1",))
+        scope = _questionnaire_form([q1, q2], [p1, p2], details=[d])
+        scope.set_answer("q1", "yes")
+        scope.set_answer("q2", "no")
+        scope.set_detail("d1", "field notes")
+        return scope
+
+    def test_clear_resets_answers_and_details(self) -> None:
+        scope = self._populate()
+        scope.eval("scope.clearAnswers();")
+        assert scope.eval("scope.answers") == {"q1": "", "q2": ""}
+        assert scope.eval("scope.details") == {"d1": ""}
+
+    def test_clear_cancel_keeps_state(self) -> None:
+        scope = self._populate()
+        scope.eval("confirm = () => false;")
+        scope.eval("scope.clearAnswers();")
+        assert scope.eval("scope.answers") == {"q1": "yes", "q2": "no"}
+        assert scope.eval("scope.details") == {"d1": "field notes"}
+
+
+class TestAssessmentClearAssessment:
+    """The assessment's clearAssessment wipes assessment state only and
+    leaves the loaded answers + details intact (those came from a
+    questionnaire JSON, not from the assessor's input)."""
+
+    def _populate(self) -> Scope:
         q1 = BinaryQuestion(id="q1", text="", properties=("p1",))
         q2 = BinaryQuestion(id="q2", text="", properties=("p2",))
         p1 = Property(id="p1", description="")
@@ -1022,7 +1108,6 @@ class TestClearMethods:
         )
         detail = Detail(id="d1", description="", properties=("p1",))
         scope = _form([q1, q2], [p1, p2], risks=[risk], controls=[ctrl], details=[detail])
-        # Populate every state slot so clear methods have something to wipe.
         scope.set_answer("q1", "yes")
         scope.set_answer("q2", "no")
         scope.set_detail("d1", "field notes")
@@ -1033,36 +1118,13 @@ class TestClearMethods:
         scope.eval("scope.mandated_comments['r1']['c1'] = 'do this';")
         return scope
 
-    def test_clear_answers_resets_all_state(self) -> None:
-        scope = self._populated_scope()
-        scope.eval("scope.clearAnswers();")
-        # confirm() returns true by default — full reset.
-        assert scope.eval("scope.answers") == {"q1": "", "q2": ""}
-        assert scope.eval("scope.details") == {"d1": ""}
-        assert scope.eval("scope.control_effectiveness") == {"r1": ""}
-        assert scope.eval("scope.residual_likelihood") == {"r1": ""}
-        assert scope.eval("scope.residual_consequence") == {"r1": ""}
-        assert scope.eval("scope.justifications") == {"r1": ""}
-        assert scope.eval("scope.mandated_controls") == {"r1": {"c1": False}}
-        assert scope.eval("scope.mandated_comments") == {"r1": {"c1": ""}}
-
-    def test_clear_answers_cancel_keeps_state(self) -> None:
-        scope = self._populated_scope()
-        scope.eval("confirm = () => false;")
-        scope.eval("scope.clearAnswers();")
-        # Nothing changed.
-        assert scope.eval("scope.answers") == {"q1": "yes", "q2": "no"}
-        assert scope.eval("scope.details") == {"d1": "field notes"}
-        assert scope.eval("scope.control_effectiveness") == {"r1": "partial"}
-        assert scope.eval("scope.justifications") == {"r1": "looks fine"}
-        assert scope.eval("scope.mandated_controls") == {"r1": {"c1": True}}
-
-    def test_clear_assessment_keeps_answers_and_details(self) -> None:
-        scope = self._populated_scope()
+    def test_clear_keeps_loaded_answers_and_details(self) -> None:
+        scope = self._populate()
         scope.eval("scope.clearAssessment();")
-        # Answers + details preserved; assessment fields wiped.
+        # Answers + details preserved (they are loaded data, not assessor input).
         assert scope.eval("scope.answers") == {"q1": "yes", "q2": "no"}
         assert scope.eval("scope.details") == {"d1": "field notes"}
+        # Assessment state wiped.
         assert scope.eval("scope.control_effectiveness") == {"r1": ""}
         assert scope.eval("scope.residual_likelihood") == {"r1": ""}
         assert scope.eval("scope.residual_consequence") == {"r1": ""}
@@ -1070,8 +1132,8 @@ class TestClearMethods:
         assert scope.eval("scope.mandated_controls") == {"r1": {"c1": False}}
         assert scope.eval("scope.mandated_comments") == {"r1": {"c1": ""}}
 
-    def test_clear_assessment_cancel_keeps_state(self) -> None:
-        scope = self._populated_scope()
+    def test_clear_cancel_keeps_state(self) -> None:
+        scope = self._populate()
         scope.eval("confirm = () => false;")
         scope.eval("scope.clearAssessment();")
         assert scope.eval("scope.control_effectiveness") == {"r1": "partial"}

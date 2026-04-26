@@ -22,9 +22,10 @@ from models import (
 def create_environment() -> Environment:
     """Create a Jinja2 environment loading from the templates directory.
 
-    Autoescape is enabled for HTML-ish templates only. `app.js.j2` renders
-    JavaScript and must NOT be autoescaped — otherwise quote characters in
-    compiled getter bodies become HTML entities that break the emitted JS.
+    Autoescape is enabled for HTML-ish templates only. The `app-*.js.j2`
+    templates render JavaScript and must NOT be autoescaped — otherwise quote
+    characters in compiled getter bodies become HTML entities that break the
+    emitted JS.
     """
     return Environment(
         loader=FileSystemLoader(config.templates_dir),
@@ -292,7 +293,7 @@ def _build_template_context(
     properties: Sequence[Property] | None = None,
     details: Sequence[Detail] | None = None,
 ) -> dict:
-    """Build the shared template context used by both page.html.j2 and app.js.j2."""
+    """Build the shared template context used by every page and factory template."""
     controls = controls or ()
     properties = properties or ()
     details = details or ()
@@ -356,29 +357,67 @@ def _build_template_context(
     }
 
 
-def render_form(
+def render_landing() -> str:
+    """Render the landing page HTML (no Alpine, no form data)."""
+    env = create_environment()
+    template = env.get_template("landing.html.j2")
+    return template.render()
+
+
+def render_questionnaire(
+    sections: Sequence[Section],
+    properties: Sequence[Property] | None = None,
+    details: Sequence[Detail] | None = None,
+) -> str:
+    """Render the questionnaire page HTML (system owner view)."""
+    env = create_environment()
+    template = env.get_template("questionnaire.html.j2")
+    context = _build_template_context(sections, [], None, properties, details)
+    return template.render(**context)
+
+
+def render_assessment(
     sections: Sequence[Section],
     risks: Sequence[Risk],
     controls: Sequence[Control] | None = None,
     properties: Sequence[Property] | None = None,
     details: Sequence[Detail] | None = None,
 ) -> str:
-    """Render the form page HTML from sections, risks, properties, and details."""
+    """Render the assessment page HTML (assessor view)."""
     env = create_environment()
-    template = env.get_template("page.html.j2")
+    template = env.get_template("assessment.html.j2")
     context = _build_template_context(sections, risks, controls, properties, details)
     return template.render(**context)
 
 
-def render_app_js(
+def render_registry() -> str:
+    """Render the registry placeholder page HTML."""
+    env = create_environment()
+    template = env.get_template("registry.html.j2")
+    return template.render()
+
+
+def render_questionnaire_app_js(
+    sections: Sequence[Section],
+    properties: Sequence[Property] | None = None,
+    details: Sequence[Detail] | None = None,
+) -> str:
+    """Render the Alpine factory for the questionnaire view as a standalone JS file."""
+    env = create_environment()
+    template = env.get_template("app-questionnaire.js.j2")
+    context = _build_template_context(sections, [], None, properties, details)
+    return template.render(**context)
+
+
+def render_assessment_app_js(
     sections: Sequence[Section],
     risks: Sequence[Risk],
     controls: Sequence[Control] | None = None,
     properties: Sequence[Property] | None = None,
     details: Sequence[Detail] | None = None,
 ) -> str:
-    """Render the Alpine.js component factory as a standalone JS file."""
+    """Render the Alpine factory for the assessment view as a standalone JS file."""
     env = create_environment()
-    template = env.get_template("app.js.j2")
+    template = env.get_template("app-assessment.js.j2")
     context = _build_template_context(sections, risks, controls, properties, details)
     return template.render(**context)

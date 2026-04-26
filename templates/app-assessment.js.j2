@@ -1,14 +1,14 @@
 document.addEventListener('alpine:init', () => {
-  Alpine.data('app', () => ({
-    activeTab: Alpine.$persist('{{ sections[0].id }}').as('_x_activeTab'),
-    answers: Alpine.$persist({{ answers_init_js }}).as('_x_answers'),
-    details: Alpine.$persist({{ details_init_js }}).as('_x_details'),
-    control_effectiveness: Alpine.$persist({{ control_effectiveness_init_js }}).as('_x_control_effectiveness'),
-    residual_likelihood: Alpine.$persist({{ residual_likelihood_init_js }}).as('_x_residual_likelihood'),
-    residual_consequence: Alpine.$persist({{ residual_consequence_init_js }}).as('_x_residual_consequence'),
-    justifications: Alpine.$persist({{ justifications_init_js }}).as('_x_justifications'),
-    mandated_controls: Alpine.$persist({{ mandated_controls_init_js }}).as('_x_mandated_controls'),
-    mandated_comments: Alpine.$persist({{ mandated_comments_init_js }}).as('_x_mandated_comments'),
+  Alpine.data('assessment', () => ({
+    activeTab: Alpine.$persist('risks').as('_x_a_activeTab'),
+    answers: Alpine.$persist({{ answers_init_js }}).as('_x_a_answers'),
+    details: Alpine.$persist({{ details_init_js }}).as('_x_a_details'),
+    control_effectiveness: Alpine.$persist({{ control_effectiveness_init_js }}).as('_x_a_control_effectiveness'),
+    residual_likelihood: Alpine.$persist({{ residual_likelihood_init_js }}).as('_x_a_residual_likelihood'),
+    residual_consequence: Alpine.$persist({{ residual_consequence_init_js }}).as('_x_a_residual_consequence'),
+    justifications: Alpine.$persist({{ justifications_init_js }}).as('_x_a_justifications'),
+    mandated_controls: Alpine.$persist({{ mandated_controls_init_js }}).as('_x_a_mandated_controls'),
+    mandated_comments: Alpine.$persist({{ mandated_comments_init_js }}).as('_x_a_mandated_comments'),
     _questionIds: {{ question_ids_js }},
     _detailIds: {{ detail_ids_js }},
     _riskIds: {{ risk_ids_js }},
@@ -77,30 +77,9 @@ document.addEventListener('alpine:init', () => {
       this.mandated_controls = freshMandated;
       this.mandated_comments = freshComments;
     },
-    clearAnswers() {
-      if (!confirm('Clear all answers and assessments? This cannot be undone.')) return;
-      const freshAnswers = {};
-      for (const id of this._questionIds) freshAnswers[id] = '';
-      this.answers = freshAnswers;
-      const freshDetails = {};
-      for (const id of this._detailIds) freshDetails[id] = '';
-      this.details = freshDetails;
-      this._freshAssessment();
-    },
     clearAssessment() {
-      if (!confirm('Clear all risk assessments? Your answers will not be affected.')) return;
+      if (!confirm('Clear all risk assessments? Loaded answers will not be affected.')) return;
       this._freshAssessment();
-    },
-    exportAnswers() {
-      this._downloadJson({
-        format: 'riskformgen-answers',
-        version: 1,
-        exported_at: new Date().toISOString(),
-        question_ids: this._questionIds,
-        answers: this.answers,
-        detail_ids: this._detailIds,
-        details: this.details,
-      }, 'riskformgen-answers.json');
     },
     _importJson(event, {format, version, fileIdsKey, currentIds, label, count, apply}) {
       const file = event.target.files[0];

@@ -1,0 +1,70 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>FormGen</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link href="https://fonts.googleapis.com/css2?family=Lora:ital,wght@0,400;0,600;0,700;1,400&family=Source+Sans+3:wght@300;400;500;600&display=swap" rel="stylesheet" />
+    <link rel="stylesheet" href="bulma.min.css" />
+    <link rel="stylesheet" href="input.css" />
+  </head>
+  <body class="persona-landing">
+    <main class="container">
+      <header class="page-header">
+        <h1 class="title is-3">FormGen</h1>
+        <p class="subtitle is-5">A risk assessment workspace.</p>
+      </header>
+
+      <section class="landing-intro stack-md">
+        <p>
+          FormGen helps an organisation assess risks for the systems it
+          builds and runs. The tool is split into three views, each for a
+          different person in the loop — the system owner who knows what
+          their system does, the risk assessor who judges the residual
+          risks, and the executive or board member who keeps oversight of
+          the register.
+        </p>
+        <p>
+          Pick the view that matches your role. Your work is saved in your
+          browser as you go, and you can export it as JSON to share with
+          others.
+        </p>
+      </section>
+
+      <section class="tool-cards">
+        <a class="tool-card tool-card-questionnaire" href="questionnaire.html">
+          <h2 class="title is-5">Questionnaire</h2>
+          <p class="tool-card-persona">For system owners.</p>
+          <p class="tool-card-blurb">
+            Describe your system by answering a series of questions. Save
+            your progress and export the answers when you're done.
+          </p>
+          <span class="tool-card-cta">Open questionnaire →</span>
+        </a>
+
+        <a class="tool-card tool-card-assessment" href="assessment.html">
+          <h2 class="title is-5">Assessment</h2>
+          <p class="tool-card-persona">For risk assessors.</p>
+          <p class="tool-card-blurb">
+            Load a system owner's answers and judge the inherent risks,
+            control effectiveness, and residual risks. Export the
+            assessment when complete.
+          </p>
+          <span class="tool-card-cta">Open assessment →</span>
+        </a>
+
+        <a class="tool-card tool-card-registry" href="registry.html">
+          <h2 class="title is-5">Registry</h2>
+          <p class="tool-card-persona">For executives and oversight.</p>
+          <p class="tool-card-blurb">
+            Browse system cards and risk assessments across the
+            organisation. (Coming soon — placeholder only for now.)
+          </p>
+          <span class="tool-card-cta">Open registry →</span>
+        </a>
+      </section>
+    </main>
+  </body>
+</html>

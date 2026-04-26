@@ -4,6 +4,10 @@ The e2e test files share a small surface for poking at the live Alpine scope,
 uploading/downloading JSON, and capturing dialogs. They live here rather than
 in `conftest.py` so they can be imported by name (pytest's fixture discovery
 doesn't fit dialog/scope helpers, which aren't fixtures).
+
+Each per-tool page uses its own `x-data` factory name (`questionnaire` /
+`assessment`). `scope_selector(...)` returns the JS expression that picks
+the live scope for whichever page the test is currently driving.
 """
 
 from __future__ import annotations
@@ -14,15 +18,18 @@ from typing import Any
 
 from playwright.sync_api import Dialog, Page
 
-SCOPE = "document.querySelector('[x-data=app]')._x_dataStack[0]"
+
+def scope_selector(name: str) -> str:
+    """JS expression that returns the Alpine scope for a given factory."""
+    return f"document.querySelector('[x-data={name}]')._x_dataStack[0]"
 
 
-def get_scope_field(page: Page, field: str) -> Any:
-    return page.evaluate(f"{SCOPE}.{field}")
+def get_scope_field(page: Page, field: str, *, scope: str) -> Any:
+    return page.evaluate(f"{scope}.{field}")
 
 
-def eval_in_scope(page: Page, body: str) -> None:
-    page.evaluate(f"const scope = {SCOPE}; {body}")
+def eval_in_scope(page: Page, body: str, *, scope: str) -> None:
+    page.evaluate(f"const scope = {scope}; {body}")
 
 
 def upload_payload(
@@ -97,13 +104,13 @@ class DialogRecorder:
         raise AssertionError("dialog did not arrive within timeout")
 
 
-def wait_for_answer(page: Page, question_id: str, expected: str) -> None:
+def wait_for_answer(page: Page, question_id: str, expected: str, *, scope: str) -> None:
     page.wait_for_function(
-        f"{SCOPE}.answers[{json.dumps(question_id)}] === {json.dumps(expected)}"
+        f"{scope}.answers[{json.dumps(question_id)}] === {json.dumps(expected)}"
     )
 
 
-def wait_for_effectiveness(page: Page, risk_id: str, expected: str) -> None:
+def wait_for_effectiveness(page: Page, risk_id: str, expected: str, *, scope: str) -> None:
     page.wait_for_function(
-        f"{SCOPE}.control_effectiveness[{json.dumps(risk_id)}] === {json.dumps(expected)}"
+        f"{scope}.control_effectiveness[{json.dumps(risk_id)}] === {json.dumps(expected)}"
     )

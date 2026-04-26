@@ -1,0 +1,115 @@
+document.addEventListener('alpine:init', () => {
+  Alpine.data('questionnaire', () => ({
+    activeTab: Alpine.$persist('{{ sections[0].id }}').as('_x_q_activeTab'),
+    answers: Alpine.$persist({{ answers_init_js }}).as('_x_q_answers'),
+    details: Alpine.$persist({{ details_init_js }}).as('_x_q_details'),
+    _questionIds: {{ question_ids_js }},
+    _detailIds: {{ detail_ids_js }},
+    init() {
+      // Fill gaps when $persist restores state from a previous build that predates newly-added IDs.
+      for (const id of this._questionIds) {
+        if (!(id in this.answers)) this.answers[id] = '';
+      }
+      for (const id of this._detailIds) {
+        if (!(id in this.details)) this.details[id] = '';
+      }
+    },
+    _downloadJson(data, filename) {
+      const blob = new Blob([JSON.stringify(data, null, 2)], {type: 'application/json'});
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = filename;
+      a.click();
+      URL.revokeObjectURL(url);
+    },
+    clearAnswers() {
+      if (!confirm('Clear all answers? This cannot be undone.')) return;
+      const freshAnswers = {};
+      for (const id of this._questionIds) freshAnswers[id] = '';
+      this.answers = freshAnswers;
+      const freshDetails = {};
+      for (const id of this._detailIds) freshDetails[id] = '';
+      this.details = freshDetails;
+    },
+    exportAnswers() {
+      this._downloadJson({
+        format: 'riskformgen-answers',
+        version: 1,
+        exported_at: new Date().toISOString(),
+        question_ids: this._questionIds,
+        answers: this.answers,
+        detail_ids: this._detailIds,
+        details: this.details,
+      }, 'riskformgen-answers.json');
+    },
+    _importJson(event, {format, version, fileIdsKey, currentIds, label, count, apply}) {
+      const file = event.target.files[0];
+      if (!file) return;
+      event.target.value = '';
+      const reader = new FileReader();
+      reader.onload = () => {
+        let data;
+        try { data = JSON.parse(reader.result); }
+        catch { alert('Invalid JSON file.'); return; }
+        if (data.format !== format) {
+          alert(`This is not a ${label} file. Expected format: ${format}`);
+          return;
+        }
+        if (data.version !== version) {
+          alert(`Incompatible ${label} file version: got ${data.version}, expected ${version}. Re-export from a matching build.`);
+          return;
+        }
+        const fileIds = new Set(data[fileIdsKey] || []);
+        const currentIdSet = new Set(currentIds);
+        const added = currentIds.filter(id => !fileIds.has(id));
+        const removed = (data[fileIdsKey] || []).filter(id => !currentIdSet.has(id));
+        const {loaded, skippedType = 0} = count(data, currentIds);
+        const parts = [`Load ${loaded} of ${currentIds.length} ${label}?`];
+        if (added.length) parts.push(`${added.length} new since export (left at defaults).`);
+        if (removed.length) parts.push(`${removed.length} exported skipped (removed).`);
+        if (skippedType) parts.push(`${skippedType} skipped (type mismatch).`);
+        if (loaded === currentIds.length && !removed.length && !skippedType) {
+          /* no mismatches — load silently */
+        } else if (!confirm(parts.join(' '))) {
+          return;
+        }
+        apply(data, currentIds);
+      };
+      reader.readAsText(file);
+    },
+    importAnswers(event) {
+      this._importJson(event, {
+        format: 'riskformgen-answers',
+        version: 1,
+        fileIdsKey: 'question_ids',
+        currentIds: this._questionIds,
+        label: 'answers',
+        count: (data, ids) => {
+          let loaded = 0;
+          for (const id of ids) {
+            if (!(id in data.answers)) continue;
+            loaded++;
+          }
+          return {loaded};
+        },
+        apply: (data, ids) => {
+          for (const id of ids) {
+            if (!(id in data.answers)) continue;
+            this.answers[id] = data.answers[id];
+          }
+          if (data.details) {
+            for (const did of this._detailIds) {
+              if (did in data.details) this.details[did] = data.details[did];
+            }
+          }
+        },
+      });
+    },
+    {% for prop in property_getters %}
+    get prop_{{ prop.id }}() {
+      {{ prop.js_body }}
+    },
+    {% endfor %}
+  }));
+});

@@ -11,7 +11,14 @@ from parse import (
     load_sections,
     validate_all,
 )
-from render import render_app_js, render_form
+from render import (
+    render_assessment,
+    render_assessment_app_js,
+    render_landing,
+    render_questionnaire,
+    render_questionnaire_app_js,
+    render_registry,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -22,32 +29,32 @@ def ensure_output_dir() -> None:
     config.output_dir.mkdir()
 
 
-def write_html(
+def write_pages(
     sections: list[Section],
     risks: list[Risk],
     controls: list[Control],
     properties: list[Property],
     details: list[Detail],
 ) -> None:
-    """Render and write the form HTML to output/index.html."""
-    html = render_form(
-        sections, risks=risks, controls=controls, properties=properties, details=details
+    """Render and write the four HTML pages and two Alpine factories."""
+    (config.output_dir / "index.html").write_text(render_landing())
+    (config.output_dir / "questionnaire.html").write_text(
+        render_questionnaire(sections, properties=properties, details=details)
     )
-    (config.output_dir / "index.html").write_text(html)
-
-
-def write_app_js(
-    sections: list[Section],
-    risks: list[Risk],
-    controls: list[Control],
-    properties: list[Property],
-    details: list[Detail],
-) -> None:
-    """Render and write the Alpine component factory to output/app.js."""
-    js = render_app_js(
-        sections, risks=risks, controls=controls, properties=properties, details=details
+    (config.output_dir / "assessment.html").write_text(
+        render_assessment(
+            sections, risks=risks, controls=controls, properties=properties, details=details
+        )
     )
-    (config.output_dir / "app.js").write_text(js)
+    (config.output_dir / "registry.html").write_text(render_registry())
+    (config.output_dir / "app-questionnaire.js").write_text(
+        render_questionnaire_app_js(sections, properties=properties, details=details)
+    )
+    (config.output_dir / "app-assessment.js").write_text(
+        render_assessment_app_js(
+            sections, risks=risks, controls=controls, properties=properties, details=details
+        )
+    )
 
 
 def copy_css() -> None:
@@ -63,7 +70,7 @@ def copy_alpine() -> None:
 
 
 def main() -> None:
-    """Build the static form page."""
+    """Build the static site — landing page plus three per-tool pages."""
     details_path = config.form_dir / "details.yaml"
     details = load_details(details_path) if details_path.exists() else []
     details_by_id = {d.id: d for d in details}
@@ -76,13 +83,12 @@ def main() -> None:
     validate_all(sections, properties, risks, controls, details)
 
     ensure_output_dir()
-    write_html(sections, risks, controls, properties, details)
-    write_app_js(sections, risks, controls, properties, details)
+    write_pages(sections, risks, controls, properties, details)
     copy_css()
     copy_alpine()
     questions = all_questions(sections)
     logger.info(
-        "Built form with %d sections, %d questions, %d properties,"
+        "Built site with %d sections, %d questions, %d properties,"
         " %d risks, %d controls, and %d details in %s/",
         len(sections),
         len(questions),
