@@ -23,6 +23,19 @@
         {% endif %}
       </header>
 
+      {% if stale_build %}
+      <div class="notification is-warning is-light stale-build-banner">
+        <p>
+          <strong>Stale build.</strong>
+          This record was made against build
+          <code>{{ record_build_id or 'unknown' }}</code>.
+          The current form is build <code>{{ build_id }}</code>.
+          The figures below reflect the form <em>as it was at the time</em>
+          and may use older question wording or risk descriptions.
+        </p>
+      </div>
+      {% endif %}
+
       <section class="stack-md">
         <h2 class="title is-4">System card</h2>
         <p class="has-text-grey">The system owner's answers, as committed.</p>
@@ -115,6 +128,7 @@
         {% endif %}
         {% endif %}
       </section>
+      {% include "_footer.html.j2" %}
     </main>
   </body>
 </html>

@@ -114,6 +114,7 @@ _ALPINE_RESERVED: frozenset[str] = frozenset(
         "_likelihoods",
         "_consequences",
         "_risk_matrix",
+        "_buildId",
         # Helper methods
         "_worst",
         "_downloadJson",

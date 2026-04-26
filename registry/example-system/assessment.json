@@ -1,7 +1,8 @@
 {
   "format": "riskformgen-assessment",
   "version": 4,
-  "exported_at": "2026-04-26T08:24:24Z",
+  "build_id": "d58ef7e6",
+  "exported_at": "2026-04-26T10:04:10Z",
   "risk_ids": [
     "cardiovascular_risk",
     "metabolic_risk",
@@ -242,7 +243,5 @@
     "preventive_care_gap_risk": {
       "regular_health_checkups": ""
     }
-  },
-  "aggregate_residual_level": "",
-  "aggregate_residual_justification": ""
+  }
 }

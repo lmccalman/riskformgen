@@ -6,6 +6,7 @@ document.addEventListener('alpine:init', () => {
     _questionIds: {{ question_ids_js }},
     _detailIds: {{ detail_ids_js }},
     _propertyIds: {{ property_ids_js }},
+    _buildId: '{{ build_id }}',
     init() {
       // Fill gaps when $persist restores state from a previous build that predates newly-added IDs.
       for (const id of this._questionIds) {
@@ -42,6 +43,7 @@ document.addEventListener('alpine:init', () => {
       this._downloadJson({
         format: 'riskformgen-answers',
         version: 2,
+        build_id: this._buildId,
         exported_at: new Date().toISOString(),
         question_ids: this._questionIds,
         answers: this.answers,
@@ -64,10 +66,8 @@ document.addEventListener('alpine:init', () => {
           alert(`This is not a ${label} file. Expected format: ${format}`);
           return;
         }
-        if (data.version !== version) {
-          alert(`Incompatible ${label} file version: got ${data.version}, expected ${version}. Re-export from a matching build.`);
-          return;
-        }
+        const versionMismatch = data.version !== version;
+        const buildIdMismatch = !!data.build_id && !!this._buildId && data.build_id !== this._buildId;
         const fileIds = new Set(data[fileIdsKey] || []);
         const currentIdSet = new Set(currentIds);
         const added = currentIds.filter(id => !fileIds.has(id));
@@ -77,8 +77,11 @@ document.addEventListener('alpine:init', () => {
         if (added.length) parts.push(`${added.length} new since export (left at defaults).`);
         if (removed.length) parts.push(`${removed.length} exported skipped (removed).`);
         if (skippedType) parts.push(`${skippedType} skipped (type mismatch).`);
-        if (loaded === currentIds.length && !removed.length && !skippedType) {
-          /* no mismatches — load silently */
+        if (buildIdMismatch) parts.push(`Exported from build ${data.build_id} (current: ${this._buildId}).`);
+        if (versionMismatch) parts.push(`Schema version was ${data.version} (current: ${version}) — fields may not all carry over.`);
+        const cleanLoad = loaded === currentIds.length && !removed.length && !skippedType && !versionMismatch;
+        if (cleanLoad) {
+          /* IDs align and schema matches — load silently even if build_id differs. */
         } else if (!confirm(parts.join(' '))) {
           return;
         }

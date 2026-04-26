@@ -239,6 +239,33 @@ single source of truth for *how* these values are computed — both
 factories' export functions snapshot their own `prop_*` and risk
 getters into the JSON.
 
+#### Versioning across form evolution
+
+Two distinct identifiers ride alongside every JSON export:
+
+- **`version`** — JSON shape version (per format). Bumped only when the
+  keys/structure of the export change. Migrators are written if and when
+  this is bumped; otherwise it never moves.
+- **`build_id`** — a content-hash fingerprint of the form YAML at the
+  build that produced the artifact (8 hex chars). Embedded in every
+  export, every rendered page footer, and both Alpine factories. Used
+  as provenance only — it never gates loading, only surfaces stale-
+  build warnings on the registry.
+
+**Discipline rules** keep this scheme tractable for risk managers:
+
+1. IDs are immutable. Renaming an id is a delete plus an add.
+2. Semantic changes earn a new id. Rewording a description is fine;
+   changing *what counts as* the property/risk requires a new id.
+3. `version` bumps only for JSON shape changes, not form-content
+   changes.
+
+In-flight reload across `build_id` mismatch is silent (when IDs align).
+Across `version` mismatch, the existing add/removed-confirmation dialog
+gains a "Schema version was X (current: Y)" line — the user accepts
+once and the ID-merge logic does the rest. Format mismatch is the only
+remaining hard reject.
+
 ### Details
 
 Details are contextual topics defined alongside properties, risks, and

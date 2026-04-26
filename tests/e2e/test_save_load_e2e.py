@@ -118,19 +118,24 @@ class TestAnswersRoundtripQuestionnaire:
         assert "riskformgen-answers" in msg
         assert "answers" in msg
 
-    def test_wrong_version_shows_alert(self, questionnaire_page: Page) -> None:
+    def test_wrong_version_routes_through_confirm_dialog(self, questionnaire_page: Page) -> None:
+        # Version mismatch is no longer a hard reject — it joins the existing
+        # confirmation dialog so a system owner doesn't lose in-flight work
+        # when the form schema is bumped under them.
         payload = {
             "format": "riskformgen-answers",
             "version": 99,
             "question_ids": [],
             "answers": {},
         }
-        recorder = DialogRecorder(questionnaire_page)
+        recorder = DialogRecorder(questionnaire_page, accept_confirm=False)
         upload_payload(questionnaire_page, 'input[x-ref="answersFile"]', payload)
-        recorder.wait_for_alerts()
-        msg = recorder.alerts()[0]["message"]
-        assert "99" in msg
-        assert "expected 2" in msg
+        recorder.wait_for_confirms()
+        msg = recorder.confirms()[0]["message"]
+        assert "Schema version was 99" in msg
+        assert "current: 2" in msg
+        # No alert path on version mismatch any more.
+        assert recorder.alerts() == []
 
     def test_added_ids_prompt_confirm_accept_applies_partial(
         self, questionnaire_page: Page
@@ -410,7 +415,9 @@ class TestAssessmentRoundtrip:
         assert ghost_ctrl not in mandated_comments
         assert recorder.alerts() == []
 
-    def test_assessment_wrong_version_shows_alert(self, assessment_page: Page) -> None:
+    def test_assessment_wrong_version_routes_through_confirm_dialog(
+        self, assessment_page: Page
+    ) -> None:
         payload = {
             "format": "riskformgen-assessment",
             "version": 1,
@@ -422,12 +429,13 @@ class TestAssessmentRoundtrip:
             "mandated_controls": {},
             "mandated_comments": {},
         }
-        recorder = DialogRecorder(assessment_page)
+        recorder = DialogRecorder(assessment_page, accept_confirm=False)
         upload_payload(assessment_page, 'input[x-ref="assessmentFile"]', payload)
-        recorder.wait_for_alerts()
-        msg = recorder.alerts()[0]["message"]
-        assert "got 1" in msg
-        assert "expected 4" in msg
+        recorder.wait_for_confirms()
+        msg = recorder.confirms()[0]["message"]
+        assert "Schema version was 1" in msg
+        assert "current: 4" in msg
+        assert recorder.alerts() == []
 
 
 class TestDownloadShape:
@@ -435,6 +443,9 @@ class TestDownloadShape:
         payload = download_payload(questionnaire_page, "Save answers", "riskformgen-answers.json")
         assert payload["format"] == "riskformgen-answers"
         assert payload["version"] == 2
+        # Build identifier embedded so the registry / re-import path can
+        # detect form drift; non-empty 8-char hex.
+        assert isinstance(payload["build_id"], str) and len(payload["build_id"]) == 8
         for key in (
             "question_ids",
             "answers",
@@ -453,6 +464,7 @@ class TestDownloadShape:
         )
         assert payload["format"] == "riskformgen-assessment"
         assert payload["version"] == 4
+        assert isinstance(payload["build_id"], str) and len(payload["build_id"]) == 8
         for key in (
             "risk_ids",
             "property_ids",

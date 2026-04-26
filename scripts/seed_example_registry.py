@@ -27,6 +27,7 @@ import yaml
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
 import config
+from build_id import compute_build_id
 from parse import (
     load_controls,
     load_details,
@@ -174,6 +175,7 @@ def _read_form() -> tuple[list, list, list, list, list]:
 
 def main() -> None:
     sections, properties, risks, controls, details = _read_form()
+    build_id = compute_build_id(config.form_dir)
     scope = build_assessment_scope(sections, properties, risks, controls, details)
 
     for qid, ans in ANSWERS.items():
@@ -229,6 +231,7 @@ def main() -> None:
     questionnaire_payload = {
         "format": config.QUESTIONNAIRE_FORMAT,
         "version": config.QUESTIONNAIRE_VERSION,
+        "build_id": build_id,
         "exported_at": timestamp,
         "question_ids": question_ids,
         "answers": answers_out,
@@ -241,6 +244,7 @@ def main() -> None:
     assessment_payload = {
         "format": config.ASSESSMENT_FORMAT,
         "version": config.ASSESSMENT_VERSION,
+        "build_id": build_id,
         "exported_at": timestamp,
         "risk_ids": risk_ids,
         "property_ids": property_ids,

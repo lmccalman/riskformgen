@@ -207,6 +207,25 @@ The layers are complementary: a refactor that preserves semantics but changes th
 
 All generated files go to `output/` (gitignored): `index.html` (landing), `questionnaire.html`, `assessment.html`, `registry.html`, `app-questionnaire.js`, `app-assessment.js`, `bulma.min.css`, `input.css`, `alpine3.15.8.min.js`, `alpine-persist.min.js`.
 
+### Versioning and form evolution
+
+Two distinct identifiers, two distinct jobs:
+
+- **`version` (per-format integer)** — JSON *shape* version. Bumped only when the keys/structure of the export change (e.g. a field is renamed or a new top-level block is added). Lives in `config.py` as `QUESTIONNAIRE_VERSION` / `ASSESSMENT_VERSION`. Migrators are written if and when this is bumped.
+- **`build_id` (8-char content hash)** — fingerprint of the form YAML at the build that produced an artifact. Computed in `build_id.py` from every `form/*.yaml` file. Embedded in every exported JSON, every rendered HTML page footer, and both Alpine factories' `_buildId` slot. Used as provenance only — it never gates loading.
+
+The registry compares each record's `build_id` to the current build and renders a "Stale build" badge / banner on mismatch. Records made before this scheme have no `build_id` field and are surfaced as stale by default. The numbers shown for an old record still come from its own baked-in `properties` and `inherent` snapshot, so they don't shift when the form changes.
+
+The in-flight questionnaire reload accepts mismatched `build_id` silently (when IDs all align) and routes mismatched `version` through the existing add/removed-confirmation dialog with a "Schema version was X (current: Y)" line. Format mismatch is the only remaining hard reject.
+
+**Discipline rules (not enforced by code; documented for risk managers):**
+
+1. **IDs are immutable.** Renaming an id is a *delete plus an add*. Never reuse a deleted id.
+2. **Semantic changes earn a new id.** Rewording a question or risk description is fine; changing *what counts as* the property/risk (different conditions, swapped L/C, parent rewiring, activation flip) means assigning a new id and treating the old one as deprecated. Description rewrites will appear on historical registry entries — the stale-build banner is the cue to interpret with care.
+3. **Bump `version` only for JSON shape changes**, not form-content changes. The vast majority of form edits leave `version` unchanged; only the JSON keys/structure bump it.
+
+When `version` does bump, write the migrator alongside this section (none exist yet).
+
 ### Spec editor (removed)
 
 There is an `editor/` directory and a `run_editor.py` shim left over from a previous spec-editor experiment, but the editor's source files (FastAPI backend and React frontend) have been removed. `run_editor.py` will not run as-is. Treat the directory as dormant; YAML is currently hand-edited.

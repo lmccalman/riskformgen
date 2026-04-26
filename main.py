@@ -2,6 +2,7 @@ import logging
 import shutil
 
 import config
+from build_id import compute_build_id
 from models import Control, Detail, Property, Risk, Section, all_questions
 from parse import (
     load_controls,
@@ -38,31 +39,48 @@ def write_pages(
     properties: list[Property],
     details: list[Detail],
     registry_records: list[SystemRecord],
+    build_id: str,
 ) -> None:
     """Render and write the static HTML pages and two Alpine factories."""
-    (config.output_dir / "index.html").write_text(render_landing())
+    (config.output_dir / "index.html").write_text(render_landing(build_id=build_id))
     (config.output_dir / "questionnaire.html").write_text(
-        render_questionnaire(sections, properties=properties, details=details)
+        render_questionnaire(sections, properties=properties, details=details, build_id=build_id)
     )
     (config.output_dir / "assessment.html").write_text(
         render_assessment(
-            sections, risks=risks, controls=controls, properties=properties, details=details
+            sections,
+            risks=risks,
+            controls=controls,
+            properties=properties,
+            details=details,
+            build_id=build_id,
         )
     )
-    (config.output_dir / "registry.html").write_text(render_registry_index(registry_records))
+    (config.output_dir / "registry.html").write_text(
+        render_registry_index(registry_records, build_id=build_id)
+    )
     if registry_records:
         registry_out = config.output_dir / "registry"
         registry_out.mkdir(exist_ok=True)
         for record in registry_records:
             (registry_out / f"{record.slug}.html").write_text(
-                render_registry_system(record, sections, risks, controls, properties, details)
+                render_registry_system(
+                    record, sections, risks, controls, properties, details, build_id=build_id
+                )
             )
     (config.output_dir / "app-questionnaire.js").write_text(
-        render_questionnaire_app_js(sections, properties=properties, details=details)
+        render_questionnaire_app_js(
+            sections, properties=properties, details=details, build_id=build_id
+        )
     )
     (config.output_dir / "app-assessment.js").write_text(
         render_assessment_app_js(
-            sections, risks=risks, controls=controls, properties=properties, details=details
+            sections,
+            risks=risks,
+            controls=controls,
+            properties=properties,
+            details=details,
+            build_id=build_id,
         )
     )
 
@@ -92,6 +110,8 @@ def main() -> None:
 
     validate_all(sections, properties, risks, controls, details)
 
+    build_id = compute_build_id(config.form_dir)
+
     registry_records = load_registry(
         config.registry_dir,
         sections=sections,
@@ -101,13 +121,14 @@ def main() -> None:
     )
 
     ensure_output_dir()
-    write_pages(sections, risks, controls, properties, details, registry_records)
+    write_pages(sections, risks, controls, properties, details, registry_records, build_id)
     copy_css()
     copy_alpine()
     questions = all_questions(sections)
     logger.info(
-        "Built site with %d sections, %d questions, %d properties,"
+        "Built site (build %s) with %d sections, %d questions, %d properties,"
         " %d risks, %d controls, %d details, and %d registered systems in %s/",
+        build_id,
         len(sections),
         len(questions),
         len(properties),

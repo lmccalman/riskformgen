@@ -33,6 +33,9 @@
           <tr>
             <td>
               <a href="registry/{{ row.slug }}.html">{{ row.name }}</a>
+              {% if row.stale_build %}
+              <span class="tag is-warning is-light is-small ml-2" title="Made against build {{ row.record_build_id or 'unknown' }}; current build is {{ build_id }}">Stale build</span>
+              {% endif %}
               {% if row.owner %}
               <p class="has-text-grey is-size-7">{{ row.owner }}</p>
               {% endif %}
@@ -64,6 +67,7 @@
         </p>
       </section>
       {% endif %}
+      {% include "_footer.html.j2" %}
     </main>
   </body>
 </html>

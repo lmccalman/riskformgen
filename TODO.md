@@ -14,41 +14,36 @@ that completes the work — git history is the record.
 
 ---
 
-## Versioning across form evolution — **large**, **needs design**
+## Versioning follow-ups — **large**, **needs design**
 
 **Spec ref:** §Key design goals → "Risks, controls, questionnaire questions
-and properties must be able to evolve" + the constraint that older
-assessments and questionnaire answers should not break.
+and properties must be able to evolve" + §Concepts → "Baked-in values in
+JSON exports".
 
-**Context:** Some basics already exist: `init()` back-fills new IDs; JSON
-exports carry `format` + `version` fields; import shows added/removed counts
-with a confirmation dialog. But there's no formal record of *which build*
-the JSON came from beyond the integer version, no migration path, and no
-guarantees about how the registry handles assessments produced against older
-versions of the form.
+**Context:** First-pass versioning is in (build_id content-hash, embedded
+in every export and page footer; stale-build banner in the registry; JSON
+imports route version mismatch through the confirmation dialog rather than
+hard-rejecting; ID-discipline rules documented in `CLAUDE.md`). What's
+left are the items that intentionally got punted out of the first pass.
 
-**Update (2026-04-26):** Both export formats now carry the resolved
-property states and per-risk inherent values (questionnaire `properties`,
-assessment `inherent`). The registry renders these directly without
-re-deriving against the current form, so historical assessments are
-stable across form changes. The versioning work narrows to: build-
-identifier embedding, migration of older-version JSONs on import, and
-stale-build warnings on the registry.
-
-**To do:** Design and implement a versioning strategy. Likely shape:
-- Embed a build identifier (e.g. a hash of the YAML + a human-friendly
-  version string) into both the built site and into every exported JSON.
-- Decide which constraints to impose on risk managers to keep things
-  tractable — e.g. "IDs are immutable; semantics behind an ID can change but
-  IDs are never reused." Document the rules in `CLAUDE.md`.
-- Make the registry able to load assessments from older builds and show them
-  meaningfully (even if the form has since changed). At minimum, surface a
-  warning when the assessment's build differs from the current build, and
-  show which fields are stale / missing / new.
-- Stretch: a "change assessment" mode (per spec workflow point 8) that loads
-  old + new questionnaire JSONs and surfaces only the diff. This is
-  effectively a registry feature on top of solid versioning, so build
-  versioning first.
+**To do:**
+- **Schema-version migrator scaffold.** No migration code exists today
+  because we haven't bumped `version` since this scheme landed. Pick a
+  small, file-local pattern (e.g. a `migrations.py` with one function per
+  bump that takes a payload and returns the upgraded shape) and wire it
+  through both the JS importer and the registry loader (`registry.py`
+  currently hard-fails on `version` mismatch — relax to "migrate on
+  read" once a migrator exists). Defer until the first `version` bump.
+- **Change-assessment mode** (spec workflow point 8). Load both an old
+  and a new questionnaire JSON in the assessment view, diff the answers
+  + property snapshot, and surface only the deltas as their own risk
+  cards. Effectively a registry / assessment feature on top of solid
+  versioning — that part is now solid, so this is pure feature work.
+- **Surface diff details on stale registry entries.** The current
+  banner says "stale" but doesn't tell viewers *what* changed between
+  the record's build and the current one. Could compare ID lists in the
+  baked-in snapshot against the current form and list added / removed /
+  re-purposed IDs.
 
 ---
 

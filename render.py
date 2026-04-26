@@ -294,6 +294,7 @@ def _build_template_context(
     controls: Sequence[Control] | None = None,
     properties: Sequence[Property] | None = None,
     details: Sequence[Detail] | None = None,
+    build_id: str = "",
 ) -> dict:
     """Build the shared template context used by every page and factory template."""
     controls = controls or ()
@@ -327,6 +328,7 @@ def _build_template_context(
     detail_ids = [d.id for d in details]
 
     return {
+        "build_id": build_id,
         "sections": section_views,
         "questions": question_views,
         "risks": risk_views,
@@ -366,23 +368,24 @@ def _build_template_context(
     }
 
 
-def render_landing() -> str:
+def render_landing(build_id: str = "") -> str:
     """Render the landing page HTML (no Alpine, no form data)."""
     env = create_environment()
     template = env.get_template("landing.html.j2")
-    return template.render()
+    return template.render(build_id=build_id, asset_prefix="")
 
 
 def render_questionnaire(
     sections: Sequence[Section],
     properties: Sequence[Property] | None = None,
     details: Sequence[Detail] | None = None,
+    build_id: str = "",
 ) -> str:
     """Render the questionnaire page HTML (system owner view)."""
     env = create_environment()
     template = env.get_template("questionnaire.html.j2")
-    context = _build_template_context(sections, [], None, properties, details)
-    return template.render(**context)
+    context = _build_template_context(sections, [], None, properties, details, build_id)
+    return template.render(asset_prefix="", **context)
 
 
 def render_assessment(
@@ -391,23 +394,25 @@ def render_assessment(
     controls: Sequence[Control] | None = None,
     properties: Sequence[Property] | None = None,
     details: Sequence[Detail] | None = None,
+    build_id: str = "",
 ) -> str:
     """Render the assessment page HTML (assessor view)."""
     env = create_environment()
     template = env.get_template("assessment.html.j2")
-    context = _build_template_context(sections, risks, controls, properties, details)
-    return template.render(**context)
+    context = _build_template_context(sections, risks, controls, properties, details, build_id)
+    return template.render(asset_prefix="", **context)
 
 
-def render_registry_index(records: Sequence[SystemRecord]) -> str:
+def render_registry_index(records: Sequence[SystemRecord], build_id: str = "") -> str:
     """Render the registry index page — table of all committed systems."""
     env = create_environment()
     template = env.get_template("registry.html.j2")
-    rows = [_build_registry_row(r) for r in records]
+    rows = [_build_registry_row(r, build_id) for r in records]
     return template.render(
         rows=rows,
         risk_level_colours=config.RISK_LEVEL_COLOURS,
         asset_prefix="",
+        build_id=build_id,
     )
 
 
@@ -418,15 +423,19 @@ def render_registry_system(
     controls: Sequence[Control],
     properties: Sequence[Property],
     details: Sequence[Detail],
+    build_id: str = "",
 ) -> str:
     """Render the per-system detail page for one registry record."""
     env = create_environment()
     template = env.get_template("registry_system.html.j2")
-    view = _build_registry_system_view(record, sections, risks, controls, properties, details)
+    view = _build_registry_system_view(
+        record, sections, risks, controls, properties, details, build_id
+    )
     return template.render(
         **view,
         risk_level_colours=config.RISK_LEVEL_COLOURS,
         asset_prefix="../",
+        build_id=build_id,
     )
 
 
@@ -442,12 +451,30 @@ def _format_date(iso: str) -> str:
     return iso[:10]
 
 
-def _build_registry_row(record: SystemRecord) -> dict[str, Any]:
+def _record_build_id(record: SystemRecord) -> str:
+    """The build_id this record was made against, preferring the assessment.
+
+    Returns an empty string for legacy records that predate build_id
+    embedding — callers use the empty value to surface the stale-build
+    banner when comparing against the current build.
+    """
+    if record.assessment is not None:
+        ass_id = record.assessment.get("build_id")
+        if isinstance(ass_id, str) and ass_id:
+            return ass_id
+    q_id = record.questionnaire.get("build_id")
+    if isinstance(q_id, str):
+        return q_id
+    return ""
+
+
+def _build_registry_row(record: SystemRecord, current_build_id: str = "") -> dict[str, Any]:
     level = (
         "not_applicable"
         if record.assessment is None
         else aggregate_residual_level(record, config.RISK_LEVELS)
     )
+    record_build_id = _record_build_id(record)
     return {
         "slug": record.slug,
         "name": record.meta.name,
@@ -455,6 +482,8 @@ def _build_registry_row(record: SystemRecord) -> dict[str, Any]:
         "last_assessed": _format_date(record.exported_at),
         "has_assessment": record.assessment is not None,
         "residual_level": level,
+        "record_build_id": record_build_id,
+        "stale_build": bool(current_build_id) and record_build_id != current_build_id,
     }
 
 
@@ -706,6 +735,7 @@ def _build_registry_system_view(
     controls: Sequence[Control],
     properties: Sequence[Property],
     details: Sequence[Detail],
+    current_build_id: str = "",
 ) -> dict[str, Any]:
     answers = record.questionnaire.get("answers") or {}
     detail_values = record.questionnaire.get("details") or {}
@@ -725,6 +755,7 @@ def _build_registry_system_view(
             record.assessment.get("aggregate_residual_justification", "") or ""
         )
 
+    record_build_id = _record_build_id(record)
     return {
         "record": record,
         "meta": record.meta,
@@ -735,6 +766,8 @@ def _build_registry_system_view(
         "has_assessment": record.assessment is not None,
         "aggregate_residual_level": aggregate_level,
         "aggregate_residual_justification": aggregate_justification,
+        "record_build_id": record_build_id,
+        "stale_build": bool(current_build_id) and record_build_id != current_build_id,
     }
 
 
@@ -742,11 +775,12 @@ def render_questionnaire_app_js(
     sections: Sequence[Section],
     properties: Sequence[Property] | None = None,
     details: Sequence[Detail] | None = None,
+    build_id: str = "",
 ) -> str:
     """Render the Alpine factory for the questionnaire view as a standalone JS file."""
     env = create_environment()
     template = env.get_template("app-questionnaire.js.j2")
-    context = _build_template_context(sections, [], None, properties, details)
+    context = _build_template_context(sections, [], None, properties, details, build_id)
     return template.render(**context)
 
 
@@ -756,9 +790,10 @@ def render_assessment_app_js(
     controls: Sequence[Control] | None = None,
     properties: Sequence[Property] | None = None,
     details: Sequence[Detail] | None = None,
+    build_id: str = "",
 ) -> str:
     """Render the Alpine factory for the assessment view as a standalone JS file."""
     env = create_environment()
     template = env.get_template("app-assessment.js.j2")
-    context = _build_template_context(sections, risks, controls, properties, details)
+    context = _build_template_context(sections, risks, controls, properties, details, build_id)
     return template.render(**context)
