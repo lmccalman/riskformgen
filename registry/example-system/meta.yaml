@@ -1,0 +1,4 @@
+name: Example System (demo data)
+owner: Demo Owner
+notes: Sample fixture committed for documentation. Not a real assessment. Regenerate
+  with `uv run python scripts/seed_example_registry.py`.

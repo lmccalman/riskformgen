@@ -5,6 +5,7 @@ document.addEventListener('alpine:init', () => {
     details: Alpine.$persist({{ details_init_js }}).as('_x_q_details'),
     _questionIds: {{ question_ids_js }},
     _detailIds: {{ detail_ids_js }},
+    _propertyIds: {{ property_ids_js }},
     init() {
       // Fill gaps when $persist restores state from a previous build that predates newly-added IDs.
       for (const id of this._questionIds) {
@@ -32,15 +33,22 @@ document.addEventListener('alpine:init', () => {
       for (const id of this._detailIds) freshDetails[id] = '';
       this.details = freshDetails;
     },
+    _propertySnapshot() {
+      const snapshot = {};
+      for (const id of this._propertyIds) snapshot[id] = this[`prop_${id}`];
+      return snapshot;
+    },
     exportAnswers() {
       this._downloadJson({
         format: 'riskformgen-answers',
-        version: 1,
+        version: 2,
         exported_at: new Date().toISOString(),
         question_ids: this._questionIds,
         answers: this.answers,
         detail_ids: this._detailIds,
         details: this.details,
+        property_ids: this._propertyIds,
+        properties: this._propertySnapshot(),
       }, 'riskformgen-answers.json');
     },
     _importJson(event, {format, version, fileIdsKey, currentIds, label, count, apply}) {
@@ -81,7 +89,7 @@ document.addEventListener('alpine:init', () => {
     importAnswers(event) {
       this._importJson(event, {
         format: 'riskformgen-answers',
-        version: 1,
+        version: 2,
         fileIdsKey: 'question_ids',
         currentIds: this._questionIds,
         label: 'answers',

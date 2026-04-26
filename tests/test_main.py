@@ -54,6 +54,13 @@ def test_main_builds_expected_files(tmp_path: Path, monkeypatch):
     assessment_js = (out / "app-assessment.js").read_text()
     assert "Alpine.data('assessment'" in assessment_js
 
+    # Registry index plus per-system page for the committed example fixture.
+    registry_html = (out / "registry.html").read_text()
+    assert 'href="registry/example-system.html"' in registry_html
+    example_html = out / "registry" / "example-system.html"
+    assert example_html.exists(), "Expected registry/example-system.html to be generated"
+    assert example_html.stat().st_size > 0
+
 
 def _eval_factory(js: str) -> None:
     ctx = MiniRacer()

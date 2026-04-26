@@ -55,12 +55,31 @@ class TestLandingNavigation:
             "() => !!document.querySelector('[x-data=assessment]')?._x_dataStack?.[0]"
         )
 
-    def test_registry_link_loads_placeholder(self, landing_page: Page) -> None:
+    def test_registry_link_loads_index(self, landing_page: Page) -> None:
         landing_page.locator('a[href="registry.html"]').first.click()
         landing_page.wait_for_url("**/registry.html")
-        # Placeholder copy is present.
         body_text = landing_page.text_content("body") or ""
         assert "Registry" in body_text
+
+    def test_registry_index_links_to_committed_systems(self, registry_page: Page) -> None:
+        # The repo ships an `example-system` fixture, so the index should
+        # carry at least one link to a per-system detail page.
+        rows = registry_page.locator("a[href^='registry/']")
+        assert rows.count() >= 1
+
+    def test_registry_system_page_renders(self, page: Page, site_url: str) -> None:
+        page.goto(f"{site_url}/registry/example-system.html")
+        body_text = page.text_content("body") or ""
+        # System name from meta.yaml, plus a known answer from the fixture.
+        assert "Example System" in body_text
+        assert "← Registry" in body_text
+        # Per-system page must use the relative `../` prefix for local CSS
+        # so the browser actually finds bulma.min.css and input.css from a
+        # subdirectory. (Skips the absolute Google Fonts URL.)
+        bulma_link = page.locator('link[rel=stylesheet][href$="bulma.min.css"]')
+        assert bulma_link.count() == 1
+        href = bulma_link.first.get_attribute("href")
+        assert href is not None and href.startswith("../")
 
 
 # ---------------------------------------------------------------------------

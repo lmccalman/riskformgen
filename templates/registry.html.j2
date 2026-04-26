@@ -7,8 +7,8 @@
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
     <link href="https://fonts.googleapis.com/css2?family=Lora:ital,wght@0,400;0,600;0,700;1,400&family=Source+Sans+3:wght@300;400;500;600&display=swap" rel="stylesheet" />
-    <link rel="stylesheet" href="bulma.min.css" />
-    <link rel="stylesheet" href="input.css" />
+    <link rel="stylesheet" href="{{ asset_prefix }}bulma.min.css" />
+    <link rel="stylesheet" href="{{ asset_prefix }}input.css" />
   </head>
   <body class="persona-registry">
     <main class="container">
@@ -18,20 +18,52 @@
         <p class="subtitle is-5">For executives and oversight.</p>
       </header>
 
-      <section class="registry-placeholder stack-md">
+      {% if rows %}
+      <table class="table registry-table is-fullwidth is-hoverable">
+        <thead>
+          <tr>
+            <th>System</th>
+            <th>Worst residual risk</th>
+            <th>Last assessed</th>
+            <th></th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for row in rows %}
+          <tr>
+            <td>
+              <a href="registry/{{ row.slug }}.html">{{ row.name }}</a>
+              {% if row.owner %}
+              <p class="has-text-grey is-size-7">{{ row.owner }}</p>
+              {% endif %}
+            </td>
+            <td>
+              {% if row.has_assessment %}
+              <span class="badge badge-{{ risk_level_colours.get(row.worst_level, 'gray') }}">
+                {{ row.worst_level | replace("_", " ") }}
+              </span>
+              {% else %}
+              <span class="has-text-grey">No assessment</span>
+              {% endif %}
+            </td>
+            <td>{{ row.last_assessed }}</td>
+            <td><a href="registry/{{ row.slug }}.html">View →</a></td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+      {% else %}
+      <section class="registry-empty-state stack-md">
         <p>
-          The registry will let executives and board members browse system
-          cards (the system owner's questionnaire answers) and the
-          associated risk assessments across the organisation.
-        </p>
-        <p>
-          This view is a placeholder for now. The questionnaire and the
-          assessment views are functional — start there.
+          No systems registered yet. The risk manager commits each system's
+          questionnaire and assessment JSON to <code>registry/&lt;slug&gt;/</code>
+          to populate this view.
         </p>
         <p>
           <a href="index.html">← Back to FormGen</a>
         </p>
       </section>
+      {% endif %}
     </main>
   </body>
 </html>

@@ -1,0 +1,97 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>{{ meta.name }} — Registry — FormGen</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link href="https://fonts.googleapis.com/css2?family=Lora:ital,wght@0,400;0,600;0,700;1,400&family=Source+Sans+3:wght@300;400;500;600&display=swap" rel="stylesheet" />
+    <link rel="stylesheet" href="{{ asset_prefix }}bulma.min.css" />
+    <link rel="stylesheet" href="{{ asset_prefix }}input.css" />
+  </head>
+  <body class="persona-registry">
+    <main class="container">
+      <header class="page-header registry-system-header">
+        <p class="page-eyebrow"><a href="../registry.html">← Registry</a></p>
+        <h1 class="title is-3">{{ meta.name }}</h1>
+        <p class="subtitle is-5">
+          {% if meta.owner %}{{ meta.owner }} · {% endif %}Last assessed {{ exported_at }}
+        </p>
+        {% if meta.notes %}
+        <p class="has-text-grey">{{ meta.notes }}</p>
+        {% endif %}
+      </header>
+
+      <section class="stack-md">
+        <h2 class="title is-4">System card</h2>
+        <p class="has-text-grey">The system owner's answers, as committed.</p>
+        <div class="answers-summary">
+          {% for section in sections %}
+          {% if section.visible %}
+          <section class="answers-summary-section">
+            <h3 class="title is-5">{{ section.title }}</h3>
+            {% for sub in section.subsections %}
+            {% if sub.visible %}
+            <div class="answers-summary-subsection">
+              <h4 class="title is-6">{{ sub.title }}</h4>
+              <dl class="answers-summary-list">
+                {% for q in sub.questions %}
+                {% if q.visible %}
+                <div class="answers-summary-row">
+                  <dt class="answers-summary-q">{{ q.text }}</dt>
+                  {% if q.type == "binary" %}
+                  <dd class="answers-summary-a">
+                    {% if q.answer == "yes" %}
+                    <span>Yes</span>
+                    {% elif q.answer == "no" %}
+                    <span>No</span>
+                    {% else %}
+                    <span class="answer-missing">—</span>
+                    {% endif %}
+                  </dd>
+                  {% elif q.type == "detail" %}
+                  <dd class="answers-summary-a">
+                    {% if q.detail_text %}
+                    <span class="answers-summary-detail">{{ q.detail_text }}</span>
+                    {% else %}
+                    <span class="answer-missing">—</span>
+                    {% endif %}
+                  </dd>
+                  {% endif %}
+                </div>
+                {% endif %}
+                {% endfor %}
+              </dl>
+            </div>
+            {% endif %}
+            {% endfor %}
+          </section>
+          {% endif %}
+          {% endfor %}
+        </div>
+      </section>
+
+      <section class="stack-md">
+        <h2 class="title is-4">Risks</h2>
+        {% if not has_assessment %}
+        <p class="has-text-grey">
+          No assessment has been committed for this system yet. Only the
+          system card is shown above.
+        </p>
+        {% elif risks %}
+        {% for risk in risks %}
+        {% with risk=risk %}
+        {% include "registry_risk.html.j2" %}
+        {% endwith %}
+        {% endfor %}
+        {% else %}
+        <p class="has-text-grey">
+          No applicable risks fired for this system based on the loaded
+          questionnaire answers.
+        </p>
+        {% endif %}
+      </section>
+    </main>
+  </body>
+</html>

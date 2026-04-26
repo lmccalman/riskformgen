@@ -1083,6 +1083,106 @@ class TestQuestionnaireClearAnswers:
         assert scope.eval("scope.details") == {"d1": "field notes"}
 
 
+class TestExportSnapshotsBakedValues:
+    """The registry consumes the JSON exports without re-evaluating the
+    property DAG or the risk conditions. That contract relies on the
+    factories writing their resolved state at export time. Pin both:
+
+    1. Questionnaire export carries `properties` snapshotting every
+       `prop_*` getter under the same key as the property id.
+    2. Assessment export carries `inherent` snapshotting each risk's
+       `{likelihood, consequence, level, firing_conditions}` plus the
+       same `properties` map.
+
+    A regression here would silently feed stale data into the registry.
+    """
+
+    def test_questionnaire_property_snapshot_round_trips(self) -> None:
+        q1 = BinaryQuestion(id="q1", text="", properties=("p1",))
+        q2 = BinaryQuestion(id="q2", text="", properties=("p2",))
+        p1 = Property(id="p1", description="")
+        p2 = Property(id="p2", description="")
+        scope = _questionnaire_form([q1, q2], [p1, p2])
+        scope.set_answer("q1", "yes")
+        scope.set_answer("q2", "no")
+
+        snapshot = scope.eval("scope._propertySnapshot()")
+        assert snapshot == {"p1": True, "p2": False}
+
+    def test_questionnaire_property_snapshot_includes_null_when_unanswered(self) -> None:
+        q = BinaryQuestion(id="q1", text="", properties=("p1",))
+        p = Property(id="p1", description="")
+        scope = _questionnaire_form([q], [p])
+
+        snapshot = scope.eval("scope._propertySnapshot()")
+        # Unanswered → null (matches the prop_* getter return).
+        assert snapshot == {"p1": None}
+
+    def test_assessment_inherent_snapshot_round_trips_levels(self) -> None:
+        q1 = BinaryQuestion(id="q1", text="", properties=("p1",))
+        q2 = BinaryQuestion(id="q2", text="", properties=("p2",))
+        p1 = Property(id="p1", description="")
+        p2 = Property(id="p2", description="")
+        risk = Risk(
+            id="r1",
+            description="",
+            conditions=(
+                ConditionMapping(property="p1", likelihood="likely", consequence="minor"),
+                ConditionMapping(property="p2", likelihood="rare", consequence="major"),
+            ),
+        )
+        scope = _form([q1, q2], [p1, p2], risks=[risk])
+        scope.set_answer("q1", "yes")
+        scope.set_answer("q2", "yes")
+
+        inherent = dict(scope.eval("scope._inherentSnapshot()"))
+        r1 = dict(inherent["r1"])
+        # Worst-per-dimension: likely / major → high
+        assert r1["likelihood"] == "likely"
+        assert r1["consequence"] == "major"
+        assert r1["level"] == "high"
+        assert sorted(r1["firing_conditions"]) == ["p1", "p2"]
+
+    def test_assessment_inherent_firing_conditions_filters_to_truthy(self) -> None:
+        q1 = BinaryQuestion(id="q1", text="", properties=("p1",))
+        q2 = BinaryQuestion(id="q2", text="", properties=("p2",))
+        p1 = Property(id="p1", description="")
+        p2 = Property(id="p2", description="")
+        risk = Risk(
+            id="r1",
+            description="",
+            conditions=(
+                ConditionMapping(property="p1", likelihood="likely", consequence="major"),
+                ConditionMapping(property="p2", likelihood="rare", consequence="minor"),
+            ),
+        )
+        scope = _form([q1, q2], [p1, p2], risks=[risk])
+        scope.set_answer("q1", "yes")
+        scope.set_answer("q2", "no")  # condition does not fire
+
+        inherent = dict(scope.eval("scope._inherentSnapshot()"))
+        r1 = dict(inherent["r1"])
+        assert list(r1["firing_conditions"]) == ["p1"]
+
+    def test_assessment_inherent_no_firing_is_not_applicable(self) -> None:
+        q = BinaryQuestion(id="q1", text="", properties=("p1",))
+        p = Property(id="p1", description="")
+        risk = Risk(
+            id="r1",
+            description="",
+            conditions=(
+                ConditionMapping(property="p1", likelihood="likely", consequence="major"),
+            ),
+        )
+        scope = _form([q], [p], risks=[risk])
+        # Question unanswered → property null → no condition fires.
+
+        inherent = dict(scope.eval("scope._inherentSnapshot()"))
+        r1 = dict(inherent["r1"])
+        assert r1["level"] == "not_applicable"
+        assert list(r1["firing_conditions"]) == []
+
+
 class TestAssessmentClearAssessment:
     """The assessment's clearAssessment wipes assessment state only and
     leaves the loaded answers + details intact (those came from a

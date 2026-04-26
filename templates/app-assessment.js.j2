@@ -11,8 +11,10 @@ document.addEventListener('alpine:init', () => {
     mandated_comments: Alpine.$persist({{ mandated_comments_init_js }}).as('_x_a_mandated_comments'),
     _questionIds: {{ question_ids_js }},
     _detailIds: {{ detail_ids_js }},
+    _propertyIds: {{ property_ids_js }},
     _riskIds: {{ risk_ids_js }},
     _controlIds: {{ control_ids_js }},
+    _riskConditions: {{ risk_conditions_js }},
     _likelihoods: {{ likelihoods_js }},
     _consequences: {{ consequences_js }},
     _risk_matrix: {{ risk_matrix_js }},
@@ -119,7 +121,7 @@ document.addEventListener('alpine:init', () => {
     importAnswers(event) {
       this._importJson(event, {
         format: 'riskformgen-answers',
-        version: 1,
+        version: 2,
         fileIdsKey: 'question_ids',
         currentIds: this._questionIds,
         label: 'answers',
@@ -144,12 +146,34 @@ document.addEventListener('alpine:init', () => {
         },
       });
     },
+    _propertySnapshot() {
+      const snapshot = {};
+      for (const id of this._propertyIds) snapshot[id] = this[`prop_${id}`];
+      return snapshot;
+    },
+    _inherentSnapshot() {
+      const snapshot = {};
+      for (const id of this._riskIds) {
+        const inh = this[id];
+        const firing = (this._riskConditions[id] || []).filter(p => this[`prop_${p}`] === true);
+        snapshot[id] = {
+          likelihood: inh.likelihood,
+          consequence: inh.consequence,
+          level: inh.level,
+          firing_conditions: firing,
+        };
+      }
+      return snapshot;
+    },
     exportAssessment() {
       this._downloadJson({
         format: 'riskformgen-assessment',
-        version: 2,
+        version: 3,
         exported_at: new Date().toISOString(),
         risk_ids: this._riskIds,
+        property_ids: this._propertyIds,
+        properties: this._propertySnapshot(),
+        inherent: this._inherentSnapshot(),
         control_effectiveness: this.control_effectiveness,
         residual_likelihood: this.residual_likelihood,
         residual_consequence: this.residual_consequence,
@@ -161,7 +185,7 @@ document.addEventListener('alpine:init', () => {
     importAssessment(event) {
       this._importJson(event, {
         format: 'riskformgen-assessment',
-        version: 2,
+        version: 3,
         fileIdsKey: 'risk_ids',
         currentIds: this._riskIds,
         label: 'assessments',

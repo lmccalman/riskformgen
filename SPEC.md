@@ -37,6 +37,21 @@ persona always knows which view they are in.
       answers, the inherent risks they imply, and inputs for residual risk.
     - **Registry view** — for executives, listing all systems' completed
       questionnaires and assessments.
+
+   Each system in the registry is a folder under `registry/` at the repo
+   root:
+
+       registry/<slug>/
+         questionnaire.json    # required, format `riskformgen-answers` v2
+         assessment.json       # optional — system in progress if missing
+         meta.yaml             # required, supplies the display name (and
+                               # optional owner / notes)
+
+   The build reads these at compile time and emits a static index page
+   (`registry.html`) plus one `registry/<slug>.html` per record. The
+   registry view is server-rendered HTML (no Alpine), so the committed
+   JSONs are the canonical record and the rendered pages are downstream
+   artifacts.
 3. System owners open the questionnaire view, fill out the form, and export
    their answers as a JSON payload. The site saves their state locally as they
    go so they don't lose their work when they refresh the page or come back
@@ -204,6 +219,25 @@ assessment view surfaces, on the risk card:
 Both pieces of state are included in the assessment JSON export, so the
 registry shows both the assessor's appraisal of existing controls and any
 controls they have required or recommended for the system going forward.
+
+#### Baked-in values in JSON exports
+
+To keep the registry simple — and to keep historical assessments stable
+when the YAML form evolves — the questionnaire and assessment exports
+each carry the values they computed at export time:
+
+- The questionnaire JSON includes a `properties` map (every property's
+  resolved DAG state, `true | false | null`).
+- The assessment JSON includes a per-risk `inherent` block with
+  `likelihood`, `consequence`, `level`, and the list of property ids
+  whose conditions fired.
+
+The registry renders these directly without re-evaluating the form;
+this means the registry shows what was assessed at the time, not a
+re-derivation against today's form. The Alpine factories remain the
+single source of truth for *how* these values are computed — both
+factories' export functions snapshot their own `prop_*` and risk
+getters into the JSON.
 
 ### Details
 

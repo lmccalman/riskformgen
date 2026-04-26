@@ -8,6 +8,16 @@ alpine_src = assets_dir / "alpine3.15.8.min.js"
 persist_src = assets_dir / "alpine-persist.min.js"
 bulma_src = assets_dir / "bulma.min.css"
 form_dir = project_root / "form"
+registry_dir = project_root / "registry"
+
+# ---------------------------------------------------------------------------
+# Export format versions (must match the JS factories in templates/app-*.js.j2)
+# ---------------------------------------------------------------------------
+
+QUESTIONNAIRE_FORMAT = "riskformgen-answers"
+QUESTIONNAIRE_VERSION = 2
+ASSESSMENT_FORMAT = "riskformgen-assessment"
+ASSESSMENT_VERSION = 3
 
 # ---------------------------------------------------------------------------
 # Risk scales and matrix (order = ascending severity)

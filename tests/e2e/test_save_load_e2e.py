@@ -41,7 +41,10 @@ class TestAnswersRoundtripQuestionnaire:
 
         payload = download_payload(questionnaire_page, "Save answers", "riskformgen-answers.json")
         assert payload["format"] == "riskformgen-answers"
-        assert payload["version"] == 1
+        assert payload["version"] == 2
+        # Properties snapshot is baked into the export so the registry can
+        # render without re-evaluating the cascade.
+        assert payload["properties"][payload["property_ids"][0]] in (True, False, None)
         assert payload["answers"][first] == "yes"
         assert payload["answers"][second] == "no"
 
@@ -72,12 +75,14 @@ class TestAnswersRoundtripQuestionnaire:
         )
         payload = {
             "format": "riskformgen-answers",
-            "version": 1,
+            "version": 2,
             "exported_at": "2025-01-01T00:00:00.000Z",
             "question_ids": list(question_ids),
             "answers": {qid: "yes" for qid in question_ids},
             "detail_ids": list(detail_ids),
             "details": {did: "note" for did in detail_ids},
+            "property_ids": [],
+            "properties": {},
         }
 
         recorder = DialogRecorder(questionnaire_page)
@@ -105,7 +110,7 @@ class TestAnswersRoundtripQuestionnaire:
         )
 
     def test_wrong_format_shows_alert(self, questionnaire_page: Page) -> None:
-        payload = {"format": "something-else", "version": 1, "question_ids": [], "answers": {}}
+        payload = {"format": "something-else", "version": 2, "question_ids": [], "answers": {}}
         recorder = DialogRecorder(questionnaire_page)
         upload_payload(questionnaire_page, 'input[x-ref="answersFile"]', payload)
         recorder.wait_for_alerts()
@@ -125,7 +130,7 @@ class TestAnswersRoundtripQuestionnaire:
         recorder.wait_for_alerts()
         msg = recorder.alerts()[0]["message"]
         assert "99" in msg
-        assert "expected 1" in msg
+        assert "expected 2" in msg
 
     def test_added_ids_prompt_confirm_accept_applies_partial(
         self, questionnaire_page: Page
@@ -137,12 +142,14 @@ class TestAnswersRoundtripQuestionnaire:
         kept = question_ids[:2]
         payload = {
             "format": "riskformgen-answers",
-            "version": 1,
+            "version": 2,
             "exported_at": "2025-01-01T00:00:00.000Z",
             "question_ids": list(kept),
             "answers": {qid: "yes" for qid in kept},
             "detail_ids": [],
             "details": {},
+            "property_ids": [],
+            "properties": {},
         }
 
         eval_in_scope(
@@ -178,12 +185,14 @@ class TestAnswersRoundtripQuestionnaire:
         file_ids = [*question_ids, extra_id]
         payload = {
             "format": "riskformgen-answers",
-            "version": 1,
+            "version": 2,
             "exported_at": "2025-01-01T00:00:00.000Z",
             "question_ids": file_ids,
             "answers": {**{qid: "yes" for qid in question_ids}, extra_id: "yes"},
             "detail_ids": [],
             "details": {},
+            "property_ids": [],
+            "properties": {},
         }
 
         recorder = DialogRecorder(questionnaire_page)
@@ -205,12 +214,14 @@ class TestAnswersRoundtripQuestionnaire:
         )
         payload = {
             "format": "riskformgen-answers",
-            "version": 1,
+            "version": 2,
             "exported_at": "2025-01-01T00:00:00.000Z",
             "question_ids": question_ids[:1],
             "answers": {first: "should-not-apply"},
             "detail_ids": [],
             "details": {},
+            "property_ids": [],
+            "properties": {},
         }
 
         recorder = DialogRecorder(questionnaire_page, accept_confirm=False)
@@ -237,12 +248,14 @@ class TestAssessmentImportsQuestionnaireJson:
         first = question_ids[0]
         payload = {
             "format": "riskformgen-answers",
-            "version": 1,
+            "version": 2,
             "exported_at": "2025-01-01T00:00:00.000Z",
             "question_ids": list(question_ids),
             "answers": {qid: ("yes" if qid == first else "") for qid in question_ids},
             "detail_ids": [],
             "details": {},
+            "property_ids": [],
+            "properties": {},
         }
 
         # Reset the assessment scope's answers first so the import has work to do.
@@ -280,11 +293,20 @@ class TestAssessmentRoundtrip:
             assessment_page, "Save assessment", "riskformgen-assessment.json"
         )
         assert payload["format"] == "riskformgen-assessment"
-        assert payload["version"] == 2
+        assert payload["version"] == 3
         assert payload["control_effectiveness"][target] == "partial"
         assert payload["residual_likelihood"][target] == "rare"
         assert payload["residual_consequence"][target] == "minor"
         assert payload["justifications"][target] == "looks fine"
+        # Inherent block carries baked-in values for the registry to render.
+        assert "inherent" in payload
+        assert payload["inherent"][target]["level"] in (
+            "low",
+            "medium",
+            "high",
+            "controlled",
+            "not_applicable",
+        )
 
         eval_in_scope(
             assessment_page,
@@ -338,9 +360,12 @@ class TestAssessmentRoundtrip:
 
         payload = {
             "format": "riskformgen-assessment",
-            "version": 2,
+            "version": 3,
             "exported_at": "2025-01-01T00:00:00.000Z",
             "risk_ids": list(risk_ids),
+            "property_ids": [],
+            "properties": {},
+            "inherent": {r: {} for r in risk_ids},
             "control_effectiveness": {r: "" for r in risk_ids},
             "residual_likelihood": {r: "" for r in risk_ids},
             "residual_consequence": {r: "" for r in risk_ids},
@@ -386,15 +411,22 @@ class TestAssessmentRoundtrip:
         recorder.wait_for_alerts()
         msg = recorder.alerts()[0]["message"]
         assert "got 1" in msg
-        assert "expected 2" in msg
+        assert "expected 3" in msg
 
 
 class TestDownloadShape:
     def test_questionnaire_export_shape(self, questionnaire_page: Page) -> None:
         payload = download_payload(questionnaire_page, "Save answers", "riskformgen-answers.json")
         assert payload["format"] == "riskformgen-answers"
-        assert payload["version"] == 1
-        for key in ("question_ids", "answers", "detail_ids", "details"):
+        assert payload["version"] == 2
+        for key in (
+            "question_ids",
+            "answers",
+            "detail_ids",
+            "details",
+            "property_ids",
+            "properties",
+        ):
             assert key in payload, f"missing {key} in payload"
         # ISO-8601 timestamp with trailing 'Z' (JS toISOString); datetime needs +00:00.
         datetime.fromisoformat(payload["exported_at"].replace("Z", "+00:00"))
@@ -404,9 +436,12 @@ class TestDownloadShape:
             assessment_page, "Save assessment", "riskformgen-assessment.json"
         )
         assert payload["format"] == "riskformgen-assessment"
-        assert payload["version"] == 2
+        assert payload["version"] == 3
         for key in (
             "risk_ids",
+            "property_ids",
+            "properties",
+            "inherent",
             "control_effectiveness",
             "residual_likelihood",
             "residual_consequence",

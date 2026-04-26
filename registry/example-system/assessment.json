@@ -1,0 +1,246 @@
+{
+  "format": "riskformgen-assessment",
+  "version": 3,
+  "exported_at": "2026-04-26T08:24:24Z",
+  "risk_ids": [
+    "cardiovascular_risk",
+    "metabolic_risk",
+    "mental_health_risk",
+    "musculoskeletal_risk",
+    "skin_cancer_risk",
+    "substance_misuse_risk",
+    "preventive_care_gap_risk"
+  ],
+  "property_ids": [
+    "physically_active",
+    "exercises_frequently",
+    "does_strength_training",
+    "does_cardio_training",
+    "well_rounded_fitness",
+    "desk_bound_job",
+    "has_ergonomic_setup",
+    "eats_balanced_diet",
+    "eats_vegetables_daily",
+    "consumes_processed_food_often",
+    "drinks_alcohol_daily",
+    "smokes_or_vapes",
+    "sleeps_well",
+    "keeps_consistent_sleep_schedule",
+    "feels_chronic_stress",
+    "practices_stress_management",
+    "socially_connected",
+    "feels_lonely",
+    "group_participant",
+    "team_sport_player",
+    "outdoors_oriented",
+    "uses_sun_protection",
+    "has_sensitive_skin",
+    "has_chronic_condition",
+    "has_family_cardiac_history",
+    "attends_regular_checkups"
+  ],
+  "properties": {
+    "physically_active": false,
+    "exercises_frequently": false,
+    "does_strength_training": false,
+    "does_cardio_training": false,
+    "well_rounded_fitness": false,
+    "desk_bound_job": true,
+    "has_ergonomic_setup": false,
+    "eats_balanced_diet": false,
+    "eats_vegetables_daily": false,
+    "consumes_processed_food_often": true,
+    "drinks_alcohol_daily": true,
+    "smokes_or_vapes": false,
+    "sleeps_well": true,
+    "keeps_consistent_sleep_schedule": true,
+    "feels_chronic_stress": true,
+    "practices_stress_management": false,
+    "socially_connected": true,
+    "feels_lonely": false,
+    "group_participant": false,
+    "team_sport_player": false,
+    "outdoors_oriented": false,
+    "uses_sun_protection": false,
+    "has_sensitive_skin": false,
+    "has_chronic_condition": false,
+    "has_family_cardiac_history": true,
+    "attends_regular_checkups": false
+  },
+  "inherent": {
+    "cardiovascular_risk": {
+      "likelihood": "likely",
+      "consequence": "major",
+      "level": "high",
+      "firing_conditions": [
+        "has_family_cardiac_history",
+        "drinks_alcohol_daily",
+        "consumes_processed_food_often",
+        "feels_chronic_stress",
+        "desk_bound_job"
+      ]
+    },
+    "metabolic_risk": {
+      "likelihood": "likely",
+      "consequence": "major",
+      "level": "high",
+      "firing_conditions": [
+        "consumes_processed_food_often",
+        "drinks_alcohol_daily",
+        "desk_bound_job"
+      ]
+    },
+    "mental_health_risk": {
+      "likelihood": "likely",
+      "consequence": "major",
+      "level": "high",
+      "firing_conditions": [
+        "feels_chronic_stress"
+      ]
+    },
+    "musculoskeletal_risk": {
+      "likelihood": "likely",
+      "consequence": "medium",
+      "level": "high",
+      "firing_conditions": [
+        "desk_bound_job",
+        "feels_chronic_stress"
+      ]
+    },
+    "skin_cancer_risk": {
+      "likelihood": null,
+      "consequence": null,
+      "level": "not_applicable",
+      "firing_conditions": []
+    },
+    "substance_misuse_risk": {
+      "likelihood": "likely",
+      "consequence": "major",
+      "level": "high",
+      "firing_conditions": [
+        "drinks_alcohol_daily",
+        "feels_chronic_stress"
+      ]
+    },
+    "preventive_care_gap_risk": {
+      "likelihood": "possible",
+      "consequence": "medium",
+      "level": "medium",
+      "firing_conditions": [
+        "has_family_cardiac_history"
+      ]
+    }
+  },
+  "control_effectiveness": {
+    "cardiovascular_risk": "partial",
+    "metabolic_risk": "partial",
+    "mental_health_risk": "partial",
+    "musculoskeletal_risk": "partial",
+    "skin_cancer_risk": "",
+    "substance_misuse_risk": "partial",
+    "preventive_care_gap_risk": "ineffective"
+  },
+  "residual_likelihood": {
+    "cardiovascular_risk": "possible",
+    "metabolic_risk": "possible",
+    "mental_health_risk": "possible",
+    "musculoskeletal_risk": "unlikely",
+    "skin_cancer_risk": "",
+    "substance_misuse_risk": "possible",
+    "preventive_care_gap_risk": ""
+  },
+  "residual_consequence": {
+    "cardiovascular_risk": "medium",
+    "metabolic_risk": "medium",
+    "mental_health_risk": "medium",
+    "musculoskeletal_risk": "medium",
+    "skin_cancer_risk": "",
+    "substance_misuse_risk": "medium",
+    "preventive_care_gap_risk": ""
+  },
+  "justifications": {
+    "cardiovascular_risk": "Family history is unmodifiable, but moderating alcohol intake, addressing diet, and adding regular movement would meaningfully reduce likelihood. Mandating routine exercise and a checkup.",
+    "metabolic_risk": "Improvements to diet and movement would lower likelihood substantially.",
+    "mental_health_risk": "Person is socially connected and sleeps well, which compensates for chronic stress. A stress-management routine would reduce likelihood further.",
+    "musculoskeletal_risk": "Ergonomic improvements and regular movement breaks would address most of this.",
+    "skin_cancer_risk": "",
+    "substance_misuse_risk": "Daily but moderate use. Substituting some evenings for non-alcoholic alternatives is a reasonable mitigation.",
+    "preventive_care_gap_risk": "No preventive care happening \u2014 full inherent risk applies."
+  },
+  "mandated_controls": {
+    "cardiovascular_risk": {
+      "regular_exercise_routine": true,
+      "balanced_strength_cardio": false,
+      "team_sport_engagement": false,
+      "nutrient_dense_diet": false,
+      "daily_vegetable_intake": false,
+      "stress_management_practice": false,
+      "regular_health_checkups": true
+    },
+    "metabolic_risk": {
+      "regular_exercise_routine": true,
+      "balanced_strength_cardio": false,
+      "nutrient_dense_diet": true,
+      "daily_vegetable_intake": false,
+      "regular_health_checkups": false
+    },
+    "mental_health_risk": {
+      "regular_exercise_routine": false,
+      "team_sport_engagement": false,
+      "restorative_sleep": false,
+      "stress_management_practice": true,
+      "active_social_connection": false
+    },
+    "musculoskeletal_risk": {
+      "regular_exercise_routine": false,
+      "balanced_strength_cardio": false,
+      "stress_management_practice": false,
+      "ergonomic_workspace": true
+    },
+    "skin_cancer_risk": {
+      "sun_protection": false
+    },
+    "substance_misuse_risk": {},
+    "preventive_care_gap_risk": {
+      "regular_health_checkups": false
+    }
+  },
+  "mandated_comments": {
+    "cardiovascular_risk": {
+      "regular_exercise_routine": "Three sessions per week \u2014 mix of cardio and strength.",
+      "balanced_strength_cardio": "",
+      "team_sport_engagement": "",
+      "nutrient_dense_diet": "",
+      "daily_vegetable_intake": "",
+      "stress_management_practice": "",
+      "regular_health_checkups": "Annual checkup with bloodwork given family history."
+    },
+    "metabolic_risk": {
+      "regular_exercise_routine": "Same as cardiovascular \u2014 joint mitigation.",
+      "balanced_strength_cardio": "",
+      "nutrient_dense_diet": "Reduce processed-food intake; add a serving of vegetables to lunch and dinner.",
+      "daily_vegetable_intake": "",
+      "regular_health_checkups": ""
+    },
+    "mental_health_risk": {
+      "regular_exercise_routine": "",
+      "team_sport_engagement": "",
+      "restorative_sleep": "",
+      "stress_management_practice": "Try a structured practice \u2014 meditation app, journalling, or therapy.",
+      "active_social_connection": ""
+    },
+    "musculoskeletal_risk": {
+      "regular_exercise_routine": "",
+      "balanced_strength_cardio": "",
+      "stress_management_practice": "",
+      "ergonomic_workspace": "Adjust chair, desk and screen height. Take a 5-minute break each hour."
+    },
+    "skin_cancer_risk": {
+      "sun_protection": ""
+    },
+    "substance_misuse_risk": {},
+    "preventive_care_gap_risk": {
+      "regular_health_checkups": ""
+    }
+  }
+}

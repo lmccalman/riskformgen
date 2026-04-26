@@ -214,9 +214,63 @@ body.persona-registry      { border-top: 6px solid var(--ent-bark-light); }
   border-top: none;
 }
 
-/* ── Registry placeholder ── */
-.registry-placeholder p {
-  font-size: 1rem;
+/* ── Registry ── */
+.registry-table {
+  background: var(--ent-bg-card);
+  border: 1px solid var(--ent-bark-border);
+  border-radius: 12px;
+  box-shadow: 0 2px 8px var(--ent-shadow);
+  overflow: hidden;
+}
+
+.registry-table thead th {
+  background: var(--ent-sunlight-pale);
+  font-family: 'Lora', Georgia, serif;
+  color: var(--ent-canopy);
+  border-bottom: 1px solid var(--ent-bark-border);
+  font-size: 0.85rem;
+  letter-spacing: 0.02em;
+}
+
+.registry-table tbody tr:hover {
+  background: var(--ent-sunlight-pale);
+}
+
+.registry-table tbody td {
+  vertical-align: middle;
+  border-color: var(--ent-bark-border);
+}
+
+.registry-table tbody td a {
+  color: var(--ent-canopy);
+  font-weight: 600;
+  text-decoration: none;
+}
+
+.registry-table tbody td a:hover {
+  text-decoration: underline;
+}
+
+.registry-system-header {
+  margin-bottom: 1.5rem;
+}
+
+.registry-empty-state {
+  background: var(--ent-bg-card);
+  border: 1px solid var(--ent-bark-border);
+  border-radius: 12px;
+  padding: 2rem;
+}
+
+.registry-empty-state code {
+  background: var(--ent-sunlight-pale);
+  padding: 0.1rem 0.4rem;
+  border-radius: 4px;
+  font-size: 0.9em;
+}
+
+.registry-risk-card {
+  /* Inherits the existing .card styling. Reserved hook for future tweaks. */
 }
 
 /* ── Alpine.js cloak ── */

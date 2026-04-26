@@ -1,6 +1,7 @@
 import json
 from collections.abc import Sequence
 from dataclasses import dataclass
+from typing import Any
 
 from jinja2 import Environment, FileSystemLoader, select_autoescape
 
@@ -17,6 +18,7 @@ from models import (
     SubSection,
     all_questions,
 )
+from registry import SystemRecord, worst_residual_level
 
 
 def create_environment() -> Environment:
@@ -352,8 +354,12 @@ def _build_template_context(
         ),
         "question_ids_js": json.dumps([q.id for q in question_views]),
         "detail_ids_js": json.dumps(detail_ids),
+        "property_ids_js": json.dumps([p.id for p in property_getters]),
         "risk_ids_js": json.dumps([r.id for r in risk_views]),
         "control_ids_js": json.dumps({r.id: [c.id for c in r.controls] for r in risk_views}),
+        "risk_conditions_js": json.dumps(
+            {r.id: list(dict.fromkeys(c.property for c in r.conditions)) for r in risks}
+        ),
     }
 
 
@@ -390,11 +396,332 @@ def render_assessment(
     return template.render(**context)
 
 
-def render_registry() -> str:
-    """Render the registry placeholder page HTML."""
+def render_registry_index(records: Sequence[SystemRecord]) -> str:
+    """Render the registry index page — table of all committed systems."""
     env = create_environment()
     template = env.get_template("registry.html.j2")
-    return template.render()
+    rows = [_build_registry_row(r) for r in records]
+    return template.render(
+        rows=rows,
+        risk_level_colours=config.RISK_LEVEL_COLOURS,
+        asset_prefix="",
+    )
+
+
+def render_registry_system(
+    record: SystemRecord,
+    sections: Sequence[Section],
+    risks: Sequence[Risk],
+    controls: Sequence[Control],
+    properties: Sequence[Property],
+    details: Sequence[Detail],
+) -> str:
+    """Render the per-system detail page for one registry record."""
+    env = create_environment()
+    template = env.get_template("registry_system.html.j2")
+    view = _build_registry_system_view(record, sections, risks, controls, properties, details)
+    return template.render(
+        **view,
+        risk_level_colours=config.RISK_LEVEL_COLOURS,
+        asset_prefix="../",
+    )
+
+
+# ---------------------------------------------------------------------------
+# Registry view construction
+# ---------------------------------------------------------------------------
+
+
+def _format_date(iso: str) -> str:
+    """Trim an ISO timestamp to YYYY-MM-DD for display, or return '—' if empty."""
+    if not iso:
+        return "—"
+    return iso[:10]
+
+
+def _build_registry_row(record: SystemRecord) -> dict[str, Any]:
+    level = (
+        "not_applicable"
+        if record.assessment is None
+        else worst_residual_level(record, config.RISK_LEVELS)
+    )
+    return {
+        "slug": record.slug,
+        "name": record.meta.name,
+        "owner": record.meta.owner,
+        "last_assessed": _format_date(record.exported_at),
+        "has_assessment": record.assessment is not None,
+        "worst_level": level,
+    }
+
+
+def _question_visible(
+    q: Question,
+    prop_by_id: dict[str, Property],
+    properties_state: dict[str, Any],
+) -> bool:
+    """Mirror of `_compile_question_visibility` evaluated server-side.
+
+    A question is visible when at least one of its target properties is
+    reachable — i.e. the property's parents satisfy its activation mode.
+    Root properties (no parents) are always visible. Uses the loaded
+    `properties_state` dict (resolved at export time) rather than
+    re-evaluating the cascade.
+    """
+    if not q.properties:
+        return True
+    for pid in q.properties:
+        prop = prop_by_id.get(pid)
+        if prop is None or not prop.parents:
+            return True
+        if prop.activation == "all":
+            if all(properties_state.get(pp) is True for pp in prop.parents):
+                return True
+        else:
+            if any(properties_state.get(pp) is True for pp in prop.parents):
+                return True
+    return False
+
+
+@dataclass(frozen=True)
+class RegistryQuestionView:
+    id: str
+    text: str
+    type: str
+    detail_id: str | None
+    answer: str
+    detail_text: str
+    visible: bool
+
+
+@dataclass(frozen=True)
+class RegistrySubSectionView:
+    title: str
+    description: str
+    questions: tuple[RegistryQuestionView, ...]
+    visible: bool
+
+
+@dataclass(frozen=True)
+class RegistrySectionView:
+    title: str
+    description: str
+    subsections: tuple[RegistrySubSectionView, ...]
+    visible: bool
+
+
+def _build_registry_section_views(
+    sections: Sequence[Section],
+    properties: Sequence[Property],
+    properties_state: dict[str, Any],
+    answers: dict[str, str],
+    details: dict[str, str],
+) -> tuple[RegistrySectionView, ...]:
+    prop_by_id = {p.id: p for p in properties}
+    out_sections: list[RegistrySectionView] = []
+    for section in sections:
+        out_subs: list[RegistrySubSectionView] = []
+        for sub in section.subsections:
+            qs: list[RegistryQuestionView] = []
+            for q in sub.questions:
+                visible = _question_visible(q, prop_by_id, properties_state)
+                detail_id = q.detail_id if isinstance(q, DetailQuestion) else None
+                qs.append(
+                    RegistryQuestionView(
+                        id=q.id,
+                        text=q.text,
+                        type=q.type,
+                        detail_id=detail_id,
+                        answer=str(answers.get(q.id, "") or ""),
+                        detail_text=str(details.get(detail_id, "") or "") if detail_id else "",
+                        visible=visible,
+                    )
+                )
+            out_subs.append(
+                RegistrySubSectionView(
+                    title=sub.title,
+                    description=sub.description,
+                    questions=tuple(qs),
+                    visible=any(qv.visible for qv in qs),
+                )
+            )
+        out_sections.append(
+            RegistrySectionView(
+                title=section.title,
+                description=section.description,
+                subsections=tuple(out_subs),
+                visible=any(sv.visible for sv in out_subs),
+            )
+        )
+    return tuple(out_sections)
+
+
+@dataclass(frozen=True)
+class RegistryControlView:
+    id: str
+    description: str
+    present: bool
+
+
+@dataclass(frozen=True)
+class RegistryMandatedControlView:
+    id: str
+    description: str
+    mandated: bool
+    comment: str
+
+
+@dataclass(frozen=True)
+class RegistryDetailView:
+    description: str
+    text: str
+
+
+@dataclass(frozen=True)
+class RegistryRiskView:
+    id: str
+    description: str
+    guidance: str | None
+    inherent_likelihood: str
+    inherent_consequence: str
+    inherent_level: str
+    residual_likelihood: str
+    residual_consequence: str
+    residual_level: str
+    effectiveness: str
+    justification: str
+    controls: tuple[RegistryControlView, ...]
+    mandated_controls: tuple[RegistryMandatedControlView, ...]
+    relevant_details: tuple[RegistryDetailView, ...]
+
+
+def _build_registry_risk_views(
+    risks: Sequence[Risk],
+    controls: Sequence[Control],
+    details: Sequence[Detail],
+    record: SystemRecord,
+) -> tuple[RegistryRiskView, ...]:
+    if record.assessment is None:
+        return ()
+
+    assessment = record.assessment
+    inherent_block = assessment.get("inherent") or {}
+    properties_state = record.questionnaire.get("properties") or {}
+    detail_values = record.questionnaire.get("details") or {}
+
+    controls_by_risk: dict[str, list[Control]] = {r.id: [] for r in risks}
+    for ctrl in controls:
+        for effect in ctrl.effects:
+            if effect.risk_id in controls_by_risk:
+                controls_by_risk[effect.risk_id].append(ctrl)
+
+    out: list[RegistryRiskView] = []
+    for risk in risks:
+        inh = inherent_block.get(risk.id) or {}
+        inh_level = inh.get("level", "not_applicable")
+        if inh_level == "not_applicable":
+            continue
+
+        eff = (assessment.get("control_effectiveness") or {}).get(risk.id) or "ineffective"
+        res_l = (assessment.get("residual_likelihood") or {}).get(risk.id) or ""
+        res_c = (assessment.get("residual_consequence") or {}).get(risk.id) or ""
+        residual_level = _registry_residual_level(inh_level, eff, res_l, res_c)
+        residual_likelihood = inh.get("likelihood") or "" if eff != "partial" else res_l
+        residual_consequence = inh.get("consequence") or "" if eff != "partial" else res_c
+
+        ctrl_views = tuple(
+            RegistryControlView(
+                id=c.id,
+                description=c.description,
+                present=bool(properties_state.get(c.property) is True),
+            )
+            for c in controls_by_risk[risk.id]
+        )
+
+        mandated_block = (assessment.get("mandated_controls") or {}).get(risk.id) or {}
+        comment_block = (assessment.get("mandated_comments") or {}).get(risk.id) or {}
+        mandated_views = tuple(
+            RegistryMandatedControlView(
+                id=c.id,
+                description=c.description,
+                mandated=bool(mandated_block.get(c.id, False)),
+                comment=str(comment_block.get(c.id, "") or ""),
+            )
+            for c in controls_by_risk[risk.id]
+            if not bool(properties_state.get(c.property) is True)
+        )
+
+        risk_prop_ids = {cond.property for cond in risk.conditions}
+        relevant_details = tuple(
+            RegistryDetailView(
+                description=d.description,
+                text=str(detail_values.get(d.id, "") or ""),
+            )
+            for d in details
+            if (risk_prop_ids & set(d.properties))
+            and any(properties_state.get(pid) is True for pid in d.properties)
+            and detail_values.get(d.id)
+        )
+
+        out.append(
+            RegistryRiskView(
+                id=risk.id,
+                description=risk.description,
+                guidance=risk.guidance,
+                inherent_likelihood=inh.get("likelihood") or "",
+                inherent_consequence=inh.get("consequence") or "",
+                inherent_level=inh_level,
+                residual_likelihood=residual_likelihood,
+                residual_consequence=residual_consequence,
+                residual_level=residual_level,
+                effectiveness=eff,
+                justification=str((assessment.get("justifications") or {}).get(risk.id, "") or ""),
+                controls=ctrl_views,
+                mandated_controls=mandated_views,
+                relevant_details=relevant_details,
+            )
+        )
+    return tuple(out)
+
+
+def _registry_residual_level(
+    inherent_level: str, effectiveness: str, res_l: str, res_c: str
+) -> str:
+    if effectiveness == "ineffective":
+        return inherent_level
+    if effectiveness == "controlled":
+        return "controlled"
+    if not res_l or not res_c:
+        return inherent_level
+    return config.RISK_MATRIX.get(res_l, {}).get(res_c, "not_applicable")
+
+
+def _build_registry_system_view(
+    record: SystemRecord,
+    sections: Sequence[Section],
+    risks: Sequence[Risk],
+    controls: Sequence[Control],
+    properties: Sequence[Property],
+    details: Sequence[Detail],
+) -> dict[str, Any]:
+    answers = record.questionnaire.get("answers") or {}
+    detail_values = record.questionnaire.get("details") or {}
+    properties_state = record.questionnaire.get("properties") or {}
+
+    section_views = _build_registry_section_views(
+        sections, properties, properties_state, answers, detail_values
+    )
+    risk_views = _build_registry_risk_views(risks, controls, details, record)
+
+    return {
+        "record": record,
+        "meta": record.meta,
+        "slug": record.slug,
+        "exported_at": _format_date(record.exported_at),
+        "sections": section_views,
+        "risks": risk_views,
+        "has_assessment": record.assessment is not None,
+    }
 
 
 def render_questionnaire_app_js(

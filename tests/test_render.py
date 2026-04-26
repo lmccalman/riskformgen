@@ -14,6 +14,7 @@ from models import (
     Section,
     SubSection,
 )
+from registry import SystemMeta, SystemRecord
 from render import (
     _compile_property_getter,
     _compile_question_visibility,
@@ -23,7 +24,8 @@ from render import (
     render_landing,
     render_questionnaire,
     render_questionnaire_app_js,
-    render_registry,
+    render_registry_index,
+    render_registry_system,
 )
 
 # ---------------------------------------------------------------------------
@@ -180,14 +182,194 @@ class TestRenderLanding:
 
 
 class TestRenderRegistry:
-    def test_returns_html(self):
-        html = render_registry()
+    def test_index_empty_state_when_no_records(self):
+        html = render_registry_index([])
         assert isinstance(html, str)
         assert "Registry" in html
-
-    def test_no_alpine(self):
-        html = render_registry()
+        assert "No systems registered yet" in html
         assert "x-data" not in html
+
+    def test_index_renders_a_row_per_record(self, sample_record_factory):
+        records = [sample_record_factory(slug="acme", name="Acme")]
+        html = render_registry_index(records)
+        assert 'href="registry/acme.html"' in html
+        assert "Acme" in html
+        # Worst residual level is "high" for the sample record (ineffective),
+        # so the colour-coded badge should appear with the red class.
+        assert "badge-red" in html
+
+    def test_index_sorts_by_exported_at_desc(self, sample_record_factory):
+        old = sample_record_factory(slug="old", name="Old", assessment_at="2026-01-01T00:00:00Z")
+        new = sample_record_factory(slug="new", name="New", assessment_at="2026-04-01T00:00:00Z")
+        # Pass already-sorted (the loader does the sort); the index renders in
+        # whatever order it receives. Pin that the rows preserve input order.
+        html = render_registry_index([new, old])
+        new_pos = html.find('href="registry/new.html"')
+        old_pos = html.find('href="registry/old.html"')
+        assert new_pos < old_pos
+
+    def test_questionnaire_only_record_shows_no_assessment(
+        self,
+        sample_record_factory,
+        sample_sections,
+        sample_risk,
+        sample_control,
+        sample_properties,
+    ):
+        rec = sample_record_factory(slug="drafty", name="Drafty", with_assessment=False)
+        html = render_registry_system(
+            rec,
+            sample_sections,
+            [sample_risk],
+            [sample_control],
+            sample_properties,
+            details=[],
+        )
+        assert "No assessment has been committed" in html
+
+    def test_system_page_renders_question_answer(
+        self,
+        sample_record_factory,
+        sample_sections,
+        sample_risk,
+        sample_control,
+        sample_properties,
+    ):
+        rec = sample_record_factory(slug="acme", name="Acme")
+        html = render_registry_system(
+            rec, sample_sections, [sample_risk], [sample_control], sample_properties, details=[]
+        )
+        assert "Acme" in html
+        # binary answer "yes" rendered as "Yes" (case-sensitive copy in template)
+        assert "<span>Yes</span>" in html
+
+    def test_system_page_renders_risk_card_with_level_badge(
+        self,
+        sample_record_factory,
+        sample_sections,
+        sample_risk,
+        sample_control,
+        sample_properties,
+    ):
+        rec = sample_record_factory(slug="acme", name="Acme")
+        html = render_registry_system(
+            rec, sample_sections, [sample_risk], [sample_control], sample_properties, details=[]
+        )
+        # Risk card title: r1 → "R1"
+        assert "R1" in html
+        # Inherent level high → red badge
+        assert "badge-red" in html
+
+    def test_system_page_uses_asset_prefix(
+        self,
+        sample_record_factory,
+        sample_sections,
+        sample_risk,
+        sample_control,
+        sample_properties,
+    ):
+        rec = sample_record_factory(slug="acme", name="Acme")
+        html = render_registry_system(
+            rec, sample_sections, [sample_risk], [sample_control], sample_properties, details=[]
+        )
+        assert 'href="../bulma.min.css"' in html
+        assert 'href="../input.css"' in html
+        assert 'href="../registry.html"' in html
+
+    def test_system_page_skips_not_applicable_risks(
+        self,
+        sample_record_factory,
+        sample_sections,
+        sample_risk,
+        sample_control,
+        sample_properties,
+    ):
+        # Build a record where r1 is not applicable (level = not_applicable).
+        # The risk card should not render at all for that risk.
+        rec = sample_record_factory(slug="acme", name="Acme", inherent_level="not_applicable")
+        html = render_registry_system(
+            rec, sample_sections, [sample_risk], [sample_control], sample_properties, details=[]
+        )
+        # Risk card is gone — the r1 title only renders when the risk fires.
+        assert "card-header-title" not in html
+        # Friendly empty-message instead.
+        assert "No applicable risks fired" in html
+
+    def test_no_alpine_anywhere(
+        self,
+        sample_record_factory,
+        sample_sections,
+        sample_risk,
+        sample_control,
+        sample_properties,
+    ):
+        rec = sample_record_factory(slug="acme", name="Acme")
+        index_html = render_registry_index([rec])
+        system_html = render_registry_system(
+            rec, sample_sections, [sample_risk], [sample_control], sample_properties, details=[]
+        )
+        for html in (index_html, system_html):
+            assert "x-data" not in html
+            assert "x-show" not in html
+            assert "x-text" not in html
+
+
+@pytest.fixture
+def sample_record_factory(sample_questions):
+    """Factory for a SystemRecord built around the sample form fixtures."""
+
+    def _make(
+        *,
+        slug: str = "demo",
+        name: str = "Demo",
+        with_assessment: bool = True,
+        inherent_level: str = "high",
+        assessment_at: str = "2026-04-01T09:00:00Z",
+    ) -> SystemRecord:
+        questionnaire = {
+            "format": "riskformgen-answers",
+            "version": 2,
+            "exported_at": "2026-04-01T08:00:00Z",
+            "question_ids": [q.id for q in sample_questions],
+            "answers": {q.id: "yes" for q in sample_questions},
+            "detail_ids": [],
+            "details": {},
+            "property_ids": ["prop_a", "prop_b"],
+            "properties": {"prop_a": True, "prop_b": True},
+        }
+        assessment = None
+        if with_assessment:
+            inherent = {
+                "r1": {
+                    "likelihood": "likely" if inherent_level != "not_applicable" else None,
+                    "consequence": "major" if inherent_level != "not_applicable" else None,
+                    "level": inherent_level,
+                    "firing_conditions": ["prop_a"] if inherent_level != "not_applicable" else [],
+                },
+            }
+            assessment = {
+                "format": "riskformgen-assessment",
+                "version": 3,
+                "exported_at": assessment_at,
+                "risk_ids": ["r1"],
+                "property_ids": ["prop_a", "prop_b"],
+                "properties": {"prop_a": True, "prop_b": True},
+                "inherent": inherent,
+                "control_effectiveness": {"r1": "ineffective"},
+                "residual_likelihood": {"r1": ""},
+                "residual_consequence": {"r1": ""},
+                "justifications": {"r1": ""},
+                "mandated_controls": {"r1": {"ctrl1": False}},
+                "mandated_comments": {"r1": {"ctrl1": ""}},
+            }
+        return SystemRecord(
+            slug=slug,
+            meta=SystemMeta(name=name, owner="Owner"),
+            questionnaire=questionnaire,
+            assessment=assessment,
+        )
+
+    return _make
 
 
 # ---------------------------------------------------------------------------

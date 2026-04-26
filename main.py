@@ -11,13 +11,15 @@ from parse import (
     load_sections,
     validate_all,
 )
+from registry import SystemRecord, load_registry
 from render import (
     render_assessment,
     render_assessment_app_js,
     render_landing,
     render_questionnaire,
     render_questionnaire_app_js,
-    render_registry,
+    render_registry_index,
+    render_registry_system,
 )
 
 logger = logging.getLogger(__name__)
@@ -35,8 +37,9 @@ def write_pages(
     controls: list[Control],
     properties: list[Property],
     details: list[Detail],
+    registry_records: list[SystemRecord],
 ) -> None:
-    """Render and write the four HTML pages and two Alpine factories."""
+    """Render and write the static HTML pages and two Alpine factories."""
     (config.output_dir / "index.html").write_text(render_landing())
     (config.output_dir / "questionnaire.html").write_text(
         render_questionnaire(sections, properties=properties, details=details)
@@ -46,7 +49,14 @@ def write_pages(
             sections, risks=risks, controls=controls, properties=properties, details=details
         )
     )
-    (config.output_dir / "registry.html").write_text(render_registry())
+    (config.output_dir / "registry.html").write_text(render_registry_index(registry_records))
+    if registry_records:
+        registry_out = config.output_dir / "registry"
+        registry_out.mkdir(exist_ok=True)
+        for record in registry_records:
+            (registry_out / f"{record.slug}.html").write_text(
+                render_registry_system(record, sections, risks, controls, properties, details)
+            )
     (config.output_dir / "app-questionnaire.js").write_text(
         render_questionnaire_app_js(sections, properties=properties, details=details)
     )
@@ -82,20 +92,29 @@ def main() -> None:
 
     validate_all(sections, properties, risks, controls, details)
 
+    registry_records = load_registry(
+        config.registry_dir,
+        sections=sections,
+        risks=risks,
+        controls=controls,
+        properties=properties,
+    )
+
     ensure_output_dir()
-    write_pages(sections, risks, controls, properties, details)
+    write_pages(sections, risks, controls, properties, details, registry_records)
     copy_css()
     copy_alpine()
     questions = all_questions(sections)
     logger.info(
         "Built site with %d sections, %d questions, %d properties,"
-        " %d risks, %d controls, and %d details in %s/",
+        " %d risks, %d controls, %d details, and %d registered systems in %s/",
         len(sections),
         len(questions),
         len(properties),
         len(risks),
         len(controls),
         len(details),
+        len(registry_records),
         config.output_dir.resolve(),
     )
 

@@ -1,0 +1,116 @@
+<div class="card mb-4 registry-risk-card">
+  <header class="card-header">
+    <p class="card-header-title">{{ risk.id | replace("_", " ") | title }}</p>
+  </header>
+
+  <div class="card-content risk-card-body">
+    <p class="subtitle is-6 has-text-grey">{{ risk.description }}</p>
+    {% if risk.guidance %}
+    <p class="help"><em>{{ risk.guidance }}</em></p>
+    {% endif %}
+
+    {# ── Inherent risk ── #}
+    <div class="risk-card-section">
+      <div class="risk-grid">
+        <div>
+          <span class="dim-label">Likelihood</span>
+          <span class="badge badge-blue">{{ risk.inherent_likelihood | replace("_", " ") or "—" }}</span>
+        </div>
+        <div>
+          <span class="dim-label">Consequence</span>
+          <span class="badge badge-purple">{{ risk.inherent_consequence | replace("_", " ") or "—" }}</span>
+        </div>
+        <div>
+          <span class="dim-label">Modelled Risk</span>
+          <span class="badge badge-{{ risk_level_colours.get(risk.inherent_level, 'gray') }}">
+            {{ risk.inherent_level | replace("_", " ") }}
+          </span>
+        </div>
+      </div>
+    </div>
+
+    {# ── Existing controls ── #}
+    {% if risk.controls %}
+    <div class="risk-card-section">
+      <span class="dim-label">Controls</span>
+      <div class="stack-sm">
+        {% for ctrl in risk.controls %}
+        <div class="control-row">
+          <span class="control-icon {{ 'control-icon-active' if ctrl.present else 'control-icon-inactive' }}">
+            {{ "✓" if ctrl.present else "✗" }}
+          </span>
+          <span class="{{ '' if ctrl.present else 'answer-missing' }}">{{ ctrl.description }}</span>
+        </div>
+        {% endfor %}
+      </div>
+    </div>
+    {% endif %}
+
+    {# ── Mandated controls (those the assessor flagged as missing) ── #}
+    {% set mandated_present = risk.mandated_controls | selectattr("mandated") | list %}
+    {% if mandated_present %}
+    <div class="risk-card-section">
+      <span class="dim-label">Mandated Controls</span>
+      <div class="stack-sm">
+        {% for ctrl in mandated_present %}
+        <div>
+          <p class="has-text-weight-semibold">{{ ctrl.description }}</p>
+          {% if ctrl.comment %}
+          <p class="linked-answer">{{ ctrl.comment }}</p>
+          {% endif %}
+        </div>
+        {% endfor %}
+      </div>
+    </div>
+    {% endif %}
+
+    {# ── Context (relevant detail text) ── #}
+    {% if risk.relevant_details %}
+    <div class="risk-card-section">
+      <span class="dim-label">Context</span>
+      <div class="stack-sm">
+        {% for detail in risk.relevant_details %}
+        <div>
+          <p class="has-text-weight-semibold is-size-7">{{ detail.description }}</p>
+          <p class="linked-answer">{{ detail.text }}</p>
+        </div>
+        {% endfor %}
+      </div>
+    </div>
+    {% endif %}
+
+    {# ── Residual risk ── #}
+    <div class="risk-card-section">
+      <span class="dim-label">Control Effectiveness</span>
+      <p>{{ risk.effectiveness | replace("_", " ") | title }}</p>
+
+      {% if risk.effectiveness == "partial" %}
+      <div class="risk-grid" style="margin-top: 0.75rem;">
+        <div>
+          <span class="dim-label">Residual Likelihood</span>
+          <span class="badge badge-blue">{{ risk.residual_likelihood | replace("_", " ") or "—" }}</span>
+        </div>
+        <div>
+          <span class="dim-label">Residual Consequence</span>
+          <span class="badge badge-purple">{{ risk.residual_consequence | replace("_", " ") or "—" }}</span>
+        </div>
+        <div></div>
+      </div>
+      {% endif %}
+
+      <div style="margin-top: 0.75rem;">
+        <span class="dim-label">Residual Risk</span>
+        <span class="badge badge-{{ risk_level_colours.get(risk.residual_level, 'gray') }}">
+          {{ risk.residual_level | replace("_", " ") }}
+        </span>
+      </div>
+    </div>
+
+    {% if risk.justification %}
+    <div class="risk-card-section">
+      <span class="dim-label">Residual Risk Justification</span>
+      <p class="linked-answer">{{ risk.justification }}</p>
+    </div>
+    {% endif %}
+  </div>
+</div>

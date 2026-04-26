@@ -52,6 +52,14 @@ the JSON came from beyond the integer version, no migration path, and no
 guarantees about how the registry handles assessments produced against older
 versions of the form.
 
+**Update (2026-04-26):** Both export formats now carry the resolved
+property states and per-risk inherent values (questionnaire `properties`,
+assessment `inherent`). The registry renders these directly without
+re-deriving against the current form, so historical assessments are
+stable across form changes. The versioning work narrows to: build-
+identifier embedding, migration of older-version JSONs on import, and
+stale-build warnings on the registry.
+
 **To do:** Design and implement a versioning strategy. Likely shape:
 - Embed a build identifier (e.g. a hash of the YAML + a human-friendly
   version string) into both the built site and into every exported JSON.
