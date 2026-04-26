@@ -1,0 +1,14 @@
+{
+  "permissions": {
+    "ask": [
+      "Edit(SPEC.md)",
+      "Write(SPEC.md)",
+      "MultiEdit(SPEC.md)",
+      "NotebookEdit(SPEC.md)",
+      "Edit(**/SPEC.md)",
+      "Write(**/SPEC.md)",
+      "MultiEdit(**/SPEC.md)",
+      "NotebookEdit(**/SPEC.md)"
+    ]
+  }
+}

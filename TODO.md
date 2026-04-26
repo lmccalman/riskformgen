@@ -1,0 +1,133 @@
+# TODO.md
+
+Outstanding features to implement and bugs to fix. Each entry carries an
+effort tag (**small** or **large**), and may carry an optional status label
+(**needs design** = open questions to resolve before coding; **unapproved**
+= Claude added proactively, awaiting user review). No status label = ready
+to work on.
+
+`small` items use a lightweight one-paragraph format; `large` items use the
+fuller **Spec ref / Context / To do** template.
+
+When an item is implemented, delete it from this file in the same commit
+that completes the work — git history is the record.
+
+---
+
+## Differentiate the three tools (questionnaire / assessment / registry) within one site — **large**, **needs design**
+
+**Spec ref:** §Workflow.
+
+**Context:** The spec describes three distinct roles — questionnaire (system
+owner), assessment (assessor / risk manager), registry (executive) — and we
+agreed all three live in one static site. The current site only has a
+questionnaire and an assessment surface, both in the same Alpine component,
+distinguished only by the tab labels "Personal / Social / Lifestyle / …" vs.
+"Risk Analysis."
+
+**To do:**
+- Make the assessment view feel like a clearly separate tool from the
+  questionnaire (e.g. distinct page header, distinct save/load section,
+  possibly a top-level mode switch rather than just a tab — design TBD).
+- Stub or scaffold the registry view as a third surface (probably read-only,
+  loading questionnaire + assessment JSONs and showing a "system card" + the
+  associated assessment).
+- Coordinate with "Aggregate residual risk" and "Versioning across form
+  evolution" below, which both naturally land in either the assessment or
+  registry surfaces.
+
+---
+
+## Aggregate residual risk — **large**
+
+**Spec ref:** §Concepts → Aggregate residual risk.
+
+**Context:** "The risk assessor assigns an overall risk level to the system
+based on their judgement of the set of residual risk levels of the risks
+after all controls are applied. This is not necessarily the maximum of the
+individual risk levels."
+
+Currently the code has per-risk residual levels but no UI for the assessor
+to pick an aggregate level for the whole system, and no field for it in the
+assessment JSON.
+
+**To do:**
+- Add an aggregate-residual-risk picker (one of `RISK_LEVELS`, probably
+  excluding `not_applicable`) to the assessment surface. Default: the worst
+  per-risk residual level, but freely overridable by the assessor.
+- Add a justification textarea for the aggregate decision (separate from
+  per-risk justifications).
+- Include both fields in the assessment JSON export (and load them back on
+  import). Bump the assessment-format version and add migration code so old
+  assessment JSONs (without the aggregate field) still import cleanly.
+
+---
+
+## Versioning across form evolution — **large**, **needs design**
+
+**Spec ref:** §Key design goals → "Risks, controls, questionnaire questions
+and properties must be able to evolve" + the constraint that older
+assessments and questionnaire answers should not break.
+
+**Context:** Some basics already exist: `init()` back-fills new IDs; JSON
+exports carry `format` + `version` fields; import shows added/removed counts
+with a confirmation dialog. But there's no formal record of *which build*
+the JSON came from beyond the integer version, no migration path, and no
+guarantees about how the registry handles assessments produced against older
+versions of the form.
+
+**To do:** Design and implement a versioning strategy. Likely shape:
+- Embed a build identifier (e.g. a hash of the YAML + a human-friendly
+  version string) into both the built site and into every exported JSON.
+- Decide which constraints to impose on risk managers to keep things
+  tractable — e.g. "IDs are immutable; semantics behind an ID can change but
+  IDs are never reused." Document the rules in `CLAUDE.md`.
+- Make the registry able to load assessments from older builds and show them
+  meaningfully (even if the form has since changed). At minimum, surface a
+  warning when the assessment's build differs from the current build, and
+  show which fields are stale / missing / new.
+- Stretch: a "change assessment" mode (per spec workflow point 8) that loads
+  old + new questionnaire JSONs and surfaces only the diff. This is
+  effectively a registry feature on top of solid versioning, so build
+  versioning first.
+
+---
+
+## Rename property/condition combinator: `all` / `any` → `all_depends` / `any_depends` — **small**
+
+The spec (§Concepts → Properties) uses the more descriptive `all_depends` /
+`any_depends`; the YAML and code use `all` / `any`. Update YAML in
+`form/properties.yaml` and `form/risks.yaml`, `_parse_combinator` in
+`parse.py` (reject the old names — no backwards-compat shim, this is a
+hand-edited format), the literal types in `models.py` (`Property.activation`,
+`ConditionMapping.mode`), the `== "all"` checks in `render.py`, and tests
+(`tests/test_parse.py`, `tests/test_models.py`, `tests/test_render.py`,
+`tests/test_form_files.py`, `tests/test_js_behaviour.py`) plus the
+`CLAUDE.md` description.
+
+---
+
+## Hide section tabs when all subsections inside are hidden — **small**
+
+Per §Concepts → Questionnaire ("If all the questions in a section or
+subsection are hidden, then that section or subsection should be hidden"),
+sections rendered as tabs in `templates/page.html.j2` should disappear when
+empty. Subsections already hide via `subsection.visibility_js` in
+`render.py`, but sections are always shown. In `_build_section_views`,
+derive a `visibility_js` per `SectionView` as the OR of its subsections'
+expressions, then gate both the tab `<li>` and the `<form>` body on it via
+`x-show` (or skip the markup when the expression is the always-true
+sentinel). Switch `activeTab` to the first visible section in `init()` (and
+on any change) if the current tab becomes hidden. Add a behaviour test in
+`tests/test_js_behaviour.py` covering both directions (becomes hidden;
+reappears).
+
+---
+
+## Remove dead `editor/` references — **small**
+
+The `editor/` directory and `run_editor.py` shim are leftover from a removed
+FastAPI/React experiment. Delete the `### Spec editor (removed)` section at
+the bottom of `CLAUDE.md`, delete `run_editor.py` and the empty `editor/`
+directory (check first that nothing useful remains), and grep for any other
+lingering mentions (README, tests, etc.) to clean up.

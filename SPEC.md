@@ -1,6 +1,6 @@
 # riskformgen spec file
 
-!!! This is a human-edited file only: AI agents should never edit this file !!!
+!!! AI agents should never edit this file without permission!!!
 
 ## Purpose
 
@@ -12,49 +12,58 @@ required.
 
 ## Workflow
 
+riskformgen produces a single static site with three distinct *views* — the
+questionnaire, the assessment, and the registry — each playing a different
+role for a different persona. They share a build pipeline, theme, and form
+definitions, but the user-facing surface of each is visually separated so the
+persona always knows which view they are in.
+
 1. Risk manager defines, in YAML files:
     - risk properties that systems have or don't have, relevant to the risk assessment
-    - risks that are present or absent as a function of what properties
-      a system has
-    - controls that modify risks' likelihood and/or consquence if they're present
+    - risks expressed as conditions over those properties, with associated
+      likelihood and consequence (see §Concepts → Risks)
+    - controls that the assessor can use as evidence when judging residual
+      risk
     - questions that form a questionnaire for system owners, which determine
-      what properies are present for a system and hence what risks and controls
+      what properties hold for a system and hence what risks and controls
       are relevant
-    - The different levels of likelihood and consquence for risks, and how
-      these translate into risk levels.
-2. Riskformgen uses these files to compile a static website designed for the
-   system owner. The site contains:
-    - The questionnaire for them to fill out about their system
-    - A description of the relevant risks and controls for their system that
-      grows / shrinks as they fill out the form
-3. System owners fill out their form, which the site provides as a JSON payload
-   for them. The form saves their state locally as they go so they don't lose
-   their work when they refresh the page or come back later. When ready, the system 
-   owner emails the JSON to the risk manager.
-5. The risk manager enters the form into another riskformgen tool that provides
-   an interface for risk asssessment. The risk assessment interface allows an
-   assessor to:
-   - view all the risks and already-implented controls relevant to the system
-     based on the questionnaire answers.
+    - the levels of likelihood and consequence and the matrix that maps
+      `(likelihood, consequence)` pairs to risk levels.
+2. Riskformgen uses these files to compile a static site. The same build
+   produces three views:
+    - **Questionnaire view** — for the system owner to fill out, with the
+      relevant risks and controls growing/shrinking as they answer.
+    - **Assessment view** — for the assessor, presenting the system owner's
+      answers, the inherent risks they imply, and inputs for residual risk.
+    - **Registry view** — for executives, listing all systems' completed
+      questionnaires and assessments.
+3. System owners open the questionnaire view, fill out the form, and export
+   their answers as a JSON payload. The site saves their state locally as they
+   go so they don't lose their work when they refresh the page or come back
+   later. When ready, the system owner emails the JSON to the risk manager.
+4. The risk manager opens the assessment view of the same site and loads the
+   questionnaire JSON. The assessment view allows an assessor to:
+   - view all the risks and already-implemented controls relevant to the
+     system based on the questionnaire answers.
    - judge the effectiveness of the already-implemented controls
    - specify residual likelihood and consequence levels for each risk
-   - require or recommend additional controls 
+   - mandate or recommend additional controls
    - provide textual explanation for their reasoning
-   - Assign the system an aggregate risk level based on their judgement and the
-     residual risks of the system.
-6. When completed, the riskformgen assessment tool outputs a json containing
-   the information for the assessment.
-7. Next, the risk manager adds both the questionnaire json and the assessment
-   json to the riskformgen registry tool. This tool enables an executive or
-   board member to view all systems' questionnaire answers ('system card') and
-   also the risk assessments of their systems.
-8. Some time later, when the system owner makes changes to their system, they
-   load their old json into the questionnaire and make any updates required.
-   This provides a new json. The assessor loads both the old and new json into
-   the assessment tool which does a 'change assessment': explicitly looking
-   only at the differences in the form and the different risks and controls
+   - assign the system an aggregate risk level based on their judgement and
+     the residual risks of the system.
+5. When completed, the assessment view exports an assessment JSON.
+6. The risk manager adds both the questionnaire JSON and the assessment JSON
+   to the registry view, which lets executives or board members browse all
+   systems' questionnaire answers ('system card') and the risk assessments of
+   their systems.
+7. Some time later, when the system owner makes changes to their system, they
+   load their old JSON into the questionnaire view and update it. This
+   produces a new JSON. The assessor loads both the old and new JSON into the
+   assessment view, which does a 'change assessment': explicitly looking only
+   at the differences in the form and the different risks and controls
    implied. They then assess these differences.
-9. New change assessment and the updates to the system card are added to the registry.
+8. The new change assessment and updates to the system card are added to the
+   registry.
 
 
 ## Concepts
@@ -91,33 +100,115 @@ undetrmined by parent state)>
 
 ### Risks
 
-Risks are special nodes on the DAG of properties, Like risks they are either
-present, absent or unset. Similarly, they are either "all_needed" or
-"any_needed" with respect to their parent relationships. However, 
-UNLIKE properties, they are not set directly by the questionnare but are
-completely determined by the state of their parent properties.
-"all_needed" risks are:
-- unset if any parent is unset
-- present if all parents are present
-- absent if at least one parent is absent
-"any_needed" risks are:
-- present if any parent is present
-- unset if no parents are present but at least 1 is unset
-- absent if all parents are absent
+Risks are nodes attached to the property DAG. Unlike properties, they are not
+present/absent/unset — they have a **level** drawn from a defined scale, and
+that level is computed automatically from property state.
 
-**Residual risk** (assessor input at runtime) — For every risk where inherent
-level is not `not_applicable`, the assessor picks a **control effectiveness**:
-`ineffective` (default — residual equals inherent), `partial` (assessor picks
-residual likelihood and consequence independently; level is computed from the
-matrix), or `controlled` (residual level is the dedicated `controlled` level).
-A single "Residual Risk Justification" textarea captures the reasoning. 
+#### Likelihood, consequence, and the matrix
+
+Three ordered scales are defined in a configuration file:
+
+- a **likelihood** scale (an ordered, finite list of severity levels)
+- a **consequence** scale (an ordered, finite list of severity levels)
+- a **risk-level** scale (an ordered, finite list of risk levels)
+
+A **risk matrix**, also configured, maps each `(likelihood, consequence)`
+pair to a risk level. Two distinguished risk levels do not appear in the
+matrix and are reached only via the paths described below: `not_applicable`
+(no condition fires) and `controlled` (the residual-risk path).
+
+#### Conditions
+
+A risk owns a list of **conditions**. Each condition is a triple:
+
+    (property, likelihood, consequence)
+
+A condition **fires** when its `property` is `true`. (Only `true` satisfies;
+an unset/`null` property never does — unanswered questions cannot push a
+risk's level up prematurely.)
+
+This is intentionally the simplest possible shape: each condition contributes
+one `(L, C)` pair when one property holds. Richer logic — "this risk fires
+only when properties A *and* B both hold" — is expressed by introducing an
+intermediate property in the property DAG (with `activation: "all"` over
+A and B) and then writing a condition against that intermediate property.
+The DAG is the place where conjunctions live; risks just enumerate the
+single-property triggers that contribute to them.
+
+#### Aggregating firing conditions: worst-case wins, per dimension
+
+Given the set of conditions that fire for a risk:
+
+- The risk's **likelihood** is the highest-severity likelihood among them
+  (using the configured likelihood ordering as severity).
+- The risk's **consequence** is the highest-severity consequence among them
+  (using the configured consequence ordering as severity).
+- The two are picked **independently** — the worst likelihood and the worst
+  consequence may come from different firing conditions, not necessarily as
+  a paired `(L, C)` tuple.
+
+#### Computing the inherent level
+
+- If no conditions fire → `level = not_applicable`.
+- Otherwise → `level = matrix(likelihood, consequence)`.
+
+This is the **inherent** risk level — the level before considering any
+controls.
+
+#### Residual risk
+
+For each risk where the *inherent* level is not `not_applicable`, the
+assessor picks a `control_effectiveness`:
+
+- `ineffective` (default) — residual likelihood, consequence, and level
+  equal the inherent ones.
+- `partial` — the assessor picks residual likelihood and consequence
+  independently from the configured scales; the residual level is then
+  derived from the risk matrix.
+- `controlled` — the residual level is the dedicated `controlled` level
+  (likelihood and consequence are kept from inherent for display).
+
+A single "Residual Risk Justification" textarea per risk captures the
+reasoning behind the chosen effectiveness and any L/C overrides.
 
 ### Controls
 
-Controls are a special kind of property: it has effects listing which risks it
-addresses. Otherwise it is identical in behaviour to a plain property. Controls
-do **not** automatically reduce risk — the assessor judges their collective
-effectiveness per risk at assessment time (see "Residual risk" below).
+A control is bound to a single property and is *present* when that property
+is `true`. Each control declares the risks it addresses via its `effects`
+list. Because the control's presence simply tracks its property, DAG
+behaviour is inherited from the property — the control concept itself does
+not introduce new DAG nodes.
+
+Controls do **not** automatically reduce risk. The assessor judges their
+collective effectiveness per risk at assessment time (see "Residual risk"
+above).
+
+#### Mandating controls
+
+For any risk where a linked control is *not* currently present, the
+assessment view surfaces, on the risk card:
+
+- a **"mandate this control"** checkbox (per risk, per control), and
+- a free-text **"how should it be implemented"** comment (per risk, per
+  control).
+
+Both pieces of state are included in the assessment JSON export, so the
+registry shows both the assessor's appraisal of existing controls and any
+controls they have required or recommended for the system going forward.
+
+### Details
+
+Details are contextual topics defined alongside properties, risks, and
+controls. Each detail has an `id`, a `description`, and a list of
+`properties` it relates to. A detail's value is free text, supplied by the
+system owner via a *detail question* (see Questionnaire).
+
+That free text is then surfaced in a "Context" panel on any risk card whose
+conditions touch one of the detail's properties. This means contextual notes
+follow the property graph rather than being hard-wired to a specific risk:
+notes the system owner provides about, say, a particular data source or a
+third-party integration appear automatically on every risk that depends on
+the same properties.
 
 
 ### Aggregate residual risk
@@ -133,9 +224,19 @@ group related questions together. Sections and subsections have explanatory
 text. If all the questions in a section or subsection are hidden, then that
 section or subsection should be hidden.
 
-Questions: These are binary. Each question sets one or more properties.
-Question visibility is derived automatically from the property DAG: Only
-questions which influence unset properties should be shown.
+Questions come in two types:
+
+- **Binary** questions present yes/no inputs and set one or more properties
+  (yes makes them `true`).
+- **Detail** questions present a free-text input that writes into a
+  `Detail` referenced by `detail_id`. They do not set property state; the
+  text they capture is shown back on risk cards via the linked detail.
+
+Question visibility is derived automatically from the property DAG: a
+question is shown when the parents of at least one of its target properties
+are satisfied (i.e. that property is *reachable*). Once shown, a question
+stays visible — the user can change their answer at any time. For detail
+questions the same rule applies, using the referenced detail's properties.
 
 ## Personas
 

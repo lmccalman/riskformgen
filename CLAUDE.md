@@ -42,6 +42,40 @@ uv run pytest tests/ -v
 
 Use `uv run ruff check --fix .` and `uv run ruff format .` to auto-fix lint and formatting issues.
 
+## Working with SPEC.md
+
+`SPEC.md` captures the high-level design decisions that explain the purpose and function of the code — the kind of context a new contributor needs that isn't obvious from reading the source.
+
+**As you add features or make design decisions, keep `SPEC.md` in sync.** When a change introduces, alters, or invalidates a design decision important to understanding the system, update `SPEC.md` to reflect it. Don't mirror low-level implementation details that the code already makes clear — focus on the intent, structure, and trade-offs.
+
+**Never edit `SPEC.md` without first checking the proposed edits with the user.** Show the user the change you intend to make (diff or summary) and wait for explicit approval before writing. This applies even in auto/continuous modes.
+
+**`SPEC.md` updates ride along with the same commit that completes the work**, after everything is implemented, working, and tested. Don't pre-edit `SPEC.md` while implementation is in flight, and don't push the spec update to a follow-up commit. (Approval is still required before writing — propose the diff at the end of the task, then commit the spec change together with the code change.)
+
+## Working with TODO.md
+
+`TODO.md` is the running list of features to implement and bugs to fix. It is the canonical place to record outstanding work — not a journal, not a changelog.
+
+**Each entry must carry an effort tag:**
+- **small** — a mechanical or self-contained change (e.g. rename, single-file fix, minor template tweak). Roughly: one focused PR, no design decisions.
+- **large** — anything that touches multiple subsystems or has non-trivial implementation work.
+
+When in doubt between the two, mark it **large**.
+
+**Entries may also carry an optional status label** alongside the effort tag:
+- **needs design** — the item has open design questions that must be resolved with the user before any code is written. In auto mode, draft a proposal rather than starting to code.
+- **unapproved** — Claude added this item proactively (e.g. noticed during unrelated work) and the user has not yet reviewed it. Don't start work on `unapproved` items until the user confirms; they may be reworded, deferred, or removed.
+
+If no status label is present, the item is approved and ready to work on.
+
+**You can add new items proactively** when you notice bugs, gaps, or follow-ups during unrelated work. Tag them `unapproved` with a one-line note about how they came up, and surface them to the user at a natural break point.
+
+**Entry format depends on the effort tag:**
+- **large** items use the full template — title (with tags), `**Spec ref:**`, `**Context:**`, `**To do:**`.
+- **small** items use a lightweight form — title (with tags) plus a one-paragraph description that inlines whatever context is needed (file paths, spec ref, key files to touch). No section headers required.
+
+**When an item is implemented, delete it from `TODO.md`** in the same commit that completes the work. Do not leave a "done" marker, do not move it to a history section, do not strike it through. The git history is the record of what changed; `TODO.md` should always reflect only what is still outstanding.
+
 ## Architecture
 
 ### Build pipeline
