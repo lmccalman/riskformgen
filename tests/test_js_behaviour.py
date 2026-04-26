@@ -197,6 +197,89 @@ class TestQuestionVisibility:
         assert scope.visibility(expr) is False
 
 
+class TestQuestionVisibilityAnyMode:
+    """For an `activation: any` child property, the child question is visible
+    when *any* of its parents is explicitly `true`. Pins the OR branch in
+    `_compile_question_visibility` (render.py:171)."""
+
+    @pytest.fixture
+    def scope_and_expr(self) -> tuple[Scope, str]:
+        q_pa = BinaryQuestion(id="q_pa", text="", properties=("pa",))
+        q_pb = BinaryQuestion(id="q_pb", text="", properties=("pb",))
+        q_child = BinaryQuestion(id="q_child", text="", properties=("p_child",))
+        pa = Property(id="pa", description="")
+        pb = Property(id="pb", description="")
+        p_child = Property(
+            id="p_child",
+            description="",
+            parents=("pa", "pb"),
+            activation="any",
+        )
+        props = [pa, pb, p_child]
+        prop_by_id = {p.id: p for p in props}
+        vis_expr = _compile_question_visibility(q_child, prop_by_id)
+        scope = _form([q_pa, q_pb, q_child], props)
+        return scope, vis_expr
+
+    def test_hidden_when_both_parents_unanswered(self, scope_and_expr: tuple[Scope, str]) -> None:
+        scope, expr = scope_and_expr
+        assert scope.visibility(expr) is False
+
+    def test_hidden_when_both_parents_no(self, scope_and_expr: tuple[Scope, str]) -> None:
+        scope, expr = scope_and_expr
+        scope.set_answer("q_pa", "no")
+        scope.set_answer("q_pb", "no")
+        assert scope.visibility(expr) is False
+
+    def test_visible_when_first_parent_yes(self, scope_and_expr: tuple[Scope, str]) -> None:
+        scope, expr = scope_and_expr
+        scope.set_answer("q_pa", "yes")
+        # second parent left unanswered — any-mode still shows the child
+        assert scope.visibility(expr) is True
+
+    def test_visible_when_second_parent_yes(self, scope_and_expr: tuple[Scope, str]) -> None:
+        scope, expr = scope_and_expr
+        scope.set_answer("q_pb", "yes")
+        assert scope.visibility(expr) is True
+
+
+class TestQuestionVisibilityMultiProperty:
+    """A question targeting multiple properties is visible when *any* of those
+    properties is reachable. Pins the cross-property OR aggregation in
+    `_compile_question_visibility`."""
+
+    @pytest.fixture
+    def scope_and_expr(self) -> tuple[Scope, str]:
+        # q_target sets both p1 and p2; p1 is gated by root1, p2 by root2.
+        # Question visibility is the OR of (root1 satisfied, root2 satisfied).
+        q_root1 = BinaryQuestion(id="q_root1", text="", properties=("root1",))
+        q_root2 = BinaryQuestion(id="q_root2", text="", properties=("root2",))
+        q_target = BinaryQuestion(id="q_target", text="", properties=("p1", "p2"))
+        root1 = Property(id="root1", description="")
+        root2 = Property(id="root2", description="")
+        p1 = Property(id="p1", description="", parents=("root1",))
+        p2 = Property(id="p2", description="", parents=("root2",))
+        props = [root1, root2, p1, p2]
+        prop_by_id = {p.id: p for p in props}
+        vis_expr = _compile_question_visibility(q_target, prop_by_id)
+        scope = _form([q_root1, q_root2, q_target], props)
+        return scope, vis_expr
+
+    def test_hidden_when_neither_root_yes(self, scope_and_expr: tuple[Scope, str]) -> None:
+        scope, expr = scope_and_expr
+        assert scope.visibility(expr) is False
+
+    def test_visible_when_first_root_yes(self, scope_and_expr: tuple[Scope, str]) -> None:
+        scope, expr = scope_and_expr
+        scope.set_answer("q_root1", "yes")
+        assert scope.visibility(expr) is True
+
+    def test_visible_when_second_root_yes(self, scope_and_expr: tuple[Scope, str]) -> None:
+        scope, expr = scope_and_expr
+        scope.set_answer("q_root2", "yes")
+        assert scope.visibility(expr) is True
+
+
 # ---------------------------------------------------------------------------
 # Risk aggregation
 # ---------------------------------------------------------------------------
@@ -270,6 +353,102 @@ class TestRiskAggregation:
             "consequence": "major",
             "level": "high",
         }
+
+    def test_mixed_firing_only_uses_firing_conditions(self) -> None:
+        """Aggregation uses *only* the conditions whose property is true.
+        Worst-per-axis must ignore non-firing conditions, even if their
+        declared (likelihood, consequence) would have been worse. Pins
+        SPEC §Risks → "A condition fires when its property is true. Only
+        true satisfies; an unset/null property never does."""
+        q1 = BinaryQuestion(id="q1", text="", properties=("p1",))
+        q2 = BinaryQuestion(id="q2", text="", properties=("p2",))
+        q3 = BinaryQuestion(id="q3", text="", properties=("p3",))
+        p1 = Property(id="p1", description="")
+        p2 = Property(id="p2", description="")
+        p3 = Property(id="p3", description="")
+        # The *worst* declared values are on conditions that won't fire (p2
+        # left unanswered, p3 explicitly false). The fired condition is p1
+        # only — a low/medium pair.
+        risk = Risk(
+            id="r1",
+            description="",
+            conditions=(
+                ConditionMapping(property="p1", likelihood="rare", consequence="medium"),
+                ConditionMapping(property="p2", likelihood="almost_certain", consequence="major"),
+                ConditionMapping(property="p3", likelihood="likely", consequence="major"),
+            ),
+        )
+        scope = _form([q1, q2, q3], [p1, p2, p3], risks=[risk])
+        scope.set_answer("q1", "yes")
+        # q2 unanswered → p2 null → its condition does not fire
+        scope.set_answer("q3", "no")  # p3 false → its condition does not fire
+        assert scope.risk("r1") == {
+            "likelihood": "rare",
+            "consequence": "medium",
+            "level": "low",
+        }
+
+
+# ---------------------------------------------------------------------------
+# _worst helper
+# ---------------------------------------------------------------------------
+
+
+class TestWorstHelper:
+    """`_worst(results, dim, scale)` picks the highest-severity value along
+    one axis, ignoring null entries. It's the engine of worst-per-dimension
+    aggregation; tests in `TestRiskAggregation` cover it indirectly, but
+    the all-null sentinel and empty-input cases are easier to assert here."""
+
+    @pytest.fixture
+    def scope(self) -> Scope:
+        # Any minimal form will do — we only need a scope on which `_worst`
+        # is defined; it doesn't depend on form contents.
+        q = BinaryQuestion(id="q1", text="", properties=("p1",))
+        p = Property(id="p1", description="")
+        return _form([q], [p])
+
+    def test_empty_input_returns_null(self, scope: Scope) -> None:
+        assert (
+            scope.eval("scope._worst([], 'likelihood', ['rare', 'unlikely', 'possible'])") is None
+        )
+
+    def test_all_null_returns_null(self, scope: Scope) -> None:
+        result = scope.eval(
+            "scope._worst("
+            "[{likelihood: null, consequence: null},"
+            " {likelihood: null, consequence: null}],"
+            " 'likelihood', ['rare', 'unlikely', 'possible'])"
+        )
+        assert result is None
+
+    def test_picks_highest_index_in_scale(self, scope: Scope) -> None:
+        result = scope.eval(
+            "scope._worst("
+            "[{likelihood: 'rare', consequence: 'minor'},"
+            " {likelihood: 'likely', consequence: 'minor'},"
+            " {likelihood: 'unlikely', consequence: 'minor'}],"
+            " 'likelihood', ['rare', 'unlikely', 'possible', 'likely', 'almost_certain'])"
+        )
+        assert result == "likely"
+
+    def test_skips_null_entries_among_others(self, scope: Scope) -> None:
+        result = scope.eval(
+            "scope._worst("
+            "[{likelihood: null},"
+            " {likelihood: 'unlikely'},"
+            " {likelihood: 'rare'}],"
+            " 'likelihood', ['rare', 'unlikely', 'possible'])"
+        )
+        assert result == "unlikely"
+
+    def test_single_entry_returns_its_value(self, scope: Scope) -> None:
+        result = scope.eval(
+            "scope._worst("
+            "[{likelihood: 'possible'}],"
+            " 'likelihood', ['rare', 'unlikely', 'possible'])"
+        )
+        assert result == "possible"
 
 
 # ---------------------------------------------------------------------------
@@ -460,6 +639,60 @@ class TestDetailShow:
     def test_shown_when_property_true(self, scope_and_expr: tuple[Scope, str]) -> None:
         scope, expr = scope_and_expr
         scope.set_answer("q1", "yes")
+        assert scope.visibility(expr) is True
+
+
+class TestDetailShowMultiProperty:
+    """A detail with multiple properties is shown when *any* one of them is
+    `true`. Pins the OR semantics in `_detail_show_js` (render.py:184)
+    against mixed parent state, where the single-property tests above
+    cannot."""
+
+    @pytest.fixture
+    def scope_and_expr(self) -> tuple[Scope, str]:
+        q1 = BinaryQuestion(id="q1", text="", properties=("p1",))
+        q2 = BinaryQuestion(id="q2", text="", properties=("p2",))
+        p1 = Property(id="p1", description="")
+        p2 = Property(id="p2", description="")
+        risk = Risk(
+            id="r1",
+            description="",
+            conditions=(
+                ConditionMapping(property="p1", likelihood="likely", consequence="major"),
+                ConditionMapping(property="p2", likelihood="rare", consequence="minor"),
+            ),
+        )
+        detail = Detail(id="d1", description="", properties=("p1", "p2"))
+        scope = _form([q1, q2], [p1, p2], risks=[risk], details=[detail])
+        show_js = _detail_show_js(detail.properties)
+        return scope, show_js
+
+    def test_hidden_when_both_null(self, scope_and_expr: tuple[Scope, str]) -> None:
+        scope, expr = scope_and_expr
+        assert scope.visibility(expr) is False
+
+    def test_hidden_when_both_false(self, scope_and_expr: tuple[Scope, str]) -> None:
+        scope, expr = scope_and_expr
+        scope.set_answer("q1", "no")
+        scope.set_answer("q2", "no")
+        assert scope.visibility(expr) is False
+
+    def test_shown_when_only_first_true(self, scope_and_expr: tuple[Scope, str]) -> None:
+        scope, expr = scope_and_expr
+        scope.set_answer("q1", "yes")
+        scope.set_answer("q2", "no")
+        assert scope.visibility(expr) is True
+
+    def test_shown_when_only_second_true(self, scope_and_expr: tuple[Scope, str]) -> None:
+        scope, expr = scope_and_expr
+        scope.set_answer("q1", "no")
+        scope.set_answer("q2", "yes")
+        assert scope.visibility(expr) is True
+
+    def test_shown_when_one_true_one_null(self, scope_and_expr: tuple[Scope, str]) -> None:
+        scope, expr = scope_and_expr
+        scope.set_answer("q1", "yes")
+        # q2 unanswered → p2 null
         assert scope.visibility(expr) is True
 
 
@@ -654,3 +887,132 @@ class TestSchemaMigration:
         assert scope.eval("scope.answers") == {"q1": ""}
         assert scope.eval("scope.mandated_controls") == {"r1": {"c1": False}}
         assert scope.eval("scope.mandated_comments") == {"r1": {"c1": ""}}
+
+    def test_init_is_idempotent(self) -> None:
+        """init() only fills *missing* keys; calling it a second time on
+        already-migrated state must be a no-op. A regression here would
+        clobber user state on hot-reload or dev-server reinit."""
+        q1 = BinaryQuestion(id="q1", text="", properties=("p1",))
+        q2 = BinaryQuestion(id="q2", text="", properties=("p2",))
+        p1 = Property(id="p1", description="")
+        p2 = Property(id="p2", description="")
+        r1 = self._risk("r1")
+        c1 = Control(
+            id="c1",
+            description="",
+            property="p1",
+            effects=(ControlEffect(risk_id="r1"),),
+        )
+        # Inject partial persisted state so init() actually does work on the
+        # first call — exercising the migration path, not just the no-op seed.
+        scope = _form(
+            [q1, q2],
+            [p1, p2],
+            risks=[r1],
+            controls=[c1],
+            persisted_state={
+                "_x_answers": {"q1": "yes"},
+                "_x_mandated_controls": {"r1": {"c1": True}},
+            },
+        )
+        snapshot_keys = (
+            "answers",
+            "details",
+            "control_effectiveness",
+            "residual_likelihood",
+            "residual_consequence",
+            "justifications",
+            "mandated_controls",
+            "mandated_comments",
+        )
+        before = {k: scope.eval(f"scope.{k}") for k in snapshot_keys}
+        scope.eval("scope.init();")
+        after = {k: scope.eval(f"scope.{k}") for k in snapshot_keys}
+        assert before == after
+
+
+# ---------------------------------------------------------------------------
+# clearAnswers / clearAssessment
+# ---------------------------------------------------------------------------
+
+
+class TestClearMethods:
+    """Both clear methods gate on a `confirm()` dialog. Accept ⇒ state is
+    reset to the build-time seed; cancel ⇒ no change. clearAssessment must
+    leave answers and details untouched; clearAnswers wipes both groups."""
+
+    def _populated_scope(self) -> Scope:
+        q1 = BinaryQuestion(id="q1", text="", properties=("p1",))
+        q2 = BinaryQuestion(id="q2", text="", properties=("p2",))
+        p1 = Property(id="p1", description="")
+        p2 = Property(id="p2", description="")
+        risk = Risk(
+            id="r1",
+            description="",
+            conditions=(
+                ConditionMapping(property="p1", likelihood="likely", consequence="major"),
+            ),
+        )
+        ctrl = Control(
+            id="c1",
+            description="",
+            property="p1",
+            effects=(ControlEffect(risk_id="r1"),),
+        )
+        detail = Detail(id="d1", description="", properties=("p1",))
+        scope = _form([q1, q2], [p1, p2], risks=[risk], controls=[ctrl], details=[detail])
+        # Populate every state slot so clear methods have something to wipe.
+        scope.set_answer("q1", "yes")
+        scope.set_answer("q2", "no")
+        scope.set_detail("d1", "field notes")
+        scope.set_effectiveness("r1", "partial")
+        scope.set_residual("r1", "unlikely", "medium")
+        scope.eval("scope.justifications['r1'] = 'looks fine';")
+        scope.eval("scope.mandated_controls['r1']['c1'] = true;")
+        scope.eval("scope.mandated_comments['r1']['c1'] = 'do this';")
+        return scope
+
+    def test_clear_answers_resets_all_state(self) -> None:
+        scope = self._populated_scope()
+        scope.eval("scope.clearAnswers();")
+        # confirm() returns true by default — full reset.
+        assert scope.eval("scope.answers") == {"q1": "", "q2": ""}
+        assert scope.eval("scope.details") == {"d1": ""}
+        assert scope.eval("scope.control_effectiveness") == {"r1": ""}
+        assert scope.eval("scope.residual_likelihood") == {"r1": ""}
+        assert scope.eval("scope.residual_consequence") == {"r1": ""}
+        assert scope.eval("scope.justifications") == {"r1": ""}
+        assert scope.eval("scope.mandated_controls") == {"r1": {"c1": False}}
+        assert scope.eval("scope.mandated_comments") == {"r1": {"c1": ""}}
+
+    def test_clear_answers_cancel_keeps_state(self) -> None:
+        scope = self._populated_scope()
+        scope.eval("confirm = () => false;")
+        scope.eval("scope.clearAnswers();")
+        # Nothing changed.
+        assert scope.eval("scope.answers") == {"q1": "yes", "q2": "no"}
+        assert scope.eval("scope.details") == {"d1": "field notes"}
+        assert scope.eval("scope.control_effectiveness") == {"r1": "partial"}
+        assert scope.eval("scope.justifications") == {"r1": "looks fine"}
+        assert scope.eval("scope.mandated_controls") == {"r1": {"c1": True}}
+
+    def test_clear_assessment_keeps_answers_and_details(self) -> None:
+        scope = self._populated_scope()
+        scope.eval("scope.clearAssessment();")
+        # Answers + details preserved; assessment fields wiped.
+        assert scope.eval("scope.answers") == {"q1": "yes", "q2": "no"}
+        assert scope.eval("scope.details") == {"d1": "field notes"}
+        assert scope.eval("scope.control_effectiveness") == {"r1": ""}
+        assert scope.eval("scope.residual_likelihood") == {"r1": ""}
+        assert scope.eval("scope.residual_consequence") == {"r1": ""}
+        assert scope.eval("scope.justifications") == {"r1": ""}
+        assert scope.eval("scope.mandated_controls") == {"r1": {"c1": False}}
+        assert scope.eval("scope.mandated_comments") == {"r1": {"c1": ""}}
+
+    def test_clear_assessment_cancel_keeps_state(self) -> None:
+        scope = self._populated_scope()
+        scope.eval("confirm = () => false;")
+        scope.eval("scope.clearAssessment();")
+        assert scope.eval("scope.control_effectiveness") == {"r1": "partial"}
+        assert scope.eval("scope.justifications") == {"r1": "looks fine"}
+        assert scope.eval("scope.mandated_controls") == {"r1": {"c1": True}}

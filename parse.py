@@ -49,10 +49,10 @@ def _check_unknown_keys(data: YamlDict, allowed: set[str], context: str) -> None
 # Combinator validation
 # ---------------------------------------------------------------------------
 #
-# `activation` (Property) and `mode` (ConditionMapping) both take the boolean
-# combinators "all" / "any". Validating here — rather than relying on downstream
-# code silently treating unknown values as "any" (see render.py `== "all"`
-# checks) — catches YAML typos like `activation: al` at parse time.
+# `Property.activation` takes the boolean combinators "all" / "any". Validating
+# here — rather than relying on downstream code silently treating unknown
+# values as "any" (see render.py `== "all"` checks) — catches YAML typos like
+# `activation: al` at parse time.
 
 
 def _parse_combinator(value: object, *, field_name: str, owner: str) -> Literal["all", "any"]:

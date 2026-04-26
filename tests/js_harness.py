@@ -36,8 +36,10 @@ const Alpine = {
 const document = {
     addEventListener: (event, cb) => { if (event === 'alpine:init') cb(); }
 };
-const alert = () => {};
-const confirm = () => true;
+// `let` rather than `const` so tests can flip the dialog stubs (e.g. to
+// exercise the user-clicks-cancel path of clearAnswers / _importJson).
+let alert = () => {};
+let confirm = () => true;
 """
 
 # Visibility / show expressions emitted by the renderer use bare identifiers

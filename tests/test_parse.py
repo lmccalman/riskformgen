@@ -27,6 +27,7 @@ from parse import (
     parse_risk,
     parse_section,
     parse_subsection,
+    validate_all,
     validate_control_properties,
     validate_control_risk_ids,
     validate_detail_properties,
@@ -850,3 +851,144 @@ class TestUnknownKeys:
                     "effect": [],  # should be "effects"
                 }
             )
+
+
+# ---------------------------------------------------------------------------
+# validate_all — orchestrator
+# ---------------------------------------------------------------------------
+
+
+class TestValidateAll:
+    """`validate_all` is the single entry point used by `main.main()`. Its
+    job is to surface the first invariant violation before render. Each
+    constituent validator has its own tests above; here we pin the
+    orchestration: a happy path passes, and a violation in any one
+    constituent is propagated."""
+
+    def _good_inputs(self):
+        section = Section(
+            id="s1",
+            title="T",
+            description="D",
+            subsections=(
+                SubSection(
+                    title="Sub",
+                    description="D",
+                    questions=(
+                        BinaryQuestion(id="q1", text="Q", properties=("p1",)),
+                        DetailQuestion(id="q_det", text="D", detail_id="d1", properties=("p1",)),
+                    ),
+                ),
+            ),
+        )
+        properties = [Property(id="p1", description="P1")]
+        risks = [
+            Risk(
+                id="r1",
+                description="R",
+                conditions=(
+                    ConditionMapping(property="p1", likelihood="rare", consequence="minor"),
+                ),
+            )
+        ]
+        controls = [
+            Control(
+                id="c1",
+                description="C",
+                property="p1",
+                effects=(ControlEffect(risk_id="r1"),),
+            )
+        ]
+        details = [Detail(id="d1", description="D", properties=("p1",))]
+        return section, properties, risks, controls, details
+
+    def test_happy_path(self):
+        section, properties, risks, controls, details = self._good_inputs()
+        validate_all([section], properties, risks, controls, details)
+
+    def test_propagates_dag_error(self):
+        section, _, risks, controls, details = self._good_inputs()
+        # Cycle in property DAG.
+        bad_props = [
+            Property(id="a", description="A", parents=("b",)),
+            Property(id="b", description="B", parents=("a",)),
+        ]
+        with pytest.raises(ValueError, match="cycle"):
+            validate_all([section], bad_props, risks, controls, details)
+
+    def test_propagates_question_property_error(self):
+        _section, properties, risks, controls, details = self._good_inputs()
+        bad_section = Section(
+            id="s1",
+            title="T",
+            description="D",
+            subsections=(
+                SubSection(
+                    title="Sub",
+                    description="D",
+                    questions=(BinaryQuestion(id="q1", text="Q", properties=("p_missing",)),),
+                ),
+            ),
+        )
+        with pytest.raises(ValueError, match="unknown property 'p_missing'"):
+            validate_all([bad_section], properties, risks, controls, details)
+
+    def test_propagates_risk_property_error(self):
+        section, properties, _, controls, details = self._good_inputs()
+        bad_risks = [
+            Risk(
+                id="r1",
+                description="R",
+                conditions=(
+                    ConditionMapping(property="p_missing", likelihood="rare", consequence="minor"),
+                ),
+            )
+        ]
+        with pytest.raises(ValueError, match="unknown property 'p_missing'"):
+            validate_all([section], properties, bad_risks, controls, details)
+
+    def test_propagates_control_property_error(self):
+        section, properties, risks, _, details = self._good_inputs()
+        bad_controls = [
+            Control(
+                id="c1",
+                description="C",
+                property="p_missing",
+                effects=(ControlEffect(risk_id="r1"),),
+            )
+        ]
+        with pytest.raises(ValueError, match="unknown property 'p_missing'"):
+            validate_all([section], properties, risks, bad_controls, details)
+
+    def test_propagates_control_risk_error(self):
+        section, properties, risks, _, details = self._good_inputs()
+        bad_controls = [
+            Control(
+                id="c1",
+                description="C",
+                property="p1",
+                effects=(ControlEffect(risk_id="r_missing"),),
+            )
+        ]
+        with pytest.raises(ValueError, match="unknown risk 'r_missing'"):
+            validate_all([section], properties, risks, bad_controls, details)
+
+    def test_propagates_detail_property_error(self):
+        section, properties, risks, controls, _ = self._good_inputs()
+        bad_details = [Detail(id="d1", description="D", properties=("p_missing",))]
+        with pytest.raises(ValueError, match="p_missing"):
+            validate_all([section], properties, risks, controls, bad_details)
+
+    def test_propagates_namespace_collision(self):
+        section, properties, risks, _, details = self._good_inputs()
+        # Control id collides with property id.
+        bad_controls = [
+            Control(
+                id="p1",
+                description="C",
+                property="p1",
+                effects=(ControlEffect(risk_id="r1"),),
+            )
+        ]
+        with pytest.raises(ValueError, match="unique across namespaces"):
+            validate_all([section], properties, risks, bad_controls, details)
