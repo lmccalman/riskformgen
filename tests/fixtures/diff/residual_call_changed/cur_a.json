@@ -1,0 +1,65 @@
+{
+  "aggregate_residual_justification": "",
+  "aggregate_residual_level": "",
+  "build_id": "abcd1234",
+  "control_effectiveness": {
+    "r1": "partial",
+    "r2": ""
+  },
+  "exported_at": "2026-01-15T11:00:00Z",
+  "format": "riskformgen-assessment",
+  "inherent": {
+    "r1": {
+      "consequence": "major",
+      "firing_conditions": [
+        "p1"
+      ],
+      "level": "high",
+      "likelihood": "likely"
+    },
+    "r2": {
+      "consequence": null,
+      "firing_conditions": [],
+      "level": "not_applicable",
+      "likelihood": null
+    }
+  },
+  "justifications": {
+    "r1": "Partial mitigation in place.",
+    "r2": ""
+  },
+  "mandated_comments": {
+    "r1": {
+      "c1": ""
+    },
+    "r2": {}
+  },
+  "mandated_controls": {
+    "r1": {
+      "c1": false
+    },
+    "r2": {}
+  },
+  "properties": {
+    "p1": true,
+    "p2": false
+  },
+  "property_ids": [
+    "p1",
+    "p2"
+  ],
+  "questionnaire_exported_at": "2026-01-15T10:00:00Z",
+  "residual_consequence": {
+    "r1": "medium",
+    "r2": ""
+  },
+  "residual_likelihood": {
+    "r1": "possible",
+    "r2": ""
+  },
+  "risk_ids": [
+    "r1",
+    "r2"
+  ],
+  "version": 4
+}

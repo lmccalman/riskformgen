@@ -5,6 +5,14 @@ Each system lives in its own folder under `registry/<slug>/`:
     questionnaire.json   # required, format `riskformgen-answers` v2
     assessment.json      # optional — system in progress if missing
     meta.yaml            # required, supplies the display name (and owner/notes)
+    history/             # optional — prior questionnaire/assessment pairs
+
+Files inside `history/` end in `-questionnaire.json` or `-assessment.json`;
+the prefix is conventionally the file's own `exported_at` with colons
+substituted to dashes for cross-platform safety, but the loader does not
+parse filenames — it pairs questionnaires with assessments by reading the
+new `questionnaire_exported_at` field on each assessment (falling back to
+chronological order when that field is absent on legacy records).
 
 Registry rendering is a pure read of these files: the JSON exports already
 carry the resolved property states and per-risk inherent values so the
@@ -28,6 +36,7 @@ from typing import Any
 import yaml
 
 import config
+from diff import ChangeSummary, diff_pair
 from models import Control, Property, Risk, Section, all_questions
 
 logger = logging.getLogger(__name__)
@@ -43,18 +52,46 @@ class SystemMeta:
 
 
 @dataclass(frozen=True)
+class HistoryEntry:
+    """One historical (questionnaire, assessment) pair plus its diff.
+
+    `assessment` may be `None` — a cycle where only the questionnaire was
+    committed (in-flight at the time) is still part of the history. The
+    `change_summary` is computed against the immediately-prior history
+    entry; the very first entry compares against `(None, None)` and so
+    has empty change lists but populated `current_only_ids`.
+    """
+
+    questionnaire: dict[str, Any]
+    assessment: dict[str, Any] | None
+    change_summary: ChangeSummary
+
+    @property
+    def exported_at(self) -> str:
+        if self.assessment is not None:
+            return str(self.assessment.get("exported_at", ""))
+        return str(self.questionnaire.get("exported_at", ""))
+
+
+@dataclass(frozen=True)
 class SystemRecord:
     """One committed system: meta, questionnaire JSON, optional assessment JSON.
 
     Both JSON payloads are kept as dicts so templates can render them
     directly. Validation has already verified format/version and warned on
     unknown ids; downstream code can trust the basic shape.
+
+    `history` holds prior pairs in oldest-first order;
+    `current_change_summary` is the diff of the current pair against the
+    last history entry (or `(None, None)` if there is no history).
     """
 
     slug: str
     meta: SystemMeta
     questionnaire: dict[str, Any]
     assessment: dict[str, Any] | None
+    history: tuple[HistoryEntry, ...] = ()
+    current_change_summary: ChangeSummary | None = None
 
     @property
     def exported_at(self) -> str:
@@ -114,6 +151,110 @@ def _warn_unknown_ids(slug: str, kind: str, payload_ids: Sequence[str], known: s
         )
 
 
+def _validate_questionnaire(
+    slug: str,
+    payload: dict[str, Any],
+    path: Path,
+    *,
+    question_ids: set[str],
+    property_ids: set[str],
+) -> None:
+    _check_format_version(payload, config.QUESTIONNAIRE_FORMAT, config.QUESTIONNAIRE_VERSION, path)
+    _warn_unknown_ids(slug, "question", payload.get("question_ids", []), question_ids)
+    _warn_unknown_ids(slug, "property", payload.get("property_ids", []), property_ids)
+
+
+def _validate_assessment(
+    slug: str, payload: dict[str, Any], path: Path, *, risk_ids: set[str], control_ids: set[str]
+) -> None:
+    _check_format_version(payload, config.ASSESSMENT_FORMAT, config.ASSESSMENT_VERSION, path)
+    _warn_unknown_ids(slug, "risk", payload.get("risk_ids", []), risk_ids)
+    seen_controls: set[str] = set()
+    for ctrls in (payload.get("mandated_controls") or {}).values():
+        if isinstance(ctrls, dict):
+            seen_controls.update(ctrls.keys())
+    _warn_unknown_ids(slug, "control", sorted(seen_controls), control_ids)
+
+
+def _load_history(
+    folder: Path,
+    *,
+    slug: str,
+    question_ids: set[str],
+    risk_ids: set[str],
+    control_ids: set[str],
+    property_ids: set[str],
+) -> list[tuple[dict[str, Any], dict[str, Any] | None]]:
+    """Load prior pairs from `<folder>/history/`, oldest-first.
+
+    Files must end in `-questionnaire.json` or `-assessment.json`. Pairs
+    questionnaires with assessments by `assessment["questionnaire_exported_at"]`
+    matching `questionnaire["exported_at"]`. Falls back to "latest
+    questionnaire whose exported_at <= assessment's exported_at" for legacy
+    records that predate the lineage field. An unpaired questionnaire (no
+    matching assessment) is kept as a questionnaire-only history entry.
+    """
+    history_dir = folder / "history"
+    if not history_dir.exists():
+        return []
+
+    questionnaires: list[dict[str, Any]] = []
+    assessments: list[dict[str, Any]] = []
+    for entry in sorted(history_dir.iterdir()):
+        if not entry.is_file():
+            continue
+        if entry.name.endswith("-questionnaire.json"):
+            payload = _parse_json(entry)
+            _validate_questionnaire(
+                slug, payload, entry, question_ids=question_ids, property_ids=property_ids
+            )
+            questionnaires.append(payload)
+        elif entry.name.endswith("-assessment.json"):
+            payload = _parse_json(entry)
+            _validate_assessment(slug, payload, entry, risk_ids=risk_ids, control_ids=control_ids)
+            assessments.append(payload)
+
+    questionnaires.sort(key=lambda q: str(q.get("exported_at", "")))
+    used_q: set[int] = set()
+    pairs: list[tuple[dict[str, Any], dict[str, Any] | None]] = []
+
+    for assessment in assessments:
+        link = str(assessment.get("questionnaire_exported_at", "") or "")
+        match_idx: int | None = None
+        if link:
+            for i, q in enumerate(questionnaires):
+                if i in used_q:
+                    continue
+                if str(q.get("exported_at", "")) == link:
+                    match_idx = i
+                    break
+        if match_idx is None:
+            # Legacy fallback: latest unused questionnaire with exported_at <= assessment's.
+            a_at = str(assessment.get("exported_at", ""))
+            for i in range(len(questionnaires) - 1, -1, -1):
+                if i in used_q:
+                    continue
+                if str(questionnaires[i].get("exported_at", "")) <= a_at:
+                    match_idx = i
+                    break
+        if match_idx is None:
+            raise ValueError(
+                f"[{slug}] historical assessment exported_at "
+                f"{assessment.get('exported_at')!r} has no matching questionnaire"
+            )
+        used_q.add(match_idx)
+        pairs.append((questionnaires[match_idx], assessment))
+
+    # Questionnaire-only history entries (in-flight cycles never assessed).
+    for i, q in enumerate(questionnaires):
+        if i in used_q:
+            continue
+        pairs.append((q, None))
+
+    pairs.sort(key=lambda p: str((p[1] or p[0]).get("exported_at", "")))
+    return pairs
+
+
 def _load_system(
     folder: Path,
     *,
@@ -138,35 +279,43 @@ def _load_system(
     if not q_path.exists():
         raise ValueError(f"Missing {q_path} for system {slug!r}")
     questionnaire = _parse_json(q_path)
-    _check_format_version(
-        questionnaire,
-        config.QUESTIONNAIRE_FORMAT,
-        config.QUESTIONNAIRE_VERSION,
-        q_path,
+    _validate_questionnaire(
+        slug, questionnaire, q_path, question_ids=question_ids, property_ids=property_ids
     )
-
-    _warn_unknown_ids(slug, "question", questionnaire.get("question_ids", []), question_ids)
-    _warn_unknown_ids(slug, "property", questionnaire.get("property_ids", []), property_ids)
 
     a_path = folder / "assessment.json"
     assessment: dict[str, Any] | None = None
     if a_path.exists():
         assessment = _parse_json(a_path)
-        _check_format_version(
-            assessment,
-            config.ASSESSMENT_FORMAT,
-            config.ASSESSMENT_VERSION,
-            a_path,
-        )
-        _warn_unknown_ids(slug, "risk", assessment.get("risk_ids", []), risk_ids)
-        # Warn on mandated-control ids that no longer exist in the form
-        seen_controls: set[str] = set()
-        for ctrls in (assessment.get("mandated_controls") or {}).values():
-            if isinstance(ctrls, dict):
-                seen_controls.update(ctrls.keys())
-        _warn_unknown_ids(slug, "control", sorted(seen_controls), control_ids)
+        _validate_assessment(slug, assessment, a_path, risk_ids=risk_ids, control_ids=control_ids)
 
-    return SystemRecord(slug=slug, meta=meta, questionnaire=questionnaire, assessment=assessment)
+    raw_history = _load_history(
+        folder,
+        slug=slug,
+        question_ids=question_ids,
+        risk_ids=risk_ids,
+        control_ids=control_ids,
+        property_ids=property_ids,
+    )
+
+    history: list[HistoryEntry] = []
+    prev_q: dict[str, Any] | None = None
+    prev_a: dict[str, Any] | None = None
+    for q, a in raw_history:
+        summary = diff_pair(prev_q, prev_a, q, a)
+        history.append(HistoryEntry(questionnaire=q, assessment=a, change_summary=summary))
+        prev_q, prev_a = q, a
+
+    current_summary: ChangeSummary | None = diff_pair(prev_q, prev_a, questionnaire, assessment)
+
+    return SystemRecord(
+        slug=slug,
+        meta=meta,
+        questionnaire=questionnaire,
+        assessment=assessment,
+        history=tuple(history),
+        current_change_summary=current_summary,
+    )
 
 
 def load_registry(

@@ -11,6 +11,19 @@ document.addEventListener('alpine:init', () => {
     mandated_comments: Alpine.$persist({{ mandated_comments_init_js }}).as('_x_a_mandated_comments'),
     aggregate_residual_level: Alpine.$persist({{ aggregate_residual_level_init_js }}).as('_x_a_aggregate_residual_level'),
     aggregate_residual_justification: Alpine.$persist({{ aggregate_residual_justification_init_js }}).as('_x_a_aggregate_residual_justification'),
+    /* Lineage: timestamps of the loaded questionnaire and prior assessment.
+       Captured on import so the exported assessment can link itself back to
+       the questionnaire it was made against, and to the assessment it
+       supersedes (when in diff mode). Both are plain strings — empty means
+       "no link". */
+    loaded_questionnaire_at: Alpine.$persist('').as('_x_a_loaded_questionnaire_at'),
+    prior_assessment_at: Alpine.$persist('').as('_x_a_prior_assessment_at'),
+    /* Diff overlay: full prior questionnaire + assessment payloads loaded
+       via `loadPrior()`. Persisted so a refresh keeps the diff session
+       coherent; both null when no prior is loaded ("first assessment"
+       case — the page renders exactly as before). */
+    prior_questionnaire: Alpine.$persist(null).as('_x_a_prior_questionnaire'),
+    prior_assessment: Alpine.$persist(null).as('_x_a_prior_assessment'),
     _questionIds: {{ question_ids_js }},
     _detailIds: {{ detail_ids_js }},
     _propertyIds: {{ property_ids_js }},
@@ -44,6 +57,8 @@ document.addEventListener('alpine:init', () => {
       }
       if (typeof this.aggregate_residual_level !== 'string') this.aggregate_residual_level = '';
       if (typeof this.aggregate_residual_justification !== 'string') this.aggregate_residual_justification = '';
+      if (typeof this.loaded_questionnaire_at !== 'string') this.loaded_questionnaire_at = '';
+      if (typeof this.prior_assessment_at !== 'string') this.prior_assessment_at = '';
     },
     _worst(results, dim, scale) {
       const vals = results.map(r => r[dim]).filter(v => v !== null);
@@ -161,6 +176,9 @@ document.addEventListener('alpine:init', () => {
               if (did in data.details) this.details[did] = data.details[did];
             }
           }
+          this.loaded_questionnaire_at = (typeof data.exported_at === 'string')
+            ? data.exported_at
+            : '';
         },
       });
     },
@@ -183,12 +201,40 @@ document.addEventListener('alpine:init', () => {
       }
       return snapshot;
     },
+    /* Live snapshot of the questionnaire/assessment as the user has filled
+       them in — used as the `cur_q` / `cur_a` arguments to `_diffPair`
+       (and shaped to match the JSON exported by `exportAssessment`). */
+    _currentQuestionnaire() {
+      return {
+        question_ids: this._questionIds,
+        answers: this.answers,
+        detail_ids: this._detailIds,
+        details: this.details,
+        property_ids: this._propertyIds,
+        properties: this._propertySnapshot(),
+      };
+    },
+    _currentAssessment() {
+      return {
+        risk_ids: this._riskIds,
+        inherent: this._inherentSnapshot(),
+        control_effectiveness: this.control_effectiveness,
+        residual_likelihood: this.residual_likelihood,
+        residual_consequence: this.residual_consequence,
+        justifications: this.justifications,
+        mandated_controls: this.mandated_controls,
+        mandated_comments: this.mandated_comments,
+        aggregate_residual_level: this.aggregate_residual_level,
+        aggregate_residual_justification: this.aggregate_residual_justification,
+      };
+    },
     exportAssessment() {
-      this._downloadJson({
+      const payload = {
         format: 'riskformgen-assessment',
         version: 4,
         build_id: this._buildId,
         exported_at: new Date().toISOString(),
+        questionnaire_exported_at: this.loaded_questionnaire_at || '',
         risk_ids: this._riskIds,
         property_ids: this._propertyIds,
         properties: this._propertySnapshot(),
@@ -201,7 +247,11 @@ document.addEventListener('alpine:init', () => {
         mandated_comments: this.mandated_comments,
         aggregate_residual_level: this.aggregate_residual_level,
         aggregate_residual_justification: this.aggregate_residual_justification,
-      }, 'riskformgen-assessment.json');
+      };
+      if (this.prior_assessment_at) {
+        payload.prior_assessment_exported_at = this.prior_assessment_at;
+      }
+      this._downloadJson(payload, 'riskformgen-assessment.json');
     },
     importAssessment(event) {
       this._importJson(event, {
@@ -259,6 +309,348 @@ document.addEventListener('alpine:init', () => {
           }
         },
       });
+    },
+    /* ── Diff overlay (mirrors diff.diff_pair in Python) ──
+
+       Computed lazily as a getter so any change to live state recomputes
+       the summary. Parity with the Python implementation is pinned by
+       `tests/test_js_behaviour.py` running the same fixture corpus through
+       both paths. If you add a field here, add it in Python too (and
+       extend the fixtures). */
+    get diffMode() {
+      return !!this.prior_questionnaire;
+    },
+    get change_summary() {
+      if (!this.prior_questionnaire) return null;
+      return this._diffPair(
+        this.prior_questionnaire,
+        this.prior_assessment,
+        this._currentQuestionnaire(),
+        this._currentAssessment()
+      );
+    },
+    _equal(a, b) {
+      if (a === b) return true;
+      if (a === undefined || b === undefined) return a === b;
+      if (a === null || b === null) return a === b;
+      if (typeof a !== typeof b) return false;
+      if (Array.isArray(a)) {
+        if (!Array.isArray(b) || a.length !== b.length) return false;
+        return a.every((v, i) => this._equal(v, b[i]));
+      }
+      if (typeof a === 'object') {
+        const ak = Object.keys(a).sort();
+        const bk = Object.keys(b).sort();
+        if (ak.length !== bk.length) return false;
+        return ak.every((k, i) => k === bk[i] && this._equal(a[k], b[k]));
+      }
+      return false;
+    },
+    _scalarChanges(prev, cur) {
+      const out = [];
+      const keys = new Set([...Object.keys(prev || {}), ...Object.keys(cur || {})]);
+      for (const key of [...keys].sort()) {
+        const before = (prev || {})[key];
+        const after = (cur || {})[key];
+        if (this._equal(before, after)) continue;
+        out.push({
+          id: key,
+          before: before === undefined ? null : before,
+          after: after === undefined ? null : after,
+        });
+      }
+      return out;
+    },
+    _coerceInherent(raw) {
+      if (!raw || typeof raw !== 'object') return null;
+      return {
+        likelihood: raw.likelihood == null ? null : raw.likelihood,
+        consequence: raw.consequence == null ? null : raw.consequence,
+        level: String(raw.level == null ? 'not_applicable' : raw.level),
+        firing_conditions: Array.from(raw.firing_conditions || []),
+      };
+    },
+    _riskChanges(prev, cur) {
+      const out = [];
+      const keys = new Set([...Object.keys(prev || {}), ...Object.keys(cur || {})]);
+      for (const key of [...keys].sort()) {
+        const before = this._coerceInherent((prev || {})[key]);
+        const after = this._coerceInherent((cur || {})[key]);
+        if (this._equal(before, after)) continue;
+        out.push({risk_id: key, before, after});
+      }
+      return out;
+    },
+    _residualChanges(prev, cur, riskIds) {
+      const get = (payload, field, rid) => {
+        const block = (payload || {})[field];
+        if (!block || typeof block !== 'object') return '';
+        const val = block[rid];
+        return val == null ? '' : String(val);
+      };
+      const out = [];
+      for (const rid of riskIds) {
+        const eff_b = get(prev, 'control_effectiveness', rid);
+        const eff_a = get(cur, 'control_effectiveness', rid);
+        const rl_b = get(prev, 'residual_likelihood', rid);
+        const rl_a = get(cur, 'residual_likelihood', rid);
+        const rc_b = get(prev, 'residual_consequence', rid);
+        const rc_a = get(cur, 'residual_consequence', rid);
+        const just_b = get(prev, 'justifications', rid);
+        const just_a = get(cur, 'justifications', rid);
+        if (eff_b === eff_a && rl_b === rl_a && rc_b === rc_a && just_b === just_a) continue;
+        out.push({
+          risk_id: rid,
+          effectiveness: [eff_b, eff_a],
+          residual_likelihood: [rl_b, rl_a],
+          residual_consequence: [rc_b, rc_a],
+          justification: [just_b, just_a],
+        });
+      }
+      return out;
+    },
+    _mandateChanges(prev, cur) {
+      const safeDict = (p, k) => {
+        const b = (p || {})[k];
+        return (b && typeof b === 'object') ? b : {};
+      };
+      const lookup = (block, rid, cid, dflt) => {
+        const sub = block[rid];
+        if (!sub || typeof sub !== 'object') return dflt;
+        return cid in sub ? sub[cid] : dflt;
+      };
+      const prevMandated = safeDict(prev, 'mandated_controls');
+      const curMandated = safeDict(cur, 'mandated_controls');
+      const prevComments = safeDict(prev, 'mandated_comments');
+      const curComments = safeDict(cur, 'mandated_comments');
+      const pairs = new Set();
+      for (const block of [prevMandated, curMandated, prevComments, curComments]) {
+        for (const [rid, ctrls] of Object.entries(block)) {
+          if (!ctrls || typeof ctrls !== 'object') continue;
+          for (const cid of Object.keys(ctrls)) pairs.add(`${rid} ${cid}`);
+        }
+      }
+      const out = [];
+      for (const key of [...pairs].sort()) {
+        const sep = key.indexOf(' ');
+        const rid = key.slice(0, sep);
+        const cid = key.slice(sep + 1);
+        const m_before = !!lookup(prevMandated, rid, cid, false);
+        const m_after = !!lookup(curMandated, rid, cid, false);
+        const c_before = String(lookup(prevComments, rid, cid, '') || '');
+        const c_after = String(lookup(curComments, rid, cid, '') || '');
+        if (m_before === m_after && c_before === c_after) continue;
+        out.push({
+          risk_id: rid,
+          control_id: cid,
+          mandated_before: m_before,
+          mandated_after: m_after,
+          comment_before: c_before,
+          comment_after: c_after,
+        });
+      }
+      return out;
+    },
+    _aggregateChange(prev, cur) {
+      const lvl_b = String((prev || {}).aggregate_residual_level || '');
+      const lvl_a = String((cur || {}).aggregate_residual_level || '');
+      const just_b = String((prev || {}).aggregate_residual_justification || '');
+      const just_a = String((cur || {}).aggregate_residual_justification || '');
+      if (lvl_b === lvl_a && just_b === just_a) return null;
+      return {
+        level_before: lvl_b,
+        level_after: lvl_a,
+        justification_before: just_b,
+        justification_after: just_a,
+      };
+    },
+    _diffPair(prevQ, prevA, curQ, curA) {
+      const idSet = (payload, key) => new Set(
+        ((payload || {})[key] || []).filter(x => typeof x === 'string')
+      );
+      if (!prevQ) {
+        return {
+          answer_changes: [],
+          detail_changes: [],
+          property_changes: [],
+          risk_changes: [],
+          residual_changes: [],
+          mandate_changes: [],
+          aggregate_change: null,
+          prior_only_ids: {},
+          current_only_ids: {
+            questions: [...idSet(curQ, 'question_ids')].sort(),
+            details: [...idSet(curQ, 'detail_ids')].sort(),
+            properties: [...idSet(curQ, 'property_ids')].sort(),
+            risks: [...idSet(curA || {}, 'risk_ids')].sort(),
+          },
+        };
+      }
+      const prevA_ = prevA || {};
+      const curA_ = curA || {};
+      const setDiff = (a, b) => [...a].filter(x => !b.has(x)).sort();
+      const filterNonempty = obj => {
+        const out = {};
+        for (const [k, v] of Object.entries(obj)) if (v.length) out[k] = v;
+        return out;
+      };
+      const prev_q_ids = idSet(prevQ, 'question_ids');
+      const cur_q_ids = idSet(curQ, 'question_ids');
+      const prev_d_ids = idSet(prevQ, 'detail_ids');
+      const cur_d_ids = idSet(curQ, 'detail_ids');
+      const prev_p_ids = idSet(prevQ, 'property_ids');
+      const cur_p_ids = idSet(curQ, 'property_ids');
+      const prev_r_ids = idSet(prevA_, 'risk_ids');
+      const cur_r_ids = idSet(curA_, 'risk_ids');
+      return {
+        answer_changes: this._scalarChanges(prevQ.answers || {}, curQ.answers || {}),
+        detail_changes: this._scalarChanges(prevQ.details || {}, curQ.details || {}),
+        property_changes: this._scalarChanges(prevQ.properties || {}, curQ.properties || {}),
+        risk_changes: this._riskChanges(prevA_.inherent || {}, curA_.inherent || {}),
+        residual_changes: this._residualChanges(prevA_, curA_, [...cur_r_ids].sort()),
+        mandate_changes: this._mandateChanges(prevA_, curA_),
+        aggregate_change: this._aggregateChange(prevA_, curA_),
+        prior_only_ids: filterNonempty({
+          questions: setDiff(prev_q_ids, cur_q_ids),
+          details: setDiff(prev_d_ids, cur_d_ids),
+          properties: setDiff(prev_p_ids, cur_p_ids),
+          risks: setDiff(prev_r_ids, cur_r_ids),
+        }),
+        current_only_ids: filterNonempty({
+          questions: setDiff(cur_q_ids, prev_q_ids),
+          details: setDiff(cur_d_ids, prev_d_ids),
+          properties: setDiff(cur_p_ids, prev_p_ids),
+          risks: setDiff(cur_r_ids, prev_r_ids),
+        }),
+      };
+    },
+    /* Per-risk helpers used by the risk card to render diff badges and
+       "Previously: …" hints. Both are no-ops when no prior is loaded. */
+    riskInherentChanged(rid) {
+      if (!this.prior_assessment) return false;
+      const before = this._coerceInherent((this.prior_assessment.inherent || {})[rid]);
+      const after = this._coerceInherent(this._inherentSnapshot()[rid]);
+      return !this._equal(before, after);
+    },
+    priorResidual(rid) {
+      if (!this.prior_assessment) return null;
+      const eff = (this.prior_assessment.control_effectiveness || {})[rid] || '';
+      const rl = (this.prior_assessment.residual_likelihood || {})[rid] || '';
+      const rc = (this.prior_assessment.residual_consequence || {})[rid] || '';
+      const just = (this.prior_assessment.justifications || {})[rid] || '';
+      return {effectiveness: eff, likelihood: rl, consequence: rc, justification: just};
+    },
+    /* ── Prior-version load ──
+
+       The "Load prior version" button accepts up to two files (the prior
+       questionnaire JSON and, optionally, the prior assessment JSON) and
+       routes them by inspecting `format`. Order in the picker doesn't
+       matter. The prior questionnaire is required; the prior assessment
+       is optional (an in-flight prior cycle still produces a valid diff).
+
+       On success: prior_* slots are populated, lineage timestamps are
+       captured, and the prior assessment's residual / justification /
+       mandate / aggregate state is carried forward into the live state
+       (so the assessor only edits what changed). */
+    loadPrior(event) {
+      const files = Array.from(event.target.files || []);
+      if (!files.length) return;
+      event.target.value = '';
+      let priorQ = null;
+      let priorA = null;
+      let aborted = false;
+      let pending = files.length;
+      const finish = () => {
+        if (aborted) return;
+        if (!priorQ) {
+          alert(
+            'No prior questionnaire file recognised. Pick the prior questionnaire JSON ' +
+            '(and optionally its assessment) and try again.'
+          );
+          return;
+        }
+        if (priorA) {
+          const buildIdMismatch =
+            !!priorA.build_id && !!this._buildId && priorA.build_id !== this._buildId;
+          if (buildIdMismatch) {
+            const ok = confirm(
+              `Prior was made against build ${priorA.build_id} (current: ${this._buildId}). ` +
+              'Diff may include form-evolution noise. Load anyway?'
+            );
+            if (!ok) return;
+          }
+        }
+        this.prior_questionnaire = priorQ;
+        this.prior_assessment = priorA;
+        this.prior_assessment_at = (priorA && priorA.exported_at) ? priorA.exported_at : '';
+        if (priorA) this._carryForwardPriorAssessment(priorA);
+      };
+      files.forEach(file => {
+        const reader = new FileReader();
+        reader.onload = () => {
+          if (aborted) return;
+          let data;
+          try { data = JSON.parse(reader.result); }
+          catch { aborted = true; alert('Invalid JSON in ' + file.name); return; }
+          if (data.format === 'riskformgen-answers') {
+            priorQ = data;
+          } else if (data.format === 'riskformgen-assessment') {
+            priorA = data;
+          } else {
+            aborted = true;
+            alert(
+              'Unrecognised format in ' + file.name +
+              '. Expected an answers or assessment file.'
+            );
+            return;
+          }
+          pending--;
+          if (pending === 0) finish();
+        };
+        reader.readAsText(file);
+      });
+    },
+    _carryForwardPriorAssessment(data) {
+      for (const id of this._riskIds) {
+        if (data.control_effectiveness && id in data.control_effectiveness) {
+          this.control_effectiveness[id] = data.control_effectiveness[id];
+        }
+        if (data.residual_likelihood && id in data.residual_likelihood) {
+          this.residual_likelihood[id] = data.residual_likelihood[id];
+        }
+        if (data.residual_consequence && id in data.residual_consequence) {
+          this.residual_consequence[id] = data.residual_consequence[id];
+        }
+        if (data.justifications && id in data.justifications) {
+          this.justifications[id] = data.justifications[id];
+        }
+        if (data.mandated_controls && data.mandated_controls[id]) {
+          for (const [ctrl, val] of Object.entries(data.mandated_controls[id])) {
+            if (this.mandated_controls[id] && ctrl in this.mandated_controls[id]) {
+              this.mandated_controls[id][ctrl] = val;
+            }
+          }
+        }
+        if (data.mandated_comments && data.mandated_comments[id]) {
+          for (const [ctrl, val] of Object.entries(data.mandated_comments[id])) {
+            if (this.mandated_comments[id] && ctrl in this.mandated_comments[id]) {
+              this.mandated_comments[id][ctrl] = val;
+            }
+          }
+        }
+      }
+      if (typeof data.aggregate_residual_level === 'string') {
+        this.aggregate_residual_level = data.aggregate_residual_level;
+      }
+      if (typeof data.aggregate_residual_justification === 'string') {
+        this.aggregate_residual_justification = data.aggregate_residual_justification;
+      }
+    },
+    clearPrior() {
+      if (!confirm('Clear the loaded prior version? Live answers and assessment are untouched.')) return;
+      this.prior_questionnaire = null;
+      this.prior_assessment = null;
+      this.prior_assessment_at = '';
     },
     {% for prop in property_getters %}
     get prop_{{ prop.id }}() {

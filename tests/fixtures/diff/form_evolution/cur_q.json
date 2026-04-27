@@ -1,0 +1,28 @@
+{
+  "answers": {
+    "q1": "yes",
+    "q_new": "yes"
+  },
+  "build_id": "abcd1234",
+  "detail_ids": [
+    "d1"
+  ],
+  "details": {
+    "d1": "prior note"
+  },
+  "exported_at": "2026-01-15T10:00:00Z",
+  "format": "riskformgen-answers",
+  "properties": {
+    "p1": true,
+    "p_new": true
+  },
+  "property_ids": [
+    "p1",
+    "p_new"
+  ],
+  "question_ids": [
+    "q1",
+    "q_new"
+  ],
+  "version": 2
+}

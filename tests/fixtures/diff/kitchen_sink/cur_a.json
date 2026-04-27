@@ -1,0 +1,63 @@
+{
+  "aggregate_residual_justification": "Net low after this cycle.",
+  "aggregate_residual_level": "low",
+  "build_id": "abcd1234",
+  "control_effectiveness": {
+    "r1": "controlled",
+    "r2": ""
+  },
+  "exported_at": "2026-04-01T11:00:00Z",
+  "format": "riskformgen-assessment",
+  "inherent": {
+    "r1": {
+      "consequence": null,
+      "firing_conditions": [],
+      "level": "not_applicable",
+      "likelihood": null
+    },
+    "r2": {
+      "consequence": null,
+      "firing_conditions": [],
+      "level": "not_applicable",
+      "likelihood": null
+    }
+  },
+  "justifications": {
+    "r1": "Risk no longer applicable.",
+    "r2": ""
+  },
+  "mandated_comments": {
+    "r1": {
+      "c1": "Mandated last cycle."
+    },
+    "r2": {}
+  },
+  "mandated_controls": {
+    "r1": {
+      "c1": true
+    },
+    "r2": {}
+  },
+  "properties": {
+    "p1": false,
+    "p2": false
+  },
+  "property_ids": [
+    "p1",
+    "p2"
+  ],
+  "questionnaire_exported_at": "2026-04-01T10:00:00Z",
+  "residual_consequence": {
+    "r1": "",
+    "r2": ""
+  },
+  "residual_likelihood": {
+    "r1": "",
+    "r2": ""
+  },
+  "risk_ids": [
+    "r1",
+    "r2"
+  ],
+  "version": 4
+}

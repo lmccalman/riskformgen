@@ -1,0 +1,78 @@
+{
+  "aggregate_change": null,
+  "answer_changes": [
+    {
+      "after": "yes",
+      "before": null,
+      "id": "q_new"
+    },
+    {
+      "after": null,
+      "before": "yes",
+      "id": "q_old"
+    }
+  ],
+  "current_only_ids": {
+    "properties": [
+      "p_new"
+    ],
+    "questions": [
+      "q_new"
+    ],
+    "risks": [
+      "r_new"
+    ]
+  },
+  "detail_changes": [],
+  "mandate_changes": [],
+  "prior_only_ids": {
+    "properties": [
+      "p_old"
+    ],
+    "questions": [
+      "q_old"
+    ],
+    "risks": [
+      "r_old"
+    ]
+  },
+  "property_changes": [
+    {
+      "after": true,
+      "before": null,
+      "id": "p_new"
+    },
+    {
+      "after": null,
+      "before": true,
+      "id": "p_old"
+    }
+  ],
+  "residual_changes": [],
+  "risk_changes": [
+    {
+      "after": {
+        "consequence": "medium",
+        "firing_conditions": [
+          "p_new"
+        ],
+        "level": "medium",
+        "likelihood": "possible"
+      },
+      "before": null,
+      "risk_id": "r_new"
+    },
+    {
+      "after": null,
+      "before": {
+        "consequence": "minor",
+        "firing_conditions": [
+          "p_old"
+        ],
+        "level": "low",
+        "likelihood": "rare"
+      },
+      "risk_id": "r_old"
+    }
+  ]
+}

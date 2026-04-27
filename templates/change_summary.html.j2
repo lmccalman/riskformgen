@@ -1,0 +1,196 @@
+{# Compact diff between two committed pairs.
+
+   Expects in scope:
+     summary  — a `diff.ChangeSummary` (or its `to_dict()` form)
+     labels   — output of `render._build_id_label_maps` (used to humanise ids)
+
+   The partial groups changes by kind. Each list is suppressed when empty,
+   so a diff that only flips one answer renders cleanly without empty
+   sections. Form-evolution ids (in `prior_only_ids` / `current_only_ids`)
+   are surfaced explicitly so the assessor sees what disappeared or
+   appeared rather than silently dropping them.
+#}
+{% macro fmt_value(value) -%}
+{%- if value is none -%}
+<em class="answer-missing">—</em>
+{%- elif value is sameas true -%}
+<code>true</code>
+{%- elif value is sameas false -%}
+<code>false</code>
+{%- elif value == "" -%}
+<em class="answer-missing">∅</em>
+{%- else -%}
+{{ value | string }}
+{%- endif -%}
+{%- endmacro %}
+
+{% macro lookup(kind, id) -%}
+{{ labels.get(kind, {}).get(id) or id }}
+{%- endmacro %}
+
+<div class="change-summary stack-sm">
+  {% if summary.answer_changes %}
+  <div class="change-summary-block">
+    <h5 class="dim-label">Answer changes</h5>
+    <ul>
+      {% for c in summary.answer_changes %}
+      <li>
+        <span class="change-summary-label">{{ lookup("questions", c.id) }}</span>
+        <span class="change-summary-arrow">{{ fmt_value(c.before) }} → {{ fmt_value(c.after) }}</span>
+      </li>
+      {% endfor %}
+    </ul>
+  </div>
+  {% endif %}
+
+  {% if summary.detail_changes %}
+  <div class="change-summary-block">
+    <h5 class="dim-label">Detail edits</h5>
+    <ul>
+      {% for c in summary.detail_changes %}
+      <li>
+        <span class="change-summary-label">{{ lookup("details", c.id) }}</span>
+        <p class="change-summary-text-before">Before: {{ fmt_value(c.before) }}</p>
+        <p class="change-summary-text-after">After:  {{ fmt_value(c.after) }}</p>
+      </li>
+      {% endfor %}
+    </ul>
+  </div>
+  {% endif %}
+
+  {% if summary.property_changes %}
+  <div class="change-summary-block">
+    <h5 class="dim-label">Property changes</h5>
+    <ul>
+      {% for c in summary.property_changes %}
+      <li>
+        <span class="change-summary-label">{{ lookup("properties", c.id) }}</span>
+        <span class="change-summary-arrow">{{ fmt_value(c.before) }} → {{ fmt_value(c.after) }}</span>
+      </li>
+      {% endfor %}
+    </ul>
+  </div>
+  {% endif %}
+
+  {% if summary.risk_changes %}
+  <div class="change-summary-block">
+    <h5 class="dim-label">Risk changes</h5>
+    <ul>
+      {% for c in summary.risk_changes %}
+      <li>
+        <span class="change-summary-label">{{ lookup("risks", c.risk_id) }}</span>
+        <span class="change-summary-arrow">
+          {% if c.before %}{{ c.before.level | replace("_", " ") }}{% else %}—{% endif %}
+          →
+          {% if c.after %}{{ c.after.level | replace("_", " ") }}{% else %}—{% endif %}
+        </span>
+        {% if c.before and c.after %}
+        {% if c.before.likelihood != c.after.likelihood or c.before.consequence != c.after.consequence %}
+        <p class="change-summary-detail">
+          L/C: {{ c.before.likelihood or "—" }}/{{ c.before.consequence or "—" }} →
+          {{ c.after.likelihood or "—" }}/{{ c.after.consequence or "—" }}
+        </p>
+        {% endif %}
+        {% if c.before.firing_conditions != c.after.firing_conditions %}
+        <p class="change-summary-detail">Firing conditions changed.</p>
+        {% endif %}
+        {% endif %}
+      </li>
+      {% endfor %}
+    </ul>
+  </div>
+  {% endif %}
+
+  {% if summary.residual_changes %}
+  <div class="change-summary-block">
+    <h5 class="dim-label">Residual call changes</h5>
+    <ul>
+      {% for c in summary.residual_changes %}
+      <li>
+        <span class="change-summary-label">{{ lookup("risks", c.risk_id) }}</span>
+        {% if c.effectiveness[0] != c.effectiveness[1] %}
+        <p class="change-summary-detail">
+          Effectiveness:
+          {{ fmt_value(c.effectiveness[0]) }} → {{ fmt_value(c.effectiveness[1]) }}
+        </p>
+        {% endif %}
+        {% if c.residual_likelihood[0] != c.residual_likelihood[1] or c.residual_consequence[0] != c.residual_consequence[1] %}
+        <p class="change-summary-detail">
+          Residual L/C:
+          {{ fmt_value(c.residual_likelihood[0]) }}/{{ fmt_value(c.residual_consequence[0]) }} →
+          {{ fmt_value(c.residual_likelihood[1]) }}/{{ fmt_value(c.residual_consequence[1]) }}
+        </p>
+        {% endif %}
+        {% if c.justification[0] != c.justification[1] %}
+        <p class="change-summary-detail">Justification updated.</p>
+        {% endif %}
+      </li>
+      {% endfor %}
+    </ul>
+  </div>
+  {% endif %}
+
+  {% if summary.mandate_changes %}
+  <div class="change-summary-block">
+    <h5 class="dim-label">Mandated control changes</h5>
+    <ul>
+      {% for c in summary.mandate_changes %}
+      <li>
+        <span class="change-summary-label">
+          {{ lookup("controls", c.control_id) }}
+          on {{ lookup("risks", c.risk_id) }}
+        </span>
+        {% if c.mandated_before != c.mandated_after %}
+        <p class="change-summary-detail">
+          Mandated: {{ "yes" if c.mandated_before else "no" }} →
+          {{ "yes" if c.mandated_after else "no" }}
+        </p>
+        {% endif %}
+        {% if c.comment_before != c.comment_after %}
+        <p class="change-summary-detail">Implementation comment updated.</p>
+        {% endif %}
+      </li>
+      {% endfor %}
+    </ul>
+  </div>
+  {% endif %}
+
+  {% if summary.aggregate_change %}
+  <div class="change-summary-block">
+    <h5 class="dim-label">Aggregate residual</h5>
+    {% if summary.aggregate_change.level_before != summary.aggregate_change.level_after %}
+    <p class="change-summary-detail">
+      Level: {{ fmt_value(summary.aggregate_change.level_before) }} →
+      {{ fmt_value(summary.aggregate_change.level_after) }}
+    </p>
+    {% endif %}
+    {% if summary.aggregate_change.justification_before != summary.aggregate_change.justification_after %}
+    <p class="change-summary-detail">Aggregate justification updated.</p>
+    {% endif %}
+  </div>
+  {% endif %}
+
+  {% set prior_only = summary.prior_only_ids %}
+  {% set current_only = summary.current_only_ids %}
+  {% if prior_only or current_only %}
+  <div class="change-summary-block">
+    <h5 class="dim-label">Form evolution since prior</h5>
+    {% for kind, ids in prior_only.items() %}
+    {% if ids %}
+    <p class="change-summary-detail">
+      Prior had {{ kind }} no longer in the form:
+      {% for id in ids %}<code>{{ id }}</code>{% if not loop.last %}, {% endif %}{% endfor %}
+    </p>
+    {% endif %}
+    {% endfor %}
+    {% for kind, ids in current_only.items() %}
+    {% if ids %}
+    <p class="change-summary-detail">
+      New {{ kind }} since prior:
+      {% for id in ids %}<code>{{ id }}</code>{% if not loop.last %}, {% endif %}{% endfor %}
+    </p>
+    {% endif %}
+    {% endfor %}
+  </div>
+  {% endif %}
+</div>

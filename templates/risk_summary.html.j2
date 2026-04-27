@@ -2,6 +2,11 @@
   {# ── Header ── #}
   <header class="card-header">
     <p class="card-header-title">{{ risk.id | replace("_", " ") | title }}</p>
+    <span
+      class="tag is-info is-light is-small risk-changed-badge"
+      x-show="diffMode && riskInherentChanged('{{ risk.id }}')"
+      x-cloak
+    >Changed since prior</span>
   </header>
 
   <div class="card-content risk-card-body">
@@ -120,6 +125,20 @@
       x-cloak
     >
       <span class="dim-label">Control Effectiveness</span>
+      <p
+        class="prior-residual-hint help"
+        x-show="diffMode && priorResidual('{{ risk.id }}') && priorResidual('{{ risk.id }}').effectiveness"
+        x-cloak
+      >
+        Previously: <span x-text="priorResidual('{{ risk.id }}') && priorResidual('{{ risk.id }}').effectiveness"></span>
+        <template x-if="priorResidual('{{ risk.id }}') && priorResidual('{{ risk.id }}').likelihood">
+          <span>
+            (residual L/C:
+            <span x-text="priorResidual('{{ risk.id }}').likelihood"></span> /
+            <span x-text="priorResidual('{{ risk.id }}').consequence"></span>)
+          </span>
+        </template>
+      </p>
       <div class="options-row">
         <label class="radio">
           <input

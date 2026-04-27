@@ -1,0 +1,86 @@
+{
+  "aggregate_change": {
+    "justification_after": "Net low after this cycle.",
+    "justification_before": "",
+    "level_after": "low",
+    "level_before": ""
+  },
+  "answer_changes": [
+    {
+      "after": "no",
+      "before": "yes",
+      "id": "q1"
+    },
+    {
+      "after": "yes",
+      "before": "",
+      "id": "q3"
+    }
+  ],
+  "current_only_ids": {},
+  "detail_changes": [
+    {
+      "after": "updated note",
+      "before": "prior note",
+      "id": "d1"
+    }
+  ],
+  "mandate_changes": [
+    {
+      "comment_after": "Mandated last cycle.",
+      "comment_before": "",
+      "control_id": "c1",
+      "mandated_after": true,
+      "mandated_before": false,
+      "risk_id": "r1"
+    }
+  ],
+  "prior_only_ids": {},
+  "property_changes": [
+    {
+      "after": false,
+      "before": true,
+      "id": "p1"
+    }
+  ],
+  "residual_changes": [
+    {
+      "effectiveness": [
+        "ineffective",
+        "controlled"
+      ],
+      "justification": [
+        "Initial call.",
+        "Risk no longer applicable."
+      ],
+      "residual_consequence": [
+        "",
+        ""
+      ],
+      "residual_likelihood": [
+        "",
+        ""
+      ],
+      "risk_id": "r1"
+    }
+  ],
+  "risk_changes": [
+    {
+      "after": {
+        "consequence": null,
+        "firing_conditions": [],
+        "level": "not_applicable",
+        "likelihood": null
+      },
+      "before": {
+        "consequence": "major",
+        "firing_conditions": [
+          "p1"
+        ],
+        "level": "high",
+        "likelihood": "likely"
+      },
+      "risk_id": "r1"
+    }
+  ]
+}

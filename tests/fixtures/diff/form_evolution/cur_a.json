@@ -1,0 +1,67 @@
+{
+  "aggregate_residual_justification": "",
+  "aggregate_residual_level": "",
+  "build_id": "abcd1234",
+  "control_effectiveness": {
+    "r1": "ineffective",
+    "r_new": ""
+  },
+  "exported_at": "2026-01-15T11:00:00Z",
+  "format": "riskformgen-assessment",
+  "inherent": {
+    "r1": {
+      "consequence": "major",
+      "firing_conditions": [
+        "p1"
+      ],
+      "level": "high",
+      "likelihood": "likely"
+    },
+    "r_new": {
+      "consequence": "medium",
+      "firing_conditions": [
+        "p_new"
+      ],
+      "level": "medium",
+      "likelihood": "possible"
+    }
+  },
+  "justifications": {
+    "r1": "Initial call.",
+    "r_new": ""
+  },
+  "mandated_comments": {
+    "r1": {
+      "c1": ""
+    },
+    "r_new": {}
+  },
+  "mandated_controls": {
+    "r1": {
+      "c1": false
+    },
+    "r_new": {}
+  },
+  "properties": {
+    "p1": true,
+    "p_new": true
+  },
+  "property_ids": [
+    "p1",
+    "p2"
+  ],
+  "questionnaire_exported_at": "2026-01-15T10:00:00Z",
+  "residual_consequence": {
+    "r1": "",
+    "r_new": ""
+  },
+  "residual_likelihood": {
+    "r1": "",
+    "r_new": ""
+  },
+  "risk_ids": [
+    "r1",
+    "r_new"
+  ],
+  "version": 4
+}

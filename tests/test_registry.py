@@ -439,6 +439,262 @@ def _record_with_aggregate(
     )
 
 
+class TestHistoryLoading:
+    """`registry/<slug>/history/` holds prior (questionnaire, assessment)
+    pairs. Loader walks the folder, validates each file, pairs them via
+    `assessment.questionnaire_exported_at`, and exposes them in oldest-first
+    order on `SystemRecord.history`. Each entry carries a precomputed
+    `change_summary` against its predecessor; `current_change_summary` is
+    the diff between the current pair and the latest history entry.
+    """
+
+    def _write_history_pair(
+        self,
+        history_dir: Path,
+        *,
+        q_exported_at: str,
+        a_exported_at: str,
+        answers: dict[str, str] | None = None,
+        properties: dict[str, bool | None] | None = None,
+    ) -> None:
+        history_dir.mkdir(exist_ok=True)
+        q_payload = {
+            "format": config.QUESTIONNAIRE_FORMAT,
+            "version": config.QUESTIONNAIRE_VERSION,
+            "exported_at": q_exported_at,
+            "question_ids": list((answers or {"q1": "yes"}).keys()),
+            "answers": answers or {"q1": "yes"},
+            "detail_ids": [],
+            "details": {},
+            "property_ids": list((properties or {"p1": True, "p2": False}).keys()),
+            "properties": properties or {"p1": True, "p2": False},
+        }
+        a_payload = {
+            "format": config.ASSESSMENT_FORMAT,
+            "version": config.ASSESSMENT_VERSION,
+            "exported_at": a_exported_at,
+            "questionnaire_exported_at": q_exported_at,
+            "risk_ids": ["r1"],
+            "property_ids": list(q_payload["property_ids"]),
+            "properties": dict(q_payload["properties"]),
+            "inherent": {
+                "r1": {
+                    "likelihood": "likely",
+                    "consequence": "major",
+                    "level": "high",
+                    "firing_conditions": ["p1"],
+                }
+            },
+            "control_effectiveness": {"r1": "ineffective"},
+            "residual_likelihood": {"r1": ""},
+            "residual_consequence": {"r1": ""},
+            "justifications": {"r1": ""},
+            "mandated_controls": {"r1": {"c1": False}},
+            "mandated_comments": {"r1": {"c1": ""}},
+        }
+        safe_q = q_exported_at.replace(":", "-")
+        safe_a = a_exported_at.replace(":", "-")
+        (history_dir / f"{safe_q}-questionnaire.json").write_text(json.dumps(q_payload))
+        (history_dir / f"{safe_a}-assessment.json").write_text(json.dumps(a_payload))
+
+    def test_no_history_dir_means_empty_history(self, tmp_path: Path, form: dict) -> None:
+        folder = _make_system(tmp_path, "acme")
+        _write_meta(folder)
+        _write_questionnaire(folder)
+        _write_assessment(folder)
+        records = load_registry(tmp_path, **form)
+        assert records[0].history == ()
+
+    def test_single_history_pair_loaded_oldest_first(self, tmp_path: Path, form: dict) -> None:
+        folder = _make_system(tmp_path, "acme")
+        _write_meta(folder)
+        _write_questionnaire(folder, exported_at="2026-04-01T08:00:00Z")
+        _write_assessment(folder, exported_at="2026-04-01T09:00:00Z")
+        self._write_history_pair(
+            folder / "history",
+            q_exported_at="2026-01-15T10:00:00Z",
+            a_exported_at="2026-01-15T11:00:00Z",
+        )
+        records = load_registry(tmp_path, **form)
+        rec = records[0]
+        assert len(rec.history) == 1
+        entry = rec.history[0]
+        assert entry.questionnaire["exported_at"] == "2026-01-15T10:00:00Z"
+        assert entry.assessment is not None
+        assert entry.assessment["exported_at"] == "2026-01-15T11:00:00Z"
+        # First entry has no predecessor, so populated current_only_ids
+        # but empty change lists.
+        assert entry.change_summary.is_empty
+        assert entry.change_summary.current_only_ids
+
+    def test_multiple_history_pairs_sorted_oldest_first(self, tmp_path: Path, form: dict) -> None:
+        folder = _make_system(tmp_path, "acme")
+        _write_meta(folder)
+        _write_questionnaire(folder, exported_at="2026-04-01T08:00:00Z")
+        _write_assessment(folder, exported_at="2026-04-01T09:00:00Z")
+        # Write the newer pair first to verify sort logic isn't insertion-order.
+        self._write_history_pair(
+            folder / "history",
+            q_exported_at="2026-03-01T10:00:00Z",
+            a_exported_at="2026-03-01T11:00:00Z",
+            answers={"q1": "no"},
+            properties={"p1": False, "p2": False},
+        )
+        self._write_history_pair(
+            folder / "history",
+            q_exported_at="2026-01-15T10:00:00Z",
+            a_exported_at="2026-01-15T11:00:00Z",
+        )
+        rec = load_registry(tmp_path, **form)[0]
+        assert [e.questionnaire["exported_at"] for e in rec.history] == [
+            "2026-01-15T10:00:00Z",
+            "2026-03-01T10:00:00Z",
+        ]
+        # The second history entry diffs against the first — q1 flipped yes→no,
+        # p1 flipped true→false, so non-empty change lists.
+        second_diff = rec.history[1].change_summary
+        assert not second_diff.is_empty
+        assert any(c.id == "q1" for c in second_diff.answer_changes)
+
+    def test_current_change_summary_diffs_against_latest_history(
+        self, tmp_path: Path, form: dict
+    ) -> None:
+        folder = _make_system(tmp_path, "acme")
+        _write_meta(folder)
+        # Current: q1=yes, p1=True, r1 high.
+        _write_questionnaire(folder, exported_at="2026-04-01T08:00:00Z")
+        _write_assessment(folder, exported_at="2026-04-01T09:00:00Z")
+        # History entry: q1=no, p1=False, r1 not_applicable — so the current
+        # diff vs history should report q1 changed and the inherent block.
+        history_dir = folder / "history"
+        history_dir.mkdir()
+        q_payload = {
+            "format": config.QUESTIONNAIRE_FORMAT,
+            "version": config.QUESTIONNAIRE_VERSION,
+            "exported_at": "2026-01-15T10:00:00Z",
+            "question_ids": ["q1"],
+            "answers": {"q1": "no"},
+            "detail_ids": [],
+            "details": {},
+            "property_ids": ["p1", "p2"],
+            "properties": {"p1": False, "p2": False},
+        }
+        a_payload = {
+            "format": config.ASSESSMENT_FORMAT,
+            "version": config.ASSESSMENT_VERSION,
+            "exported_at": "2026-01-15T11:00:00Z",
+            "questionnaire_exported_at": "2026-01-15T10:00:00Z",
+            "risk_ids": ["r1"],
+            "property_ids": ["p1", "p2"],
+            "properties": {"p1": False, "p2": False},
+            "inherent": {
+                "r1": {
+                    "likelihood": None,
+                    "consequence": None,
+                    "level": "not_applicable",
+                    "firing_conditions": [],
+                }
+            },
+            "control_effectiveness": {"r1": ""},
+            "residual_likelihood": {"r1": ""},
+            "residual_consequence": {"r1": ""},
+            "justifications": {"r1": ""},
+            "mandated_controls": {"r1": {"c1": False}},
+            "mandated_comments": {"r1": {"c1": ""}},
+        }
+        (history_dir / "2026-01-15T10-00-00Z-questionnaire.json").write_text(json.dumps(q_payload))
+        (history_dir / "2026-01-15T11-00-00Z-assessment.json").write_text(json.dumps(a_payload))
+
+        rec = load_registry(tmp_path, **form)[0]
+        assert rec.current_change_summary is not None
+        diff = rec.current_change_summary
+        assert any(c.id == "q1" for c in diff.answer_changes)
+        # r1 inherent flipped from not_applicable to high.
+        risk_change = next((c for c in diff.risk_changes if c.risk_id == "r1"), None)
+        assert risk_change is not None
+        assert risk_change.before is not None and risk_change.before.level == "not_applicable"
+        assert risk_change.after is not None and risk_change.after.level == "high"
+
+    def test_legacy_pair_without_questionnaire_link_falls_back_to_chronology(
+        self, tmp_path: Path, form: dict
+    ) -> None:
+        """An assessment without `questionnaire_exported_at` is paired with
+        the latest unused questionnaire whose `exported_at` <= the
+        assessment's. Pins the legacy fallback path."""
+        folder = _make_system(tmp_path, "acme")
+        _write_meta(folder)
+        _write_questionnaire(folder)
+        _write_assessment(folder)
+
+        history_dir = folder / "history"
+        history_dir.mkdir()
+        q_payload = {
+            "format": config.QUESTIONNAIRE_FORMAT,
+            "version": config.QUESTIONNAIRE_VERSION,
+            "exported_at": "2025-12-01T10:00:00Z",
+            "question_ids": ["q1"],
+            "answers": {"q1": "yes"},
+            "detail_ids": [],
+            "details": {},
+            "property_ids": ["p1", "p2"],
+            "properties": {"p1": True, "p2": False},
+        }
+        a_payload = {
+            "format": config.ASSESSMENT_FORMAT,
+            "version": config.ASSESSMENT_VERSION,
+            "exported_at": "2025-12-01T11:00:00Z",
+            # NB: no questionnaire_exported_at field.
+            "risk_ids": ["r1"],
+            "property_ids": ["p1", "p2"],
+            "properties": {"p1": True, "p2": False},
+            "inherent": {
+                "r1": {
+                    "likelihood": "likely",
+                    "consequence": "major",
+                    "level": "high",
+                    "firing_conditions": ["p1"],
+                }
+            },
+            "control_effectiveness": {"r1": "ineffective"},
+            "residual_likelihood": {"r1": ""},
+            "residual_consequence": {"r1": ""},
+            "justifications": {"r1": ""},
+            "mandated_controls": {"r1": {"c1": False}},
+            "mandated_comments": {"r1": {"c1": ""}},
+        }
+        (history_dir / "2025-12-01T10-00-00Z-questionnaire.json").write_text(json.dumps(q_payload))
+        (history_dir / "2025-12-01T11-00-00Z-assessment.json").write_text(json.dumps(a_payload))
+
+        rec = load_registry(tmp_path, **form)[0]
+        assert len(rec.history) == 1
+        assert rec.history[0].assessment is not None
+
+    def test_questionnaire_only_history_entry_is_kept(self, tmp_path: Path, form: dict) -> None:
+        """A historical cycle where only the questionnaire was committed (no
+        assessment) is preserved as a questionnaire-only history entry."""
+        folder = _make_system(tmp_path, "acme")
+        _write_meta(folder)
+        _write_questionnaire(folder, exported_at="2026-04-01T08:00:00Z")
+        _write_assessment(folder, exported_at="2026-04-01T09:00:00Z")
+        history_dir = folder / "history"
+        history_dir.mkdir()
+        q_payload = {
+            "format": config.QUESTIONNAIRE_FORMAT,
+            "version": config.QUESTIONNAIRE_VERSION,
+            "exported_at": "2026-01-15T10:00:00Z",
+            "question_ids": ["q1"],
+            "answers": {"q1": "yes"},
+            "detail_ids": [],
+            "details": {},
+            "property_ids": ["p1", "p2"],
+            "properties": {"p1": True, "p2": False},
+        }
+        (history_dir / "2026-01-15T10-00-00Z-questionnaire.json").write_text(json.dumps(q_payload))
+        rec = load_registry(tmp_path, **form)[0]
+        assert len(rec.history) == 1
+        assert rec.history[0].assessment is None
+
+
 class TestAggregateResidualLevel:
     def test_no_assessment_is_not_applicable(self) -> None:
         rec = SystemRecord(

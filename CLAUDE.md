@@ -119,10 +119,15 @@ The data flow is: **Questions → Properties → Risks / Controls / Details**.
 | `config.py` | Project paths, risk scales (`LIKELIHOODS`, `CONSEQUENCES`, `RISK_LEVELS`), `RISK_LEVEL_COLOURS`, and `RISK_MATRIX` lookup table |
 | `models.py` | Frozen dataclasses: `BinaryQuestion`, `DetailQuestion`, `Property`, `ConditionMapping`, `Risk`, `Control`, `ControlEffect`, `Detail`, `Section`, `SubSection` |
 | `parse.py` | YAML → dataclass parsing (one `load_*` function per YAML file), id/combinator validation, and `validate_all()` orchestrator |
-| `render.py` | Jinja2 environment, view dataclasses (`SectionView`, `RiskView`, `DetailView`, …), `_compile_property_getter`, `_compile_question_visibility`, `_build_template_context`, and the per-tool render functions: `render_landing()`, `render_questionnaire()`, `render_assessment()`, `render_registry()`, `render_questionnaire_app_js()`, `render_assessment_app_js()` |
+| `render.py` | Jinja2 environment, view dataclasses (`SectionView`, `RiskView`, `DetailView`, …), `_compile_property_getter`, `_compile_question_visibility`, `_build_template_context`, `_build_snapshot_view`, and the per-tool render functions: `render_landing()`, `render_questionnaire()`, `render_assessment()`, `render_registry()`, `render_questionnaire_app_js()`, `render_assessment_app_js()` |
+| `registry.py` | Registry loader; pairs prior questionnaires/assessments from `<slug>/history/` and computes per-step `ChangeSummary` |
+| `diff.py` | `ChangeSummary` dataclass + `diff_pair()` — pure JSON-to-JSON diff used by the registry and mirrored in JS |
+| `scripts/add_to_registry.py` | Promotion helper: validates a new pair, moves any existing current files into `<slug>/history/`, and writes the new current pair |
 | `main.py` | Build orchestrator — loads YAML, validates, renders the four pages and two factories, copies assets |
 | `form/*.yaml` | Form definitions: `sections.yaml`, `properties.yaml`, `risks.yaml`, `controls.yaml`, `details.yaml` |
 | `templates/landing.html.j2` | Landing page (`index.html`): intro copy plus three tool cards. No Alpine. |
+| `templates/snapshot.html.j2` | Per-pair "system card + risks" partial — reused by the current registry view and each history entry |
+| `templates/change_summary.html.j2` | Compact diff renderer used by both the registry's history section and the per-system "changes since previous version" panel |
 | `templates/questionnaire.html.j2` | Questionnaire page skeleton with section tabs + Debug. `x-data="questionnaire"`. |
 | `templates/assessment.html.j2` | Assessment page skeleton: load-questionnaire bar, risk cards, read-only answers summary, Debug. `x-data="assessment"`. |
 | `templates/registry.html.j2` | Registry placeholder page — no Alpine, no form data. |

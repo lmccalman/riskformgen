@@ -1,0 +1,101 @@
+{# Snapshot of one committed (questionnaire, assessment) pair.
+
+   Expects a `snapshot` dict in scope (see `render._build_snapshot_view`):
+     sections, risks, has_assessment, aggregate_residual_level,
+     aggregate_residual_justification.
+
+   The partial is reused for the current pair and for each history entry,
+   so it deliberately omits the page header / stale-build banner — those
+   are rendered once per page by the surrounding template.
+#}
+<section class="stack-md">
+  <h3 class="title is-5">System card</h3>
+  <p class="has-text-grey">The system owner's answers, as committed.</p>
+  <div class="answers-summary">
+    {% for section in snapshot.sections %}
+    {% if section.visible %}
+    <section class="answers-summary-section">
+      <h4 class="title is-6">{{ section.title }}</h4>
+      {% for sub in section.subsections %}
+      {% if sub.visible %}
+      <div class="answers-summary-subsection">
+        <h5 class="title is-6">{{ sub.title }}</h5>
+        <dl class="answers-summary-list">
+          {% for q in sub.questions %}
+          {% if q.visible %}
+          <div class="answers-summary-row">
+            <dt class="answers-summary-q">{{ q.text }}</dt>
+            {% if q.type == "binary" %}
+            <dd class="answers-summary-a">
+              {% if q.answer == "yes" %}
+              <span>Yes</span>
+              {% elif q.answer == "no" %}
+              <span>No</span>
+              {% else %}
+              <span class="answer-missing">—</span>
+              {% endif %}
+            </dd>
+            {% elif q.type == "detail" %}
+            <dd class="answers-summary-a">
+              {% if q.detail_text %}
+              <span class="answers-summary-detail">{{ q.detail_text }}</span>
+              {% else %}
+              <span class="answer-missing">—</span>
+              {% endif %}
+            </dd>
+            {% endif %}
+          </div>
+          {% endif %}
+          {% endfor %}
+        </dl>
+      </div>
+      {% endif %}
+      {% endfor %}
+    </section>
+    {% endif %}
+    {% endfor %}
+  </div>
+</section>
+
+<section class="stack-md">
+  <h3 class="title is-5">Risks</h3>
+  {% if not snapshot.has_assessment %}
+  <p class="has-text-grey">
+    No assessment was committed for this snapshot — only the system card
+    is shown above.
+  </p>
+  {% else %}
+  {% if snapshot.aggregate_residual_level != "not_applicable" %}
+  <div class="card mb-4 aggregate-residual-card">
+    <header class="card-header">
+      <p class="card-header-title">Overall Residual Risk</p>
+    </header>
+    <div class="card-content risk-card-body">
+      <div class="risk-card-section">
+        <span class="dim-label">Assessor's aggregate</span>
+        <span class="badge badge-{{ risk_level_colours.get(snapshot.aggregate_residual_level, 'gray') }}">
+          {{ snapshot.aggregate_residual_level | replace("_", " ") }}
+        </span>
+      </div>
+      {% if snapshot.aggregate_residual_justification %}
+      <div class="risk-card-section">
+        <span class="dim-label">Aggregate Justification</span>
+        <p class="linked-answer">{{ snapshot.aggregate_residual_justification }}</p>
+      </div>
+      {% endif %}
+    </div>
+  </div>
+  {% endif %}
+  {% if snapshot.risks %}
+  {% for risk in snapshot.risks %}
+  {% with risk=risk %}
+  {% include "registry_risk.html.j2" %}
+  {% endwith %}
+  {% endfor %}
+  {% else %}
+  <p class="has-text-grey">
+    No applicable risks fired for this snapshot based on the committed answers.
+  </p>
+  {% endif %}
+  {% endif %}
+</section>

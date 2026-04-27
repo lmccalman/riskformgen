@@ -80,6 +80,66 @@ persona always knows which view they are in.
 8. The new change assessment and updates to the system card are added to the
    registry.
 
+### Re-assessment and history
+
+Steps 7–8 are served by a single, unified assessment tool. The page has
+the same surface for first-time and re-assessment cycles; loading a
+prior `(questionnaire, assessment)` pair flips the page into **diff
+mode**, which:
+
+- carries the prior assessor's residual, justification, mandate, and
+  aggregate inputs forward into the live state (so only changed risks
+  need re-input);
+- renders a "Changes since prior version" panel listing the deltas;
+- annotates each risk card whose inherent block changed since the prior
+  version with a "Changed since prior" badge;
+- shows "Previously: …" hints next to the residual and aggregate inputs
+  whose prior values are known.
+
+When no prior is loaded the page is unchanged from a fresh assessment —
+`diffMode` is off and the diff overlay is hidden. There is no separate
+"change-assessment tool"; the diff layer is purely additive UI on the
+normal assessment surface.
+
+#### Storage layout: side-car history
+
+Each `registry/<slug>/` directory may contain an optional `history/`
+folder. The current pair lives at `registry/<slug>/{questionnaire,
+assessment}.json` (unchanged); prior pairs live in `history/`, named
+`<exported_at>-questionnaire.json` and `<exported_at>-assessment.json`
+(with colons in the timestamp substituted to dashes for cross-platform
+filename safety). The registry loader pairs questionnaires with
+assessments by reading the `questionnaire_exported_at` field on each
+assessment, falling back to chronological order for legacy records that
+predate the field. The provided `scripts/add_to_registry.py` performs
+the promotion (move current → history, write the new current) atomically
+with format/version validation.
+
+#### Lineage on assessment exports
+
+Every `assessment.json` carries an additional, optional field
+`questionnaire_exported_at` (the `exported_at` of the questionnaire it
+was assessed against). When the export was made in diff mode, it also
+carries `prior_assessment_exported_at` — the `exported_at` of the
+assessment it supersedes. Both fields are additive (old loaders ignore
+them); `ASSESSMENT_VERSION` is unchanged.
+
+#### Diff parity
+
+The diff is computed by `diff.diff_pair` server-side (used for the
+registry's history rendering) and by a JS mirror in the assessment
+factory (used for the live overlay). Parity is pinned by a fixture
+corpus in `tests/fixtures/diff/` driven through both implementations.
+The JSON exports already bake in resolved property and inherent-risk
+state, so the diff is a pure JSON-to-JSON computation — it never
+re-evaluates the property DAG and survives form evolution gracefully
+(ids absent on either side are surfaced under `prior_only_ids` /
+`current_only_ids` rather than silently dropped).
+
+Build-id mismatch in diff mode is allowed with a banner: the diff
+operates over the intersection of ids present in both files, matching
+the existing "warn-but-load" policy on questionnaire/assessment imports.
+
 
 ## Concepts
 
@@ -265,6 +325,10 @@ Across `version` mismatch, the existing add/removed-confirmation dialog
 gains a "Schema version was X (current: Y)" line — the user accepts
 once and the ID-merge logic does the rest. Format mismatch is the only
 remaining hard reject.
+
+The same warn-but-load policy applies when the assessor loads a prior
+`(questionnaire, assessment)` pair into diff mode against a different
+build: the diff renders, with a banner that flags the mismatch.
 
 ### Details
 

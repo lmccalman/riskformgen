@@ -14,6 +14,10 @@ clearAnswers / `_x_q_*` migration semantics that are unique to it.
 
 from __future__ import annotations
 
+import json
+from pathlib import Path
+from typing import Any
+
 import pytest
 
 from models import (
@@ -1328,3 +1332,222 @@ class TestAssessmentClearAssessment:
         assert scope.eval("scope.control_effectiveness") == {"r1": "partial"}
         assert scope.eval("scope.justifications") == {"r1": "looks fine"}
         assert scope.eval("scope.mandated_controls") == {"r1": {"c1": True}}
+
+
+class TestJsDiffParity:
+    """The JS `_diffPair` and Python `diff.diff_pair` must produce identical
+    output for the same inputs. The same fixture corpus that drives the
+    Python tests is fed through a live assessment scope here — a regression
+    in either implementation breaks parity and fails this test.
+    """
+
+    @staticmethod
+    def _scope() -> Scope:
+        # `_diffPair` reads only its arguments; the form structure on the
+        # surrounding scope is irrelevant to the diff.
+        q = BinaryQuestion(id="q1", text="", properties=("p1",))
+        p = Property(id="p1", description="")
+        return _form([q], [p])
+
+    @staticmethod
+    def _fixtures_dir() -> Path:
+        return Path(__file__).parent / "fixtures" / "diff"
+
+    @pytest.mark.parametrize(
+        "scenario",
+        sorted(
+            p.name for p in (Path(__file__).parent / "fixtures" / "diff").iterdir() if p.is_dir()
+        ),
+    )
+    def test_js_diff_matches_python_expected(self, scenario: str) -> None:
+        folder = self._fixtures_dir() / scenario
+        prev_q = self._maybe_load(folder / "prev_q.json")
+        prev_a = self._maybe_load(folder / "prev_a.json")
+        cur_q = json.loads((folder / "cur_q.json").read_text())
+        cur_a = self._maybe_load(folder / "cur_a.json")
+        expected = json.loads((folder / "expected.json").read_text())
+
+        scope = self._scope()
+        result = scope.eval(
+            "JSON.stringify(scope._diffPair("
+            f"{json.dumps(prev_q)}, {json.dumps(prev_a)}, "
+            f"{json.dumps(cur_q)}, {json.dumps(cur_a)}"
+            "))"
+        )
+        assert json.loads(result) == expected
+
+    @staticmethod
+    def _maybe_load(path: Path) -> Any:
+        if not path.exists():
+            return None
+        return json.loads(path.read_text())
+
+
+class TestAssessmentPriorLoad:
+    """The "Load prior version" affordance populates the prior_* slots and
+    flips `diffMode` on. Loading the prior assessment also carries its
+    residual / justification / mandate state forward into live state, so
+    the assessor only edits what changed.
+    """
+
+    def _scope_with_assessment(self) -> Scope:
+        q = BinaryQuestion(id="q1", text="", properties=("p1",))
+        p = Property(id="p1", description="")
+        r = Risk(
+            id="r1",
+            description="",
+            conditions=(
+                ConditionMapping(property="p1", likelihood="likely", consequence="major"),
+            ),
+        )
+        c = Control(id="c1", description="", property="p1", effects=(ControlEffect(risk_id="r1"),))
+        return _form([q], [p], risks=[r], controls=[c])
+
+    def test_diff_mode_off_by_default(self) -> None:
+        scope = self._scope_with_assessment()
+        assert scope.eval("scope.diffMode") is False
+        assert scope.eval("scope.change_summary") is None
+
+    def test_setting_prior_questionnaire_flips_diff_mode_on(self) -> None:
+        scope = self._scope_with_assessment()
+        scope.eval("scope.prior_questionnaire = {question_ids: ['q1'], answers: {q1: 'no'}};")
+        assert scope.eval("scope.diffMode") is True
+        # change_summary now resolves to a populated diff (q1 changed yes/empty → live).
+        result = scope.eval("scope.change_summary")
+        assert result is not None
+        assert "answer_changes" in result
+
+    def test_carry_forward_prior_assessment_populates_live_state(self) -> None:
+        scope = self._scope_with_assessment()
+        prior_assessment = {
+            "risk_ids": ["r1"],
+            "control_effectiveness": {"r1": "partial"},
+            "residual_likelihood": {"r1": "possible"},
+            "residual_consequence": {"r1": "medium"},
+            "justifications": {"r1": "Prior call."},
+            "mandated_controls": {"r1": {"c1": True}},
+            "mandated_comments": {"r1": {"c1": "Implement before EOY."}},
+            "aggregate_residual_level": "medium",
+            "aggregate_residual_justification": "Prior aggregate.",
+        }
+        scope.eval(f"scope._carryForwardPriorAssessment({json.dumps(prior_assessment)});")
+        assert scope.eval("scope.control_effectiveness") == {"r1": "partial"}
+        assert scope.eval("scope.residual_likelihood") == {"r1": "possible"}
+        assert scope.eval("scope.residual_consequence") == {"r1": "medium"}
+        assert scope.eval("scope.justifications") == {"r1": "Prior call."}
+        assert scope.eval("scope.mandated_controls") == {"r1": {"c1": True}}
+        assert scope.eval("scope.mandated_comments") == {"r1": {"c1": "Implement before EOY."}}
+        assert scope.eval("scope.aggregate_residual_level") == "medium"
+        assert scope.eval("scope.aggregate_residual_justification") == "Prior aggregate."
+
+    def test_risk_inherent_changed_detects_level_flip(self) -> None:
+        scope = self._scope_with_assessment()
+        scope.eval(
+            "scope.prior_assessment = {"
+            " inherent: {r1: {likelihood: null, consequence: null, "
+            "level: 'not_applicable', firing_conditions: []}}"
+            "};"
+        )
+        # Live: q1 unanswered → r1 not_applicable. No change.
+        assert scope.eval("scope.riskInherentChanged('r1')") is False
+        # Flip live to applicable → change detected.
+        scope.set_answer("q1", "yes")
+        assert scope.eval("scope.riskInherentChanged('r1')") is True
+
+    def test_prior_residual_returns_prior_values_when_loaded(self) -> None:
+        scope = self._scope_with_assessment()
+        scope.eval(
+            "scope.prior_assessment = {"
+            " control_effectiveness: {r1: 'partial'},"
+            " residual_likelihood: {r1: 'unlikely'},"
+            " residual_consequence: {r1: 'minor'},"
+            " justifications: {r1: 'Prior reasoning.'}"
+            "};"
+        )
+        result = scope.eval("scope.priorResidual('r1')")
+        assert dict(result) == {
+            "effectiveness": "partial",
+            "likelihood": "unlikely",
+            "consequence": "minor",
+            "justification": "Prior reasoning.",
+        }
+
+    def test_prior_residual_returns_null_when_no_prior(self) -> None:
+        scope = self._scope_with_assessment()
+        assert scope.eval("scope.priorResidual('r1')") is None
+
+    def test_clear_prior_resets_slots(self) -> None:
+        scope = self._scope_with_assessment()
+        scope.eval(
+            "scope.prior_questionnaire = {question_ids: ['q1']};"
+            "scope.prior_assessment = {risk_ids: ['r1']};"
+            "scope.prior_assessment_at = '2026-01-01T00:00:00Z';"
+        )
+        scope.eval("scope.clearPrior();")
+        assert scope.eval("scope.prior_questionnaire") is None
+        assert scope.eval("scope.prior_assessment") is None
+        assert scope.eval("scope.prior_assessment_at") == ""
+        assert scope.eval("scope.diffMode") is False
+
+    def test_clear_prior_cancel_keeps_state(self) -> None:
+        scope = self._scope_with_assessment()
+        scope.eval("scope.prior_questionnaire = {question_ids: ['q1']};")
+        scope.eval("confirm = () => false;")
+        scope.eval("scope.clearPrior();")
+        assert scope.eval("scope.prior_questionnaire") is not None
+
+
+class TestAssessmentExportLineage:
+    """The assessment export carries pointers to the questionnaire it was
+    made against and (optionally) the prior assessment it supersedes. The
+    registry uses these to chain history without inventing a new ID
+    scheme. Pins:
+
+    1. `questionnaire_exported_at` is always emitted; it tracks
+       `loaded_questionnaire_at`, which is set when `importAnswers` runs.
+    2. `prior_assessment_exported_at` is omitted unless `prior_assessment_at`
+       has been set.
+    """
+
+    def _scope(self) -> Scope:
+        q = BinaryQuestion(id="q1", text="", properties=("p1",))
+        p = Property(id="p1", description="")
+        r = Risk(
+            id="r1",
+            description="",
+            conditions=(
+                ConditionMapping(property="p1", likelihood="likely", consequence="major"),
+            ),
+        )
+        return _form([q], [p], risks=[r])
+
+    def _capture_export(self, scope: Scope) -> dict[str, object]:
+        """Stub the download path so exportAssessment hands us the payload."""
+        scope.eval(
+            "var __captured = null;"
+            "scope._downloadJson = (data, _name) => { __captured = data; };"
+            "scope.exportAssessment();"
+        )
+        return dict(scope.eval("__captured"))
+
+    def test_questionnaire_exported_at_defaults_to_empty(self) -> None:
+        scope = self._scope()
+        payload = self._capture_export(scope)
+        assert payload["questionnaire_exported_at"] == ""
+        assert "prior_assessment_exported_at" not in payload
+
+    def test_loaded_questionnaire_at_round_trips_to_export(self) -> None:
+        scope = self._scope()
+        scope.eval("scope.loaded_questionnaire_at = '2026-01-15T10:00:00Z';")
+        payload = self._capture_export(scope)
+        assert payload["questionnaire_exported_at"] == "2026-01-15T10:00:00Z"
+
+    def test_prior_assessment_at_emits_pointer_field(self) -> None:
+        scope = self._scope()
+        scope.eval(
+            "scope.loaded_questionnaire_at = '2026-04-01T10:00:00Z';"
+            "scope.prior_assessment_at = '2026-01-15T11:00:00Z';"
+        )
+        payload = self._capture_export(scope)
+        assert payload["questionnaire_exported_at"] == "2026-04-01T10:00:00Z"
+        assert payload["prior_assessment_exported_at"] == "2026-01-15T11:00:00Z"

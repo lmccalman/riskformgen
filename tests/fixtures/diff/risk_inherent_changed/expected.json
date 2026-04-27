@@ -1,0 +1,41 @@
+{
+  "aggregate_change": null,
+  "answer_changes": [
+    {
+      "after": "no",
+      "before": "yes",
+      "id": "q1"
+    }
+  ],
+  "current_only_ids": {},
+  "detail_changes": [],
+  "mandate_changes": [],
+  "prior_only_ids": {},
+  "property_changes": [
+    {
+      "after": false,
+      "before": true,
+      "id": "p1"
+    }
+  ],
+  "residual_changes": [],
+  "risk_changes": [
+    {
+      "after": {
+        "consequence": null,
+        "firing_conditions": [],
+        "level": "not_applicable",
+        "likelihood": null
+      },
+      "before": {
+        "consequence": "major",
+        "firing_conditions": [
+          "p1"
+        ],
+        "level": "high",
+        "likelihood": "likely"
+      },
+      "risk_id": "r1"
+    }
+  ]
+}

@@ -1,0 +1,28 @@
+{
+  "aggregate_change": null,
+  "answer_changes": [],
+  "current_only_ids": {
+    "details": [
+      "d1"
+    ],
+    "properties": [
+      "p1",
+      "p2"
+    ],
+    "questions": [
+      "q1",
+      "q2",
+      "q3"
+    ],
+    "risks": [
+      "r1",
+      "r2"
+    ]
+  },
+  "detail_changes": [],
+  "mandate_changes": [],
+  "prior_only_ids": {},
+  "property_changes": [],
+  "residual_changes": [],
+  "risk_changes": []
+}

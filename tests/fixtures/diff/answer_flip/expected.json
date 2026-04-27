@@ -1,0 +1,34 @@
+{
+  "aggregate_change": null,
+  "answer_changes": [
+    {
+      "after": "yes",
+      "before": "no",
+      "id": "q2"
+    },
+    {
+      "after": "yes",
+      "before": "",
+      "id": "q3"
+    }
+  ],
+  "current_only_ids": {},
+  "detail_changes": [
+    {
+      "after": "updated note",
+      "before": "prior note",
+      "id": "d1"
+    }
+  ],
+  "mandate_changes": [],
+  "prior_only_ids": {},
+  "property_changes": [
+    {
+      "after": true,
+      "before": false,
+      "id": "p2"
+    }
+  ],
+  "residual_changes": [],
+  "risk_changes": []
+}

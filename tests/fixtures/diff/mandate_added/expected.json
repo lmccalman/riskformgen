@@ -1,0 +1,20 @@
+{
+  "aggregate_change": null,
+  "answer_changes": [],
+  "current_only_ids": {},
+  "detail_changes": [],
+  "mandate_changes": [
+    {
+      "comment_after": "Implement before next review.",
+      "comment_before": "",
+      "control_id": "c1",
+      "mandated_after": true,
+      "mandated_before": false,
+      "risk_id": "r1"
+    }
+  ],
+  "prior_only_ids": {},
+  "property_changes": [],
+  "residual_changes": [],
+  "risk_changes": []
+}

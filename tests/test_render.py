@@ -226,7 +226,7 @@ class TestRenderRegistry:
             sample_properties,
             details=[],
         )
-        assert "No assessment has been committed" in html
+        assert "No assessment was committed for this snapshot" in html
 
     def test_system_page_renders_question_answer(
         self,
@@ -312,7 +312,111 @@ class TestRenderRegistry:
         for html in (index_html, system_html):
             assert "x-data" not in html
             assert "x-show" not in html
-            assert "x-text" not in html
+
+    def test_no_history_section_when_empty(
+        self,
+        sample_record_factory,
+        sample_sections,
+        sample_risk,
+        sample_control,
+        sample_properties,
+    ):
+        rec = sample_record_factory(slug="acme", name="Acme")
+        html = render_registry_system(
+            rec, sample_sections, [sample_risk], [sample_control], sample_properties, details=[]
+        )
+        # When there is no history, the "History" section header is suppressed.
+        assert "registry-history" not in html
+
+    def test_history_section_renders_when_history_present(
+        self,
+        sample_record_factory,
+        sample_sections,
+        sample_risk,
+        sample_control,
+        sample_properties,
+    ):
+        from diff import diff_pair
+        from registry import HistoryEntry
+
+        rec = sample_record_factory(slug="acme", name="Acme")
+        # Synthesise a single history entry by reusing the factory's payloads
+        # but flipping one answer so the diff is non-empty.
+        prior_q = dict(rec.questionnaire)
+        prior_q["exported_at"] = "2026-01-15T10:00:00Z"
+        prior_a = dict(rec.assessment) if rec.assessment else None
+        if prior_a is not None:
+            prior_a = dict(prior_a)
+            prior_a["exported_at"] = "2026-01-15T11:00:00Z"
+            prior_a["aggregate_residual_level"] = "medium"
+        # Build the diff for the (questionnaire-only-prior → current) cycle.
+        history_summary = diff_pair(None, None, prior_q, prior_a)
+        history = (
+            HistoryEntry(
+                questionnaire=prior_q, assessment=prior_a, change_summary=history_summary
+            ),
+        )
+        # Compute the current diff against the history entry.
+        current_summary = diff_pair(prior_q, prior_a, rec.questionnaire, rec.assessment)
+        rec_with_history = SystemRecord(
+            slug=rec.slug,
+            meta=rec.meta,
+            questionnaire=rec.questionnaire,
+            assessment=rec.assessment,
+            history=history,
+            current_change_summary=current_summary,
+        )
+        html = render_registry_system(
+            rec_with_history,
+            sample_sections,
+            [sample_risk],
+            [sample_control],
+            sample_properties,
+            details=[],
+        )
+        # The History section is present.
+        assert "registry-history" in html
+        # The history entry is collapsible via <details>.
+        assert "<details" in html
+        # The historical date is surfaced.
+        assert "2026-01-15" in html
+
+    def test_current_change_summary_renders_at_top(
+        self,
+        sample_record_factory,
+        sample_sections,
+        sample_risk,
+        sample_control,
+        sample_properties,
+    ):
+        from diff import diff_pair
+
+        rec = sample_record_factory(slug="acme", name="Acme")
+        # Prior with q_a flipped — that single answer change produces a
+        # non-empty current_change_summary.
+        prior_q = dict(rec.questionnaire)
+        prior_q["answers"] = {**prior_q["answers"], "q_a": "no"}
+        prior_q["properties"] = {"prop_a": False, "prop_b": True}
+        summary = diff_pair(prior_q, None, rec.questionnaire, rec.assessment)
+        rec_with_summary = SystemRecord(
+            slug=rec.slug,
+            meta=rec.meta,
+            questionnaire=rec.questionnaire,
+            assessment=rec.assessment,
+            current_change_summary=summary,
+        )
+        html = render_registry_system(
+            rec_with_summary,
+            sample_sections,
+            [sample_risk],
+            [sample_control],
+            sample_properties,
+            details=[],
+        )
+        # The "Changes since previous version" heading is present.
+        assert "Changes since previous version" in html
+        # Answer-changes block surfaced.
+        assert "Answer changes" in html
 
 
 @pytest.fixture

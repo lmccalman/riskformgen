@@ -36,98 +36,66 @@
       </div>
       {% endif %}
 
-      <section class="stack-md">
-        <h2 class="title is-4">System card</h2>
-        <p class="has-text-grey">The system owner's answers, as committed.</p>
-        <div class="answers-summary">
-          {% for section in sections %}
-          {% if section.visible %}
-          <section class="answers-summary-section">
-            <h3 class="title is-5">{{ section.title }}</h3>
-            {% for sub in section.subsections %}
-            {% if sub.visible %}
-            <div class="answers-summary-subsection">
-              <h4 class="title is-6">{{ sub.title }}</h4>
-              <dl class="answers-summary-list">
-                {% for q in sub.questions %}
-                {% if q.visible %}
-                <div class="answers-summary-row">
-                  <dt class="answers-summary-q">{{ q.text }}</dt>
-                  {% if q.type == "binary" %}
-                  <dd class="answers-summary-a">
-                    {% if q.answer == "yes" %}
-                    <span>Yes</span>
-                    {% elif q.answer == "no" %}
-                    <span>No</span>
-                    {% else %}
-                    <span class="answer-missing">—</span>
-                    {% endif %}
-                  </dd>
-                  {% elif q.type == "detail" %}
-                  <dd class="answers-summary-a">
-                    {% if q.detail_text %}
-                    <span class="answers-summary-detail">{{ q.detail_text }}</span>
-                    {% else %}
-                    <span class="answer-missing">—</span>
-                    {% endif %}
-                  </dd>
-                  {% endif %}
-                </div>
-                {% endif %}
-                {% endfor %}
-              </dl>
-            </div>
-            {% endif %}
-            {% endfor %}
-          </section>
-          {% endif %}
-          {% endfor %}
-        </div>
-      </section>
-
-      <section class="stack-md">
-        <h2 class="title is-4">Risks</h2>
-        {% if not has_assessment %}
+      {% if current_change_summary and not current_change_summary.is_empty %}
+      <section class="stack-md change-summary-current">
+        <h2 class="title is-4">Changes since previous version</h2>
         <p class="has-text-grey">
-          No assessment has been committed for this system yet. Only the
-          system card is shown above.
+          What changed between the latest committed snapshot and the prior
+          one in <code>history/</code>.
         </p>
-        {% else %}
-        {% if aggregate_residual_level != "not_applicable" %}
-        <div class="card mb-4 aggregate-residual-card">
-          <header class="card-header">
-            <p class="card-header-title">Overall Residual Risk</p>
-          </header>
-          <div class="card-content risk-card-body">
-            <div class="risk-card-section">
-              <span class="dim-label">Assessor's aggregate</span>
-              <span class="badge badge-{{ risk_level_colours.get(aggregate_residual_level, 'gray') }}">
-                {{ aggregate_residual_level | replace("_", " ") }}
-              </span>
-            </div>
-            {% if aggregate_residual_justification %}
-            <div class="risk-card-section">
-              <span class="dim-label">Aggregate Justification</span>
-              <p class="linked-answer">{{ aggregate_residual_justification }}</p>
-            </div>
-            {% endif %}
-          </div>
-        </div>
-        {% endif %}
-        {% if risks %}
-        {% for risk in risks %}
-        {% with risk=risk %}
-        {% include "registry_risk.html.j2" %}
+        {% with summary=current_change_summary %}
+        {% include "change_summary.html.j2" %}
         {% endwith %}
-        {% endfor %}
-        {% else %}
-        <p class="has-text-grey">
-          No applicable risks fired for this system based on the loaded
-          questionnaire answers.
-        </p>
-        {% endif %}
-        {% endif %}
       </section>
+      {% endif %}
+
+      {% include "snapshot.html.j2" %}
+
+      {% if history %}
+      <section class="stack-md registry-history">
+        <h2 class="title is-4">History</h2>
+        <p class="has-text-grey">
+          Prior committed snapshots, newest first. Expand any entry to see
+          the snapshot as it stood at the time.
+        </p>
+        {% for entry in history %}
+        <details class="registry-history-entry">
+          <summary>
+            <span class="history-summary-date">{{ entry.snapshot.exported_at }}</span>
+            {% if entry.snapshot.has_assessment %}
+            <span class="badge badge-{{ risk_level_colours.get(entry.snapshot.aggregate_residual_level, 'gray') }}">
+              {{ entry.snapshot.aggregate_residual_level | replace("_", " ") }}
+            </span>
+            {% else %}
+            <span class="has-text-grey">questionnaire only</span>
+            {% endif %}
+            {% if entry.snapshot.stale_build %}
+            <span class="tag is-warning is-light is-small" title="Built against {{ entry.snapshot.record_build_id or 'unknown' }}">stale build</span>
+            {% endif %}
+          </summary>
+          <div class="registry-history-body">
+            {% if not entry.change_summary.is_empty %}
+            <h3 class="title is-5">Changes from previous version</h3>
+            {% with summary=entry.change_summary %}
+            {% include "change_summary.html.j2" %}
+            {% endwith %}
+            {% else %}
+            <p class="has-text-grey">First committed snapshot for this system.</p>
+            {% endif %}
+            <details class="registry-history-snapshot">
+              <summary>Snapshot at this version</summary>
+              <div class="registry-history-snapshot-body">
+                {% with snapshot=entry.snapshot %}
+                {% include "snapshot.html.j2" %}
+                {% endwith %}
+              </div>
+            </details>
+          </div>
+        </details>
+        {% endfor %}
+      </section>
+      {% endif %}
+
       {% include "_footer.html.j2" %}
     </main>
   </body>

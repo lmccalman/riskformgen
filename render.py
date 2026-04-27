@@ -18,7 +18,7 @@ from models import (
     SubSection,
     all_questions,
 )
-from registry import SystemRecord, aggregate_residual_level
+from registry import SystemMeta, SystemRecord, aggregate_residual_level
 
 
 def create_environment() -> Environment:
@@ -728,6 +728,84 @@ def _registry_residual_level(
     return config.RISK_MATRIX.get(res_l, {}).get(res_c, "not_applicable")
 
 
+def _build_snapshot_view(
+    questionnaire: dict[str, Any],
+    assessment: dict[str, Any] | None,
+    *,
+    sections: Sequence[Section],
+    risks: Sequence[Risk],
+    controls: Sequence[Control],
+    properties: Sequence[Property],
+    details: Sequence[Detail],
+    current_build_id: str,
+) -> dict[str, Any]:
+    """View dict for one (questionnaire, assessment) pair.
+
+    Reused for the system's *current* pair and for each entry in its
+    history. The snapshot is a pure read of the JSON payloads — the
+    questionnaire's `properties` and the assessment's `inherent` block are
+    consumed directly without re-evaluating the property DAG, so older
+    pairs render the way they were assessed even when the form has since
+    evolved.
+    """
+    answers = questionnaire.get("answers") or {}
+    detail_values = questionnaire.get("details") or {}
+    properties_state = questionnaire.get("properties") or {}
+
+    section_views = _build_registry_section_views(
+        sections, properties, properties_state, answers, detail_values
+    )
+
+    # `_build_registry_risk_views` and `aggregate_residual_level` take a
+    # SystemRecord; build a throwaway one over the raw payloads.
+    pseudo = SystemRecord(
+        slug="",
+        meta=SystemMeta(name=""),
+        questionnaire=questionnaire,
+        assessment=assessment,
+    )
+    risk_views = _build_registry_risk_views(risks, controls, details, pseudo)
+
+    if assessment is None:
+        aggregate_level = "not_applicable"
+        aggregate_justification = ""
+        exported_at = str(questionnaire.get("exported_at", ""))
+    else:
+        aggregate_level = aggregate_residual_level(pseudo, config.RISK_LEVELS)
+        aggregate_justification = str(assessment.get("aggregate_residual_justification", "") or "")
+        exported_at = str(assessment.get("exported_at", ""))
+
+    snapshot_build_id = _record_build_id(pseudo)
+    return {
+        "exported_at_raw": exported_at,
+        "exported_at": _format_date(exported_at),
+        "record_build_id": snapshot_build_id,
+        "stale_build": bool(current_build_id) and snapshot_build_id != current_build_id,
+        "sections": section_views,
+        "risks": risk_views,
+        "has_assessment": assessment is not None,
+        "aggregate_residual_level": aggregate_level,
+        "aggregate_residual_justification": aggregate_justification,
+    }
+
+
+def _build_id_label_maps(
+    sections: Sequence[Section],
+    risks: Sequence[Risk],
+    controls: Sequence[Control],
+    properties: Sequence[Property],
+    details: Sequence[Detail],
+) -> dict[str, dict[str, str]]:
+    """Lookup tables used by the change-summary template to humanise ids."""
+    return {
+        "questions": {q.id: q.text for q in all_questions(sections)},
+        "properties": {p.id: p.description for p in properties},
+        "risks": {r.id: r.description for r in risks},
+        "controls": {c.id: c.description for c in controls},
+        "details": {d.id: d.description for d in details},
+    }
+
+
 def _build_registry_system_view(
     record: SystemRecord,
     sections: Sequence[Section],
@@ -737,37 +815,49 @@ def _build_registry_system_view(
     details: Sequence[Detail],
     current_build_id: str = "",
 ) -> dict[str, Any]:
-    answers = record.questionnaire.get("answers") or {}
-    detail_values = record.questionnaire.get("details") or {}
-    properties_state = record.questionnaire.get("properties") or {}
-
-    section_views = _build_registry_section_views(
-        sections, properties, properties_state, answers, detail_values
+    snapshot = _build_snapshot_view(
+        record.questionnaire,
+        record.assessment,
+        sections=sections,
+        risks=risks,
+        controls=controls,
+        properties=properties,
+        details=details,
+        current_build_id=current_build_id,
     )
-    risk_views = _build_registry_risk_views(risks, controls, details, record)
 
-    if record.assessment is None:
-        aggregate_level = "not_applicable"
-        aggregate_justification = ""
-    else:
-        aggregate_level = aggregate_residual_level(record, config.RISK_LEVELS)
-        aggregate_justification = str(
-            record.assessment.get("aggregate_residual_justification", "") or ""
+    history_views: list[dict[str, Any]] = []
+    for entry in record.history:
+        history_views.append(
+            {
+                "snapshot": _build_snapshot_view(
+                    entry.questionnaire,
+                    entry.assessment,
+                    sections=sections,
+                    risks=risks,
+                    controls=controls,
+                    properties=properties,
+                    details=details,
+                    current_build_id=current_build_id,
+                ),
+                "change_summary": entry.change_summary,
+            }
         )
+    # Newest first in the rendered page (most recent prior on top).
+    history_views.reverse()
 
-    record_build_id = _record_build_id(record)
     return {
         "record": record,
         "meta": record.meta,
         "slug": record.slug,
-        "exported_at": _format_date(record.exported_at),
-        "sections": section_views,
-        "risks": risk_views,
-        "has_assessment": record.assessment is not None,
-        "aggregate_residual_level": aggregate_level,
-        "aggregate_residual_justification": aggregate_justification,
-        "record_build_id": record_build_id,
-        "stale_build": bool(current_build_id) and record_build_id != current_build_id,
+        "snapshot": snapshot,
+        "history": history_views,
+        "current_change_summary": record.current_change_summary,
+        "labels": _build_id_label_maps(sections, risks, controls, properties, details),
+        # Keep the legacy keys the template still uses on the page header.
+        "exported_at": snapshot["exported_at"],
+        "record_build_id": snapshot["record_build_id"],
+        "stale_build": snapshot["stale_build"],
     }
 
 
