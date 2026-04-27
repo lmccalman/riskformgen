@@ -226,6 +226,3 @@ The in-flight questionnaire reload accepts mismatched `build_id` silently (when 
 
 When `version` does bump, write the migrator alongside this section (none exist yet).
 
-### Spec editor (removed)
-
-There is an `editor/` directory and a `run_editor.py` shim left over from a previous spec-editor experiment, but the editor's source files (FastAPI backend and React frontend) have been removed. `run_editor.py` will not run as-is. Treat the directory as dormant; YAML is currently hand-edited.

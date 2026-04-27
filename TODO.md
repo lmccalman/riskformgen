@@ -14,39 +14,6 @@ that completes the work — git history is the record.
 
 ---
 
-## Versioning follow-ups — **large**, **needs design**
-
-**Spec ref:** §Key design goals → "Risks, controls, questionnaire questions
-and properties must be able to evolve" + §Concepts → "Baked-in values in
-JSON exports".
-
-**Context:** First-pass versioning is in (build_id content-hash, embedded
-in every export and page footer; stale-build banner in the registry; JSON
-imports route version mismatch through the confirmation dialog rather than
-hard-rejecting; ID-discipline rules documented in `CLAUDE.md`). What's
-left are the items that intentionally got punted out of the first pass.
-
-**To do:**
-- **Schema-version migrator scaffold.** No migration code exists today
-  because we haven't bumped `version` since this scheme landed. Pick a
-  small, file-local pattern (e.g. a `migrations.py` with one function per
-  bump that takes a payload and returns the upgraded shape) and wire it
-  through both the JS importer and the registry loader (`registry.py`
-  currently hard-fails on `version` mismatch — relax to "migrate on
-  read" once a migrator exists). Defer until the first `version` bump.
-- **Change-assessment mode** (spec workflow point 8). Load both an old
-  and a new questionnaire JSON in the assessment view, diff the answers
-  + property snapshot, and surface only the deltas as their own risk
-  cards. Effectively a registry / assessment feature on top of solid
-  versioning — that part is now solid, so this is pure feature work.
-- **Surface diff details on stale registry entries.** The current
-  banner says "stale" but doesn't tell viewers *what* changed between
-  the record's build and the current one. Could compare ID lists in the
-  baked-in snapshot against the current form and list added / removed /
-  re-purposed IDs.
-
----
-
 ## Rename property/condition combinator: `all` / `any` → `all_depends` / `any_depends` — **small**
 
 The spec (§Concepts → Properties) uses the more descriptive `all_depends` /
@@ -75,16 +42,6 @@ sentinel). Switch `activeTab` to the first visible section in `init()` (and
 on any change) if the current tab becomes hidden. Add a behaviour test in
 `tests/test_js_behaviour.py` covering both directions (becomes hidden;
 reappears).
-
----
-
-## Remove dead `editor/` references — **small**
-
-The `editor/` directory and `run_editor.py` shim are leftover from a removed
-FastAPI/React experiment. Delete the `### Spec editor (removed)` section at
-the bottom of `CLAUDE.md`, delete `run_editor.py` and the empty `editor/`
-directory (check first that nothing useful remains), and grep for any other
-lingering mentions (README, tests, etc.) to clean up.
 
 ---
 
