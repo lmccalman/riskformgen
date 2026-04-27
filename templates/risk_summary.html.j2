@@ -1,12 +1,21 @@
-<div class="card mb-4">
+<div
+  class="card mb-4"
+  id="risk-{{ risk.id }}"
+  x-show="!(diffMode && show_only_changed_risks) || riskChanged('{{ risk.id }}')"
+  x-cloak
+>
   {# ── Header ── #}
   <header class="card-header">
     <p class="card-header-title">{{ risk.id | replace("_", " ") | title }}</p>
-    <span
-      class="tag is-info is-light is-small risk-changed-badge"
-      x-show="diffMode && riskInherentChanged('{{ risk.id }}')"
-      x-cloak
-    >Changed since prior</span>
+    <div class="risk-changed-badges" x-show="diffMode && riskChanged('{{ risk.id }}')" x-cloak>
+      <template x-for="kind in riskChangeKinds('{{ risk.id }}')" :key="kind">
+        <span
+          class="tag is-light is-small risk-changed-badge"
+          :class="'risk-changed-badge-' + kind"
+          x-text="kind"
+        ></span>
+      </template>
+    </div>
   </header>
 
   <div class="card-content risk-card-body">

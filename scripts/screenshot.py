@@ -34,9 +34,10 @@ from pathlib import Path
 REPO_ROOT = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(REPO_ROOT))
 
+from playwright.sync_api import Browser, Page, sync_playwright  # noqa: E402
+
 import config  # noqa: E402
 import main as main_module  # noqa: E402
-from playwright.sync_api import Browser, Page, sync_playwright  # noqa: E402
 
 DEFAULT_OUT = REPO_ROOT / "tmp" / "screenshots"
 EXAMPLE_DIR = REPO_ROOT / "registry" / "example-system"
@@ -71,9 +72,7 @@ def _scope(name: str) -> str:
 
 
 def wait_for_factory(page: Page, name: str) -> None:
-    page.wait_for_function(
-        f"() => !!document.querySelector('[x-data={name}]')?._x_dataStack?.[0]"
-    )
+    page.wait_for_function(f"() => !!document.querySelector('[x-data={name}]')?._x_dataStack?.[0]")
 
 
 def shot(out: Path, name: str, page: Page, *, locator: str | None = None) -> None:
@@ -132,6 +131,38 @@ def seed_assessment(page: Page, ajson: dict) -> None:
         f"(a) => ({SEED_ASSESSMENT_JS})({_scope('assessment')}, a)",
         ajson,
     )
+
+
+def _synthesize_prior(qjson: dict, ajson: dict) -> tuple[dict, dict]:
+    """Build a synthetic prior questionnaire/assessment that differs from the
+    current example just enough to populate the diff banner: one flipped
+    answer (changes one inherent risk) and one tweaked residual on a
+    different risk. Used by the diff-mode screenshot scenario.
+    """
+    prior_q = json.loads(json.dumps(qjson))
+    prior_a = json.loads(json.dumps(ajson))
+
+    # Flip the first non-detail answer that's currently 'yes' to 'no' (or
+    # vice versa) so an inherent level shifts in the live diff.
+    answers = prior_q.get("answers") or {}
+    for qid, val in answers.items():
+        if val in ("yes", "no"):
+            answers[qid] = "no" if val == "yes" else "yes"
+            break
+
+    # Tweak the residual / mandate state on the first risk so it lights up
+    # under residual + mandates as well.
+    risk_ids = list(prior_a.get("risk_ids") or [])
+    if risk_ids:
+        rid = risk_ids[0]
+        eff = prior_a.setdefault("control_effectiveness", {})
+        eff[rid] = "ineffective" if eff.get(rid) != "ineffective" else "controlled"
+        mandated = prior_a.setdefault("mandated_controls", {}).setdefault(rid, {})
+        for cid, flag in list(mandated.items()):
+            mandated[cid] = not bool(flag)
+            break
+
+    return prior_q, prior_a
 
 
 def capture(browser: Browser, site_url: str, out: Path) -> None:
@@ -201,7 +232,39 @@ def capture(browser: Browser, site_url: str, out: Path) -> None:
     shot(out, "09-assessment-answers-tab", page)
     ctx.close()
 
-    # 6. Registry index
+    # 6. Assessment (diff mode against a synthetic prior)
+    print("Assessment (diff mode)")
+    ctx = browser.new_context(viewport=VIEWPORT)
+    page = ctx.new_page()
+    page.goto(f"{site_url}/assessment.html")
+    wait_for_factory(page, "assessment")
+    seed_questionnaire(page, "assessment", qjson)
+    seed_assessment(page, ajson)
+    prior_q, prior_a = _synthesize_prior(qjson, ajson)
+    page.evaluate(
+        "([pq, pa]) => {"
+        f"  const s = {_scope('assessment')};"
+        "  s.prior_questionnaire = pq;"
+        "  s.prior_assessment = pa;"
+        "  s.prior_assessment_at = pa.exported_at || '';"
+        "}",
+        [prior_q, prior_a],
+    )
+    page.wait_for_timeout(250)
+    shot(out, "12-assessment-diff-banner", page)
+    page.evaluate(f"{_scope('assessment')}.show_only_changed_risks = true")
+    page.wait_for_timeout(150)
+    shot(out, "13-assessment-diff-only-changed-risks", page)
+    page.evaluate(f"{_scope('assessment')}.show_only_changed_risks = false")
+    page.evaluate(f"{_scope('assessment')}.activeTab = 'answers'")
+    page.wait_for_timeout(150)
+    shot(out, "14-assessment-diff-answers-tab", page)
+    page.evaluate(f"{_scope('assessment')}.show_only_changed_answers = true")
+    page.wait_for_timeout(150)
+    shot(out, "15-assessment-diff-only-changed-answers", page)
+    ctx.close()
+
+    # 7. Registry index
     print("Registry index")
     ctx = browser.new_context(viewport=VIEWPORT)
     page = ctx.new_page()

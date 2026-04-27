@@ -92,104 +92,90 @@
             </div>
           </div>
 
-          {# ── Diff overlay panel ── #}
-          <div class="diff-overlay-panel" x-show="diffMode" x-cloak>
-            <div class="diff-overlay-header">
-              <h3 class="title is-5">Changes since prior version</h3>
-              <p class="has-text-grey">
-                Loaded prior assessment: <span x-text="prior_assessment_at || '—'"></span>.
-                Prior assessment values have been carried forward into the
-                inputs below; review and update only what changed.
-              </p>
+          {# ── Re-assessment summary banner ── #}
+          <div class="diff-summary-banner" x-show="diffMode" x-cloak>
+            <div class="diff-summary-banner-head">
+              <div>
+                <h3 class="title is-5">Re-assessment of prior version</h3>
+                <p class="has-text-grey">
+                  Loaded prior assessment: <span x-text="prior_assessment_at || '—'"></span>.
+                  Prior assessment values have been carried forward into the
+                  inputs below; review and update only what changed.
+                </p>
+              </div>
+              <label class="checkbox show-only-changed-toggle">
+                <input type="checkbox" x-model="show_only_changed_risks" />
+                Show only changed risks
+              </label>
             </div>
-            <template x-if="change_summary && (
-              change_summary.answer_changes.length ||
-              change_summary.detail_changes.length ||
-              change_summary.property_changes.length ||
-              change_summary.risk_changes.length ||
-              change_summary.residual_changes.length ||
-              change_summary.mandate_changes.length ||
-              change_summary.aggregate_change ||
-              Object.keys(change_summary.prior_only_ids).length ||
-              Object.keys(change_summary.current_only_ids).length
-            )">
-              <div class="diff-overlay-body stack-sm">
-                <template x-if="change_summary.answer_changes.length">
-                  <div>
-                    <span class="dim-label">Answer changes</span>
-                    <ul>
-                      <template x-for="c in change_summary.answer_changes" :key="c.id">
-                        <li>
-                          <code x-text="c.id"></code>:
-                          <span x-text="c.before === null || c.before === '' ? '—' : c.before"></span>
-                          →
-                          <span x-text="c.after === null || c.after === '' ? '—' : c.after"></span>
-                        </li>
-                      </template>
-                    </ul>
-                  </div>
-                </template>
-                <template x-if="change_summary.detail_changes.length">
-                  <div>
-                    <span class="dim-label">Detail edits</span>
-                    <ul>
-                      <template x-for="c in change_summary.detail_changes" :key="c.id">
-                        <li><code x-text="c.id"></code> updated</li>
-                      </template>
-                    </ul>
-                  </div>
-                </template>
-                <template x-if="change_summary.risk_changes.length">
-                  <div>
-                    <span class="dim-label">Risk inherent changes</span>
-                    <ul>
-                      <template x-for="c in change_summary.risk_changes" :key="c.risk_id">
-                        <li>
-                          <code x-text="c.risk_id"></code>:
-                          <span x-text="(c.before && c.before.level) || '—'"></span>
-                          →
-                          <span x-text="(c.after && c.after.level) || '—'"></span>
-                        </li>
-                      </template>
-                    </ul>
-                  </div>
-                </template>
-                <template x-if="change_summary.aggregate_change">
-                  <div>
-                    <span class="dim-label">Aggregate residual</span>
-                    <p>
-                      <span x-text="change_summary.aggregate_change.level_before || '—'"></span>
-                      →
-                      <span x-text="change_summary.aggregate_change.level_after || '—'"></span>
-                    </p>
-                  </div>
-                </template>
-                <template x-if="
-                  Object.keys(change_summary.prior_only_ids).length ||
-                  Object.keys(change_summary.current_only_ids).length
-                ">
-                  <div>
-                    <span class="dim-label">Form evolution</span>
-                    <template x-for="kind in Object.keys(change_summary.prior_only_ids)" :key="'p-' + kind">
-                      <p>
-                        Prior only (<span x-text="kind"></span>):
-                        <template x-for="id in change_summary.prior_only_ids[kind]" :key="id">
-                          <code x-text="id" style="margin-right: 0.5em;"></code>
-                        </template>
-                      </p>
+
+            <p class="diff-summary-counter">
+              <strong x-text="change_counts.risks"></strong>
+              of <strong x-text="_riskIds.length"></strong>
+              <span x-text="_riskIds.length === 1 ? 'risk has' : 'risks have'"></span>
+              changed since the prior assessment.
+            </p>
+
+            <template x-if="changed_risk_ids.length">
+              <div class="changed-risk-chip-list">
+                <template x-for="rid in changed_risk_ids" :key="rid">
+                  <a class="changed-risk-chip" :href="'#risk-' + rid">
+                    <span class="changed-risk-chip-name"
+                          x-text="rid.replace(/_/g, ' ')"></span>
+                    <template x-for="kind in riskChangeKinds(rid)" :key="kind">
+                      <span class="changed-risk-chip-kind"
+                            :class="'changed-risk-chip-kind-' + kind"
+                            x-text="kind"></span>
                     </template>
-                    <template x-for="kind in Object.keys(change_summary.current_only_ids)" :key="'c-' + kind">
-                      <p>
-                        Current only (<span x-text="kind"></span>):
-                        <template x-for="id in change_summary.current_only_ids[kind]" :key="id">
-                          <code x-text="id" style="margin-right: 0.5em;"></code>
-                        </template>
-                      </p>
-                    </template>
-                  </div>
+                  </a>
                 </template>
               </div>
             </template>
+
+            <template x-if="change_summary && change_summary.aggregate_change">
+              <p class="diff-summary-aggregate">
+                <span class="dim-label">Aggregate residual</span>
+                <span
+                  class="badge"
+                  :class="'badge-' + ({ {% for level, colour in risk_level_colours.items() %}'{{ level }}': '{{ colour }}'{% if not loop.last %}, {% endif %}{% endfor %} }[change_summary.aggregate_change.level_before] || 'gray')"
+                  x-text="(change_summary.aggregate_change.level_before || '—').replace(/_/g, ' ')"
+                ></span>
+                <span class="diff-summary-arrow">→</span>
+                <span
+                  class="badge"
+                  :class="'badge-' + ({ {% for level, colour in risk_level_colours.items() %}'{{ level }}': '{{ colour }}'{% if not loop.last %}, {% endif %}{% endfor %} }[change_summary.aggregate_change.level_after] || 'gray')"
+                  x-text="(change_summary.aggregate_change.level_after || '—').replace(/_/g, ' ')"
+                ></span>
+              </p>
+            </template>
+
+            <template x-if="change_summary && (
+              Object.keys(change_summary.prior_only_ids).length ||
+              Object.keys(change_summary.current_only_ids).length
+            )">
+              <details class="diff-summary-form-evolution">
+                <summary>Form changes since prior version</summary>
+                <div class="stack-sm">
+                  <template x-for="kind in Object.keys(change_summary.prior_only_ids)" :key="'p-' + kind">
+                    <p>
+                      Prior only (<span x-text="kind"></span>):
+                      <template x-for="id in change_summary.prior_only_ids[kind]" :key="id">
+                        <code x-text="id" style="margin-right: 0.5em;"></code>
+                      </template>
+                    </p>
+                  </template>
+                  <template x-for="kind in Object.keys(change_summary.current_only_ids)" :key="'c-' + kind">
+                    <p>
+                      Current only (<span x-text="kind"></span>):
+                      <template x-for="id in change_summary.current_only_ids[kind]" :key="id">
+                        <code x-text="id" style="margin-right: 0.5em;"></code>
+                      </template>
+                    </p>
+                  </template>
+                </div>
+              </details>
+            </template>
+
             <template x-if="change_summary && !(
               change_summary.answer_changes.length ||
               change_summary.detail_changes.length ||
@@ -201,7 +187,7 @@
               Object.keys(change_summary.prior_only_ids).length ||
               Object.keys(change_summary.current_only_ids).length
             )">
-              <p class="has-text-grey">
+              <p class="has-text-grey diff-summary-empty">
                 No changes between the loaded prior version and the current
                 state. Edit answers (or load a different questionnaire) to see
                 a diff.
@@ -296,6 +282,20 @@
               <span x-text="system_owner || '—'"></span>
             </div>
           </section>
+          <div class="diff-answers-toolbar" x-show="diffMode" x-cloak>
+            <p class="diff-summary-counter">
+              <strong x-text="change_counts.answers"></strong>
+              <span x-text="change_counts.answers === 1 ? 'answer' : 'answers'"></span>
+              and
+              <strong x-text="change_counts.details"></strong>
+              <span x-text="change_counts.details === 1 ? 'detail' : 'details'"></span>
+              changed since the prior version.
+            </p>
+            <label class="checkbox show-only-changed-toggle">
+              <input type="checkbox" x-model="show_only_changed_answers" />
+              Show only changed answers
+            </label>
+          </div>
           {% include "answers_summary.html.j2" %}
         </div>
 

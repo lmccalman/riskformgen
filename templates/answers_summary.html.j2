@@ -1,39 +1,75 @@
 {# Read-only summary of the loaded questionnaire answers.
    Walks the same SectionView tree as the questionnaire, but renders each
-   visible question as a "Q / A" pair. Visibility expressions match the
-   questionnaire so empty / hidden branches collapse identically. #}
+   visible question as a "Q / A" pair. When a prior version is loaded
+   (`diffMode`), each row that changed shows the prior value alongside the
+   current one and gets a "changed" highlight. The `show_only_changed_answers`
+   toggle filters rows down to changes only; subsections / sections whose
+   rows all collapse hide their headers too. #}
+{% macro changed_predicate(q) -%}
+  {%- if q.type == 'binary' -%}answer_changes_by_id['{{ q.id }}']
+  {%- elif q.type == 'detail' -%}detail_changes_by_id['{{ q.detail_id }}']
+  {%- else -%}false
+  {%- endif -%}
+{%- endmacro %}
+{% macro row_predicate(q) -%}
+  ({{ q.visibility_js }}) && (!(diffMode && show_only_changed_answers) || {{ changed_predicate(q) }})
+{%- endmacro %}
+{% macro subsection_predicate(sub) -%}
+  {%- if sub.questions -%}
+    {%- for q in sub.questions -%}
+      ({{ row_predicate(q) }}){% if not loop.last %} || {% endif %}
+    {%- endfor -%}
+  {%- else -%}false{%- endif -%}
+{%- endmacro %}
 <div class="answers-summary">
   {% for section in sections %}
-  {% set always_visible_subs = section.subsections | selectattr("visibility_js", "equalto", "true") | list %}
   <section
     class="answers-summary-section"
-    {% if not always_visible_subs and section.subsections %}
-    x-show="{% for sub in section.subsections %}({{ sub.visibility_js }}){% if not loop.last %} || {% endif %}{% endfor %}"
-    {% endif %}
+    x-show="{% for sub in section.subsections %}({{ subsection_predicate(sub) }}){% if not loop.last %} || {% endif %}{% endfor %}"
   >
     <h3 class="title is-5">{{ section.title }}</h3>
     {% for sub in section.subsections %}
     <div
       class="answers-summary-subsection"
-      {% if sub.visibility_js != "true" %}x-show="{{ sub.visibility_js }}"{% endif %}
+      x-show="{{ subsection_predicate(sub) }}"
     >
       <h4 class="title is-6">{{ sub.title }}</h4>
       <dl class="answers-summary-list">
         {% for q in sub.questions %}
         <div
           class="answers-summary-row"
-          {% if q.visibility_js != "true" %}x-show="{{ q.visibility_js }}"{% endif %}
+          :class="diffMode && {{ changed_predicate(q) }} ? 'answers-summary-row-changed' : ''"
+          x-show="{{ row_predicate(q) }}"
         >
           <dt class="answers-summary-q">{{ q.text }}</dt>
           {% if q.type == "binary" %}
           <dd class="answers-summary-a">
             <span x-text="answers['{{ q.id }}'] === 'yes' ? 'Yes' : answers['{{ q.id }}'] === 'no' ? 'No' : '—'"
                   :class="answers['{{ q.id }}'] ? '' : 'answer-missing'"></span>
+            <span
+              class="answers-summary-prior"
+              x-show="diffMode && answer_changes_by_id['{{ q.id }}']"
+              x-cloak
+            >
+              <span class="answers-summary-prior-label">Was:</span>
+              <span x-text="formatPriorAnswer((answer_changes_by_id['{{ q.id }}'] || {}).before)"></span>
+            </span>
           </dd>
           {% elif q.type == "detail" %}
           <dd class="answers-summary-a">
             <span x-show="!details['{{ q.detail_id }}']" class="answer-missing">—</span>
             <span x-show="details['{{ q.detail_id }}']" x-text="details['{{ q.detail_id }}']" class="answers-summary-detail"></span>
+            <div
+              class="answers-summary-prior"
+              x-show="diffMode && detail_changes_by_id['{{ q.detail_id }}']"
+              x-cloak
+            >
+              <span class="answers-summary-prior-label">Was:</span>
+              <span
+                class="answers-summary-detail"
+                x-text="formatPriorDetail((detail_changes_by_id['{{ q.detail_id }}'] || {}).before)"
+              ></span>
+            </div>
           </dd>
           {% endif %}
         </div>

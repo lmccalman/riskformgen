@@ -1497,6 +1497,394 @@ class TestAssessmentPriorLoad:
         assert scope.eval("scope.prior_questionnaire") is not None
 
 
+class TestAssessmentDiffPresentationHelpers:
+    """Presentation-layer helpers used by the diff-summary banner and the
+    diff-aware Loaded Answers tab. Each derives from `change_summary` and
+    the prior_* slots; together they let the templates render per-row /
+    per-risk diff state without re-walking the change arrays.
+    """
+
+    def _scope_with_one_risk_one_control(self) -> Scope:
+        q = BinaryQuestion(id="q1", text="", properties=("p1",))
+        p = Property(id="p1", description="")
+        risk = Risk(
+            id="r1",
+            description="",
+            conditions=(
+                ConditionMapping(property="p1", likelihood="likely", consequence="major"),
+            ),
+        )
+        ctrl = Control(
+            id="c1",
+            description="",
+            property="p1",
+            effects=(ControlEffect(risk_id="r1"),),
+        )
+        return _form([q], [p], risks=[risk], controls=[ctrl])
+
+    def _set_prior(self, scope: Scope, prior_q: dict[str, Any], prior_a: dict[str, Any]) -> None:
+        scope.eval(f"scope.prior_questionnaire = {json.dumps(prior_q)};")
+        scope.eval(f"scope.prior_assessment = {json.dumps(prior_a)};")
+
+    def test_no_prior_returns_inert_helpers(self) -> None:
+        scope = self._scope_with_one_risk_one_control()
+        assert scope.eval("scope.diffMode") is False
+        assert scope.eval("scope.riskChanged('r1')") is False
+        assert list(scope.eval("scope.riskChangeKinds('r1')")) == []
+        assert list(scope.eval("scope.changed_risk_ids")) == []
+        assert dict(scope.eval("scope.answer_changes_by_id")) == {}
+        assert dict(scope.eval("scope.detail_changes_by_id")) == {}
+        assert dict(scope.eval("scope.residual_changes_by_id")) == {}
+        assert dict(scope.eval("scope.mandate_changes_by_risk")) == {}
+        counts = dict(scope.eval("scope.change_counts"))
+        assert counts == {
+            "answers": 0,
+            "details": 0,
+            "risks": 0,
+            "residual": 0,
+            "mandates": 0,
+            "aggregate": 0,
+        }
+
+    def test_inherent_only_change_marks_risk_changed_with_inherent_kind(self) -> None:
+        scope = self._scope_with_one_risk_one_control()
+        # Live: q1 = yes → r1 inherent = high. Prior: q1 = no → r1 inherent = N/A.
+        scope.set_answer("q1", "yes")
+        self._set_prior(
+            scope,
+            {
+                "question_ids": ["q1"],
+                "answers": {"q1": "no"},
+                "detail_ids": [],
+                "details": {},
+                "property_ids": ["p1"],
+                "properties": {"p1": False},
+            },
+            {
+                "risk_ids": ["r1"],
+                "inherent": {
+                    "r1": {
+                        "likelihood": None,
+                        "consequence": None,
+                        "level": "not_applicable",
+                        "firing_conditions": [],
+                    }
+                },
+                "control_effectiveness": {"r1": ""},
+                "residual_likelihood": {"r1": ""},
+                "residual_consequence": {"r1": ""},
+                "justifications": {"r1": ""},
+                "mandated_controls": {"r1": {"c1": False}},
+                "mandated_comments": {"r1": {"c1": ""}},
+            },
+        )
+        assert scope.eval("scope.riskChanged('r1')") is True
+        assert list(scope.eval("scope.riskChangeKinds('r1')")) == ["inherent"]
+        assert list(scope.eval("scope.changed_risk_ids")) == ["r1"]
+
+    def test_residual_only_change_marks_risk_changed_with_residual_kind(self) -> None:
+        scope = self._scope_with_one_risk_one_control()
+        # Same answers either side → inherent unchanged.
+        scope.set_answer("q1", "yes")
+        scope.set_effectiveness("r1", "controlled")
+        self._set_prior(
+            scope,
+            {
+                "question_ids": ["q1"],
+                "answers": {"q1": "yes"},
+                "detail_ids": [],
+                "details": {},
+                "property_ids": ["p1"],
+                "properties": {"p1": True},
+            },
+            {
+                "risk_ids": ["r1"],
+                "inherent": {
+                    "r1": {
+                        "likelihood": "likely",
+                        "consequence": "major",
+                        "level": "high",
+                        "firing_conditions": ["p1"],
+                    }
+                },
+                # Prior was 'partial'; live is 'controlled' → residual changed.
+                "control_effectiveness": {"r1": "partial"},
+                "residual_likelihood": {"r1": "unlikely"},
+                "residual_consequence": {"r1": "minor"},
+                "justifications": {"r1": "prior call"},
+                "mandated_controls": {"r1": {"c1": False}},
+                "mandated_comments": {"r1": {"c1": ""}},
+            },
+        )
+        assert scope.eval("scope.riskChanged('r1')") is True
+        assert list(scope.eval("scope.riskChangeKinds('r1')")) == ["residual"]
+
+    def test_mandate_only_change_marks_risk_changed_with_mandates_kind(self) -> None:
+        scope = self._scope_with_one_risk_one_control()
+        scope.set_answer("q1", "yes")
+        scope.eval("scope.mandated_controls['r1']['c1'] = true;")
+        scope.eval("scope.mandated_comments['r1']['c1'] = 'do this';")
+        self._set_prior(
+            scope,
+            {
+                "question_ids": ["q1"],
+                "answers": {"q1": "yes"},
+                "detail_ids": [],
+                "details": {},
+                "property_ids": ["p1"],
+                "properties": {"p1": True},
+            },
+            {
+                "risk_ids": ["r1"],
+                "inherent": {
+                    "r1": {
+                        "likelihood": "likely",
+                        "consequence": "major",
+                        "level": "high",
+                        "firing_conditions": ["p1"],
+                    }
+                },
+                "control_effectiveness": {"r1": ""},
+                "residual_likelihood": {"r1": ""},
+                "residual_consequence": {"r1": ""},
+                "justifications": {"r1": ""},
+                # Prior had this mandate flag off and no comment.
+                "mandated_controls": {"r1": {"c1": False}},
+                "mandated_comments": {"r1": {"c1": ""}},
+            },
+        )
+        assert scope.eval("scope.riskChanged('r1')") is True
+        assert list(scope.eval("scope.riskChangeKinds('r1')")) == ["mandates"]
+
+    def test_combined_changes_lists_all_kinds_in_canonical_order(self) -> None:
+        scope = self._scope_with_one_risk_one_control()
+        # Live: yes → inherent high; mandate flagged on; effectiveness 'controlled'.
+        scope.set_answer("q1", "yes")
+        scope.set_effectiveness("r1", "controlled")
+        scope.eval("scope.mandated_controls['r1']['c1'] = true;")
+        # Prior: differs on inherent (no), residual (partial), and mandate (off).
+        self._set_prior(
+            scope,
+            {
+                "question_ids": ["q1"],
+                "answers": {"q1": "no"},
+                "detail_ids": [],
+                "details": {},
+                "property_ids": ["p1"],
+                "properties": {"p1": False},
+            },
+            {
+                "risk_ids": ["r1"],
+                "inherent": {
+                    "r1": {
+                        "likelihood": None,
+                        "consequence": None,
+                        "level": "not_applicable",
+                        "firing_conditions": [],
+                    }
+                },
+                "control_effectiveness": {"r1": "partial"},
+                "residual_likelihood": {"r1": "unlikely"},
+                "residual_consequence": {"r1": "minor"},
+                "justifications": {"r1": ""},
+                "mandated_controls": {"r1": {"c1": False}},
+                "mandated_comments": {"r1": {"c1": ""}},
+            },
+        )
+        assert list(scope.eval("scope.riskChangeKinds('r1')")) == [
+            "inherent",
+            "residual",
+            "mandates",
+        ]
+
+    def test_unchanged_risk_is_not_in_changed_list(self) -> None:
+        scope = self._scope_with_one_risk_one_control()
+        scope.set_answer("q1", "yes")
+        self._set_prior(
+            scope,
+            {
+                "question_ids": ["q1"],
+                "answers": {"q1": "yes"},
+                "detail_ids": [],
+                "details": {},
+                "property_ids": ["p1"],
+                "properties": {"p1": True},
+            },
+            {
+                "risk_ids": ["r1"],
+                "inherent": {
+                    "r1": {
+                        "likelihood": "likely",
+                        "consequence": "major",
+                        "level": "high",
+                        "firing_conditions": ["p1"],
+                    }
+                },
+                "control_effectiveness": {"r1": ""},
+                "residual_likelihood": {"r1": ""},
+                "residual_consequence": {"r1": ""},
+                "justifications": {"r1": ""},
+                "mandated_controls": {"r1": {"c1": False}},
+                "mandated_comments": {"r1": {"c1": ""}},
+            },
+        )
+        assert scope.eval("scope.riskChanged('r1')") is False
+        assert list(scope.eval("scope.changed_risk_ids")) == []
+
+    def test_answer_changes_by_id_keys_match_summary(self) -> None:
+        scope = self._scope_with_one_risk_one_control()
+        scope.set_answer("q1", "yes")
+        self._set_prior(
+            scope,
+            {
+                "question_ids": ["q1"],
+                "answers": {"q1": "no"},
+                "detail_ids": [],
+                "details": {},
+                "property_ids": ["p1"],
+                "properties": {"p1": False},
+            },
+            {
+                "risk_ids": ["r1"],
+                "inherent": {
+                    "r1": {
+                        "likelihood": None,
+                        "consequence": None,
+                        "level": "not_applicable",
+                        "firing_conditions": [],
+                    }
+                },
+            },
+        )
+        by_id = dict(scope.eval("scope.answer_changes_by_id"))
+        assert set(by_id) == {"q1"}
+        assert dict(by_id["q1"]) == {"id": "q1", "before": "no", "after": "yes"}
+
+    def test_detail_changes_by_id_keys_match_summary(self) -> None:
+        q = BinaryQuestion(id="q1", text="", properties=("p1",))
+        p = Property(id="p1", description="")
+        d = Detail(id="d1", description="", properties=("p1",))
+        scope = _form([q], [p], details=[d])
+        scope.set_detail("d1", "current note")
+        scope.eval(
+            "scope.prior_questionnaire = "
+            + json.dumps(
+                {
+                    "question_ids": ["q1"],
+                    "answers": {"q1": ""},
+                    "detail_ids": ["d1"],
+                    "details": {"d1": "prior note"},
+                    "property_ids": ["p1"],
+                    "properties": {"p1": None},
+                }
+            )
+            + ";"
+        )
+        by_id = dict(scope.eval("scope.detail_changes_by_id"))
+        assert set(by_id) == {"d1"}
+        assert dict(by_id["d1"]) == {
+            "id": "d1",
+            "before": "prior note",
+            "after": "current note",
+        }
+
+    def test_change_counts_reflect_each_dimension(self) -> None:
+        scope = self._scope_with_one_risk_one_control()
+        scope.set_answer("q1", "yes")
+        scope.set_effectiveness("r1", "controlled")
+        self._set_prior(
+            scope,
+            {
+                "question_ids": ["q1"],
+                "answers": {"q1": "no"},
+                "detail_ids": [],
+                "details": {},
+                "property_ids": ["p1"],
+                "properties": {"p1": False},
+            },
+            {
+                "risk_ids": ["r1"],
+                "inherent": {
+                    "r1": {
+                        "likelihood": None,
+                        "consequence": None,
+                        "level": "not_applicable",
+                        "firing_conditions": [],
+                    }
+                },
+                "control_effectiveness": {"r1": "partial"},
+                "residual_likelihood": {"r1": "unlikely"},
+                "residual_consequence": {"r1": "minor"},
+                "justifications": {"r1": ""},
+                "mandated_controls": {"r1": {"c1": False}},
+                "mandated_comments": {"r1": {"c1": ""}},
+                "aggregate_residual_level": "medium",
+                "aggregate_residual_justification": "prior",
+            },
+        )
+        counts = dict(scope.eval("scope.change_counts"))
+        assert counts["answers"] == 1
+        assert counts["details"] == 0
+        assert counts["risks"] == 1
+        assert counts["residual"] == 1
+        assert counts["mandates"] == 0
+        assert counts["aggregate"] == 1
+
+
+class TestPriorQuestionnaireOnlyDiff:
+    """When the assessor loads a prior questionnaire but no prior assessment,
+    inherent-risk diffs should still be detected — the prior inherent is
+    synthesised from the prior questionnaire's `properties` snapshot using
+    the current form's risk rules.
+    """
+
+    def _scope(self) -> Scope:
+        q = BinaryQuestion(id="q1", text="", properties=("p1",))
+        p = Property(id="p1", description="")
+        risk = Risk(
+            id="r1",
+            description="",
+            conditions=(
+                ConditionMapping(property="p1", likelihood="likely", consequence="major"),
+            ),
+        )
+        return _form([q], [p], risks=[risk])
+
+    def test_changed_property_drives_riskChanged_without_prior_assessment(self) -> None:
+        scope = self._scope()
+        # Live answer fires the risk; prior questionnaire shows the property
+        # was false on the prior side. No prior assessment loaded.
+        scope.set_answer("q1", "yes")
+        scope.eval(
+            "scope.prior_questionnaire = "
+            + json.dumps(
+                {
+                    "question_ids": ["q1"],
+                    "answers": {"q1": "no"},
+                    "detail_ids": [],
+                    "details": {},
+                    "property_ids": ["p1"],
+                    "properties": {"p1": False},
+                }
+            )
+            + ";"
+        )
+        assert scope.eval("scope.diffMode") is True
+        assert scope.eval("scope.riskInherentChanged('r1')") is True
+        assert scope.eval("scope.riskChanged('r1')") is True
+        assert dict(scope.eval("scope.change_counts"))["risks"] == 1
+
+    def test_clearPrior_resets_show_only_changed_toggles(self) -> None:
+        scope = self._scope()
+        scope.eval("scope.prior_questionnaire = {question_ids: ['q1']};")
+        scope.eval("scope.show_only_changed_risks = true;")
+        scope.eval("scope.show_only_changed_answers = true;")
+        # The clearPrior() guarded confirm() defaults to true in the harness.
+        scope.eval("scope.clearPrior();")
+        assert scope.eval("scope.show_only_changed_risks") is False
+        assert scope.eval("scope.show_only_changed_answers") is False
+
+
 class TestAssessmentExportLineage:
     """The assessment export carries pointers to the questionnaire it was
     made against and (optionally) the prior assessment it supersedes. The

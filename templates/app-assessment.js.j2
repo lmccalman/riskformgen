@@ -26,12 +26,16 @@ document.addEventListener('alpine:init', () => {
        case — the page renders exactly as before). */
     prior_questionnaire: Alpine.$persist(null).as('_x_a_prior_questionnaire'),
     prior_assessment: Alpine.$persist(null).as('_x_a_prior_assessment'),
+    /* UI filters for the diff view. Only meaningful in diffMode. */
+    show_only_changed_risks: Alpine.$persist(false).as('_x_a_show_only_changed_risks'),
+    show_only_changed_answers: Alpine.$persist(false).as('_x_a_show_only_changed_answers'),
     _questionIds: {{ question_ids_js }},
     _detailIds: {{ detail_ids_js }},
     _propertyIds: {{ property_ids_js }},
     _riskIds: {{ risk_ids_js }},
     _controlIds: {{ control_ids_js }},
     _riskConditions: {{ risk_conditions_js }},
+    _riskRules: {{ risk_rules_js }},
     _buildId: '{{ build_id }}',
     _likelihoods: {{ likelihoods_js }},
     _consequences: {{ consequences_js }},
@@ -63,6 +67,8 @@ document.addEventListener('alpine:init', () => {
       if (typeof this.prior_assessment_at !== 'string') this.prior_assessment_at = '';
       if (typeof this.system_name !== 'string') this.system_name = '';
       if (typeof this.system_owner !== 'string') this.system_owner = '';
+      if (typeof this.show_only_changed_risks !== 'boolean') this.show_only_changed_risks = false;
+      if (typeof this.show_only_changed_answers !== 'boolean') this.show_only_changed_answers = false;
     },
     _worst(results, dim, scale) {
       const vals = results.map(r => r[dim]).filter(v => v !== null);
@@ -207,6 +213,50 @@ document.addEventListener('alpine:init', () => {
       }
       return snapshot;
     },
+    /* Compute an inherent snapshot from a raw properties dict — used to
+       synthesise a "prior inherent" when the user loaded only a prior
+       questionnaire (no prior assessment to read inherent from). Mirrors
+       the per-risk getter logic but keys off the supplied dict instead of
+       live `prop_*` getters, so it works for any properties snapshot. */
+    _inherentSnapshotFromProperties(props) {
+      const snapshot = {};
+      const safe = (props && typeof props === 'object') ? props : {};
+      for (const id of this._riskIds) {
+        const rules = this._riskRules[id] || [];
+        const fired = rules.filter(r => safe[r.property] === true);
+        const firing = fired.map(r => r.property);
+        if (fired.length === 0) {
+          snapshot[id] = {
+            likelihood: null, consequence: null,
+            level: 'not_applicable', firing_conditions: firing,
+          };
+          continue;
+        }
+        const likelihood = this._worst(fired, 'likelihood', this._likelihoods);
+        const consequence = this._worst(fired, 'consequence', this._consequences);
+        snapshot[id] = {
+          likelihood, consequence,
+          level: (this._risk_matrix[likelihood] || {})[consequence] || 'not_applicable',
+          firing_conditions: firing,
+        };
+      }
+      return snapshot;
+    },
+    /* The prior-assessment payload used by the diff machinery. When the
+       assessor loaded a real prior assessment, we use it as-is. When they
+       loaded only a prior questionnaire, we synthesise a minimal payload
+       so inherent-risk diffs still work — residual / mandate / aggregate
+       fields stay empty (no judgements were ever made). */
+    get _priorAssessmentForDiff() {
+      if (this.prior_assessment) return this.prior_assessment;
+      if (!this.prior_questionnaire) return null;
+      return {
+        risk_ids: this._riskIds,
+        inherent: this._inherentSnapshotFromProperties(
+          this.prior_questionnaire.properties || {}
+        ),
+      };
+    },
     /* Live snapshot of the questionnaire/assessment as the user has filled
        them in — used as the `cur_q` / `cur_a` arguments to `_diffPair`
        (and shaped to match the JSON exported by `exportAssessment`). */
@@ -336,7 +386,7 @@ document.addEventListener('alpine:init', () => {
       if (!this.prior_questionnaire) return null;
       return this._diffPair(
         this.prior_questionnaire,
-        this.prior_assessment,
+        this._priorAssessmentForDiff,
         this._currentQuestionnaire(),
         this._currentAssessment()
       );
@@ -539,8 +589,9 @@ document.addEventListener('alpine:init', () => {
     /* Per-risk helpers used by the risk card to render diff badges and
        "Previously: …" hints. Both are no-ops when no prior is loaded. */
     riskInherentChanged(rid) {
-      if (!this.prior_assessment) return false;
-      const before = this._coerceInherent((this.prior_assessment.inherent || {})[rid]);
+      const prior = this._priorAssessmentForDiff;
+      if (!prior) return false;
+      const before = this._coerceInherent((prior.inherent || {})[rid]);
       const after = this._coerceInherent(this._inherentSnapshot()[rid]);
       return !this._equal(before, after);
     },
@@ -551,6 +602,86 @@ document.addEventListener('alpine:init', () => {
       const rc = (this.prior_assessment.residual_consequence || {})[rid] || '';
       const just = (this.prior_assessment.justifications || {})[rid] || '';
       return {effectiveness: eff, likelihood: rl, consequence: rc, justification: just};
+    },
+    /* ── Presentation-layer diff helpers ──
+
+       Derived from `change_summary`; expose per-id lookup tables and per-risk
+       predicates so the templates can render diff state without re-walking
+       the change arrays for every row. Empty / inert when not in diffMode. */
+    get answer_changes_by_id() {
+      const summary = this.change_summary;
+      if (!summary) return {};
+      const out = {};
+      for (const c of summary.answer_changes) out[c.id] = c;
+      return out;
+    },
+    get detail_changes_by_id() {
+      const summary = this.change_summary;
+      if (!summary) return {};
+      const out = {};
+      for (const c of summary.detail_changes) out[c.id] = c;
+      return out;
+    },
+    get residual_changes_by_id() {
+      const summary = this.change_summary;
+      if (!summary) return {};
+      const out = {};
+      for (const c of summary.residual_changes) out[c.risk_id] = c;
+      return out;
+    },
+    get mandate_changes_by_risk() {
+      const summary = this.change_summary;
+      if (!summary) return {};
+      const out = {};
+      for (const c of summary.mandate_changes) {
+        if (!out[c.risk_id]) out[c.risk_id] = [];
+        out[c.risk_id].push(c);
+      }
+      return out;
+    },
+    riskChanged(rid) {
+      if (!this.diffMode) return false;
+      if (this.riskInherentChanged(rid)) return true;
+      if (rid in this.residual_changes_by_id) return true;
+      if (rid in this.mandate_changes_by_risk) return true;
+      return false;
+    },
+    riskChangeKinds(rid) {
+      if (!this.diffMode) return [];
+      const kinds = [];
+      if (this.riskInherentChanged(rid)) kinds.push('inherent');
+      if (rid in this.residual_changes_by_id) kinds.push('residual');
+      if (rid in this.mandate_changes_by_risk) kinds.push('mandates');
+      return kinds;
+    },
+    get changed_risk_ids() {
+      if (!this.diffMode) return [];
+      return this._riskIds.filter(rid => this.riskChanged(rid));
+    },
+    get change_counts() {
+      const summary = this.change_summary;
+      if (!summary) {
+        return {answers: 0, details: 0, risks: 0, residual: 0, mandates: 0, aggregate: 0};
+      }
+      return {
+        answers: summary.answer_changes.length,
+        details: summary.detail_changes.length,
+        risks: this.changed_risk_ids.length,
+        residual: summary.residual_changes.length,
+        mandates: summary.mandate_changes.length,
+        aggregate: summary.aggregate_change ? 1 : 0,
+      };
+    },
+    /* Format a stored answer value for display in the "Was: …" prior-value
+       hint. Mirrors the binary/detail formatting used in the live answers
+       summary so the prior reads identically to the current. */
+    formatPriorAnswer(val) {
+      if (val === 'yes') return 'Yes';
+      if (val === 'no') return 'No';
+      return '—';
+    },
+    formatPriorDetail(val) {
+      return (typeof val === 'string' && val.length) ? val : '—';
     },
     /* ── Prior-version load ──
 
@@ -663,6 +794,8 @@ document.addEventListener('alpine:init', () => {
       this.prior_questionnaire = null;
       this.prior_assessment = null;
       this.prior_assessment_at = '';
+      this.show_only_changed_risks = false;
+      this.show_only_changed_answers = false;
     },
     {% for prop in property_getters %}
     get prop_{{ prop.id }}() {

@@ -367,6 +367,19 @@ def _build_template_context(
         "risk_conditions_js": json.dumps(
             {r.id: list(dict.fromkeys(c.property for c in r.conditions)) for r in risks}
         ),
+        "risk_rules_js": json.dumps(
+            {
+                r.id: [
+                    {
+                        "property": c.property,
+                        "likelihood": c.likelihood,
+                        "consequence": c.consequence,
+                    }
+                    for c in r.conditions
+                ]
+                for r in risks
+            }
+        ),
     }
 
 
