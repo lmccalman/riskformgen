@@ -30,9 +30,11 @@ ASSESSMENT = scope_selector("assessment")
 def _build_questionnaire_payload(question_ids, detail_ids, property_ids, *, exported_at):
     return {
         "format": "riskformgen-answers",
-        "version": 2,
+        "version": 3,
         "build_id": "abcd1234",
         "exported_at": exported_at,
+        "system_name": "Test System",
+        "system_owner": "Test Owner",
         "question_ids": list(question_ids),
         "answers": {qid: "" for qid in question_ids},
         "detail_ids": list(detail_ids),
@@ -55,10 +57,12 @@ def _build_assessment_payload(
     eff = effectiveness or {}
     return {
         "format": "riskformgen-assessment",
-        "version": 4,
+        "version": 5,
         "build_id": "abcd1234",
         "exported_at": exported_at,
         "questionnaire_exported_at": questionnaire_exported_at,
+        "system_name": "Test System",
+        "system_owner": "Test Owner",
         "risk_ids": list(risk_ids),
         "property_ids": list(property_ids),
         "properties": {pid: None for pid in property_ids},

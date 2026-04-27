@@ -136,14 +136,16 @@ def main() -> int:
         assert args.assessment is not None  # narrow for the type checker
         _reconcile_questionnaire_link(questionnaire, assessment, args.assessment)
 
-    target = config.registry_dir / args.slug
-    target.mkdir(parents=True, exist_ok=True)
-    if not (target / "meta.yaml").exists():
+    name = questionnaire.get("system_name")
+    if not isinstance(name, str) or not name.strip():
         print(
-            f"warning: {target / 'meta.yaml'} is missing — create it before "
-            "the next build or `load_registry` will fail.",
+            f"warning: {args.questionnaire} has no system_name — the registry "
+            f"will display the slug ({args.slug!r}) as the system's name.",
             file=sys.stderr,
         )
+
+    target = config.registry_dir / args.slug
+    target.mkdir(parents=True, exist_ok=True)
 
     moved_q = _move_to_history(target, source_name="questionnaire.json", kind="questionnaire")
     moved_a = _move_to_history(target, source_name="assessment.json", kind="assessment")

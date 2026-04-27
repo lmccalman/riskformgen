@@ -40,6 +40,17 @@
 
         {# ── Risks tab ── #}
         <div x-show="activeTab === 'risks'" class="stack-md">
+          <section class="box loaded-system-identity stack-sm">
+            <div>
+              <span class="dim-label">System</span>
+              <span x-text="system_name || '—'"></span>
+            </div>
+            <div>
+              <span class="dim-label">Owner</span>
+              <span x-text="system_owner || '—'"></span>
+            </div>
+          </section>
+
           <div class="load-questionnaire-bar">
             <p class="has-text-grey">
               Load a questionnaire JSON exported by a system owner to populate
@@ -275,6 +286,16 @@
             The system owner's answers, as loaded from their questionnaire
             JSON. Read-only.
           </p>
+          <section class="box loaded-system-identity stack-sm">
+            <div>
+              <span class="dim-label">System</span>
+              <span x-text="system_name || '—'"></span>
+            </div>
+            <div>
+              <span class="dim-label">Owner</span>
+              <span x-text="system_owner || '—'"></span>
+            </div>
+          </section>
           {% include "answers_summary.html.j2" %}
         </div>
 

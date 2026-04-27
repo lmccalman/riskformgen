@@ -15,9 +15,9 @@ registry_dir = project_root / "registry"
 # ---------------------------------------------------------------------------
 
 QUESTIONNAIRE_FORMAT = "riskformgen-answers"
-QUESTIONNAIRE_VERSION = 2
+QUESTIONNAIRE_VERSION = 3
 ASSESSMENT_FORMAT = "riskformgen-assessment"
-ASSESSMENT_VERSION = 4
+ASSESSMENT_VERSION = 5
 
 # ---------------------------------------------------------------------------
 # Risk scales and matrix (order = ascending severity)

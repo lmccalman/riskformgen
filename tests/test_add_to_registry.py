@@ -24,6 +24,8 @@ def _q_payload(exported_at: str = "2026-04-01T08:00:00Z") -> dict:
         "version": config.QUESTIONNAIRE_VERSION,
         "build_id": "abcd1234",
         "exported_at": exported_at,
+        "system_name": "Acme",
+        "system_owner": "Jane",
         "question_ids": ["q1"],
         "answers": {"q1": "yes"},
         "detail_ids": [],

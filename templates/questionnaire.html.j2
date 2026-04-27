@@ -22,6 +22,37 @@
       </header>
 
       <div x-data="questionnaire">
+        {# ── System identity ── #}
+        <section class="box system-identity stack-sm">
+          <h2 class="title is-6">About this system</h2>
+          <div class="field">
+            <label class="label" for="system_name">System name</label>
+            <div class="control">
+              <input
+                id="system_name"
+                class="input"
+                type="text"
+                x-model="system_name"
+                placeholder="e.g. Acme Payments"
+                required
+              />
+            </div>
+          </div>
+          <div class="field">
+            <label class="label" for="system_owner">System owner</label>
+            <div class="control">
+              <input
+                id="system_owner"
+                class="input"
+                type="text"
+                x-model="system_owner"
+                placeholder="Who is responsible for this system?"
+                required
+              />
+            </div>
+          </div>
+        </section>
+
         {# ── Tab navigation ── #}
         <div class="tabs is-boxed">
           <ul>

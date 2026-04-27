@@ -4,7 +4,6 @@ Run with `uv run python scripts/seed_example_registry.py`. Writes:
 
     registry/example-system/questionnaire.json
     registry/example-system/assessment.json
-    registry/example-system/meta.yaml
 
 Drives the real Alpine factories via the test harness so the produced
 JSONs are guaranteed valid against the current form. Re-run if the form
@@ -21,8 +20,6 @@ import sys
 from datetime import UTC, datetime
 from pathlib import Path
 
-import yaml
-
 # Allow `uv run python scripts/seed_example_registry.py` from the repo root.
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
@@ -36,6 +33,9 @@ from parse import (
     load_sections,
 )
 from tests.js_harness import build_assessment_scope
+
+SYSTEM_NAME = "Example System (demo data)"
+SYSTEM_OWNER = "Demo Owner"
 
 # Answers: a person who is desk-bound, drinks daily, eats poorly, stressed,
 # socially connected, with family cardiac history but no chronic condition.
@@ -233,6 +233,8 @@ def main() -> None:
         "version": config.QUESTIONNAIRE_VERSION,
         "build_id": build_id,
         "exported_at": timestamp,
+        "system_name": SYSTEM_NAME,
+        "system_owner": SYSTEM_OWNER,
         "question_ids": question_ids,
         "answers": answers_out,
         "detail_ids": detail_ids,
@@ -246,6 +248,9 @@ def main() -> None:
         "version": config.ASSESSMENT_VERSION,
         "build_id": build_id,
         "exported_at": timestamp,
+        "questionnaire_exported_at": timestamp,
+        "system_name": SYSTEM_NAME,
+        "system_owner": SYSTEM_OWNER,
         "risk_ids": risk_ids,
         "property_ids": property_ids,
         "properties": properties_state,
@@ -262,16 +267,6 @@ def main() -> None:
     out_dir.mkdir(parents=True, exist_ok=True)
     (out_dir / "questionnaire.json").write_text(json.dumps(questionnaire_payload, indent=2) + "\n")
     (out_dir / "assessment.json").write_text(json.dumps(assessment_payload, indent=2) + "\n")
-
-    meta = {
-        "name": "Example System (demo data)",
-        "owner": "Demo Owner",
-        "notes": (
-            "Sample fixture committed for documentation. Not a real assessment. "
-            "Regenerate with `uv run python scripts/seed_example_registry.py`."
-        ),
-    }
-    (out_dir / "meta.yaml").write_text(yaml.safe_dump(meta, sort_keys=False))
 
     print(f"Wrote example fixture to {out_dir}")
 

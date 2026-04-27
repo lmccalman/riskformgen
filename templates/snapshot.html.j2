@@ -11,6 +11,22 @@
 <section class="stack-md">
   <h3 class="title is-5">System card</h3>
   <p class="has-text-grey">The system owner's answers, as committed.</p>
+  {% if snapshot.system_name or snapshot.system_owner %}
+  <dl class="answers-summary-list snapshot-identity">
+    {% if snapshot.system_name %}
+    <div class="answers-summary-row">
+      <dt class="answers-summary-q">System name</dt>
+      <dd class="answers-summary-a">{{ snapshot.system_name }}</dd>
+    </div>
+    {% endif %}
+    {% if snapshot.system_owner %}
+    <div class="answers-summary-row">
+      <dt class="answers-summary-q">System owner</dt>
+      <dd class="answers-summary-a">{{ snapshot.system_owner }}</dd>
+    </div>
+    {% endif %}
+  </dl>
+  {% endif %}
   <div class="answers-summary">
     {% for section in snapshot.sections %}
     {% if section.visible %}

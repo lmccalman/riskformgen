@@ -25,7 +25,7 @@ from py_mini_racer import MiniRacer
 
 from build_id import compute_build_id
 from models import BinaryQuestion, Property, Section, SubSection
-from registry import SystemMeta, SystemRecord
+from registry import SystemRecord
 from render import (
     render_assessment,
     render_assessment_app_js,
@@ -143,8 +143,10 @@ def _make_record(build_id_value: str | None) -> SystemRecord:
     record that predates build_id embedding (no field at all)."""
     questionnaire: dict[str, Any] = {
         "format": "riskformgen-answers",
-        "version": 2,
+        "version": 3,
         "exported_at": "2026-04-01T08:00:00Z",
+        "system_name": "Demo",
+        "system_owner": "Demo Owner",
         "question_ids": [],
         "answers": {},
         "detail_ids": [],
@@ -156,7 +158,6 @@ def _make_record(build_id_value: str | None) -> SystemRecord:
         questionnaire["build_id"] = build_id_value
     return SystemRecord(
         slug="demo",
-        meta=SystemMeta(name="Demo"),
         questionnaire=questionnaire,
         assessment=None,
     )
@@ -276,12 +277,14 @@ def _build_questionnaire_with_build_id(build_id_str: str) -> MiniRacer:
 
 
 def _payload(
-    *, version: int = 2, build_id_value: str | None = "abc12345", answer: str = "yes"
+    *, version: int = 3, build_id_value: str | None = "abc12345", answer: str = "yes"
 ) -> dict[str, Any]:
     p: dict[str, Any] = {
         "format": "riskformgen-answers",
         "version": version,
         "exported_at": "2026-04-01T08:00:00Z",
+        "system_name": "Test System",
+        "system_owner": "Test Owner",
         "question_ids": ["q1"],
         "answers": {"q1": answer},
         "detail_ids": [],

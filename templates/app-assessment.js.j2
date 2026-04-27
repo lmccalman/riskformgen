@@ -3,6 +3,8 @@ document.addEventListener('alpine:init', () => {
     activeTab: Alpine.$persist('risks').as('_x_a_activeTab'),
     answers: Alpine.$persist({{ answers_init_js }}).as('_x_a_answers'),
     details: Alpine.$persist({{ details_init_js }}).as('_x_a_details'),
+    system_name: Alpine.$persist({{ system_name_init_js }}).as('_x_a_system_name'),
+    system_owner: Alpine.$persist({{ system_owner_init_js }}).as('_x_a_system_owner'),
     control_effectiveness: Alpine.$persist({{ control_effectiveness_init_js }}).as('_x_a_control_effectiveness'),
     residual_likelihood: Alpine.$persist({{ residual_likelihood_init_js }}).as('_x_a_residual_likelihood'),
     residual_consequence: Alpine.$persist({{ residual_consequence_init_js }}).as('_x_a_residual_consequence'),
@@ -59,6 +61,8 @@ document.addEventListener('alpine:init', () => {
       if (typeof this.aggregate_residual_justification !== 'string') this.aggregate_residual_justification = '';
       if (typeof this.loaded_questionnaire_at !== 'string') this.loaded_questionnaire_at = '';
       if (typeof this.prior_assessment_at !== 'string') this.prior_assessment_at = '';
+      if (typeof this.system_name !== 'string') this.system_name = '';
+      if (typeof this.system_owner !== 'string') this.system_owner = '';
     },
     _worst(results, dim, scale) {
       const vals = results.map(r => r[dim]).filter(v => v !== null);
@@ -154,7 +158,7 @@ document.addEventListener('alpine:init', () => {
     importAnswers(event) {
       this._importJson(event, {
         format: 'riskformgen-answers',
-        version: 2,
+        version: 3,
         fileIdsKey: 'question_ids',
         currentIds: this._questionIds,
         label: 'answers',
@@ -176,6 +180,8 @@ document.addEventListener('alpine:init', () => {
               if (did in data.details) this.details[did] = data.details[did];
             }
           }
+          this.system_name = (typeof data.system_name === 'string') ? data.system_name : '';
+          this.system_owner = (typeof data.system_owner === 'string') ? data.system_owner : '';
           this.loaded_questionnaire_at = (typeof data.exported_at === 'string')
             ? data.exported_at
             : '';
@@ -206,6 +212,8 @@ document.addEventListener('alpine:init', () => {
        (and shaped to match the JSON exported by `exportAssessment`). */
     _currentQuestionnaire() {
       return {
+        system_name: this.system_name,
+        system_owner: this.system_owner,
         question_ids: this._questionIds,
         answers: this.answers,
         detail_ids: this._detailIds,
@@ -231,10 +239,12 @@ document.addEventListener('alpine:init', () => {
     exportAssessment() {
       const payload = {
         format: 'riskformgen-assessment',
-        version: 4,
+        version: 5,
         build_id: this._buildId,
         exported_at: new Date().toISOString(),
         questionnaire_exported_at: this.loaded_questionnaire_at || '',
+        system_name: this.system_name,
+        system_owner: this.system_owner,
         risk_ids: this._riskIds,
         property_ids: this._propertyIds,
         properties: this._propertySnapshot(),
@@ -256,7 +266,7 @@ document.addEventListener('alpine:init', () => {
     importAssessment(event) {
       this._importJson(event, {
         format: 'riskformgen-assessment',
-        version: 4,
+        version: 5,
         fileIdsKey: 'risk_ids',
         currentIds: this._riskIds,
         label: 'assessments',
@@ -307,6 +317,8 @@ document.addEventListener('alpine:init', () => {
           if (typeof data.aggregate_residual_justification === 'string') {
             this.aggregate_residual_justification = data.aggregate_residual_justification;
           }
+          if (typeof data.system_name === 'string') this.system_name = data.system_name;
+          if (typeof data.system_owner === 'string') this.system_owner = data.system_owner;
         },
       });
     },

@@ -1,8 +1,11 @@
 {
   "format": "riskformgen-assessment",
-  "version": 4,
+  "version": 5,
   "build_id": "d58ef7e6",
-  "exported_at": "2026-04-26T10:04:10Z",
+  "exported_at": "2026-04-27T01:48:36Z",
+  "questionnaire_exported_at": "2026-04-27T01:48:36Z",
+  "system_name": "Example System (demo data)",
+  "system_owner": "Demo Owner",
   "risk_ids": [
     "cardiovascular_risk",
     "metabolic_risk",

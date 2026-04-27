@@ -41,7 +41,7 @@ class TestAnswersRoundtripQuestionnaire:
 
         payload = download_payload(questionnaire_page, "Save answers", "riskformgen-answers.json")
         assert payload["format"] == "riskformgen-answers"
-        assert payload["version"] == 2
+        assert payload["version"] == 3
         # Properties snapshot is baked into the export so the registry can
         # render without re-evaluating the cascade.
         assert payload["properties"][payload["property_ids"][0]] in (True, False, None)
@@ -66,6 +66,29 @@ class TestAnswersRoundtripQuestionnaire:
         wait_for_answer(questionnaire_page, second, "no", scope=QUESTIONNAIRE)
         assert recorder.captured == []
 
+    def test_system_identity_round_trips(self, questionnaire_page: Page) -> None:
+        """The system owner's `system_name` / `system_owner` ride along on
+        every export and restore on import."""
+        eval_in_scope(
+            questionnaire_page,
+            "scope.system_name = 'Acme Payments';scope.system_owner = 'Jane Operator';",
+            scope=QUESTIONNAIRE,
+        )
+        payload = download_payload(questionnaire_page, "Save answers", "riskformgen-answers.json")
+        assert payload["system_name"] == "Acme Payments"
+        assert payload["system_owner"] == "Jane Operator"
+
+        eval_in_scope(
+            questionnaire_page,
+            "scope.system_name = ''; scope.system_owner = '';",
+            scope=QUESTIONNAIRE,
+        )
+        upload_payload(questionnaire_page, 'input[x-ref="answersFile"]', payload)
+        questionnaire_page.wait_for_function(f"{QUESTIONNAIRE}.system_name === 'Acme Payments'")
+        assert get_scope_field(questionnaire_page, "system_owner", scope=QUESTIONNAIRE) == (
+            "Jane Operator"
+        )
+
     def test_silent_apply_when_ids_align(self, questionnaire_page: Page) -> None:
         question_ids: list[str] = get_scope_field(
             questionnaire_page, "_questionIds", scope=QUESTIONNAIRE
@@ -75,7 +98,7 @@ class TestAnswersRoundtripQuestionnaire:
         )
         payload = {
             "format": "riskformgen-answers",
-            "version": 2,
+            "version": 3,
             "exported_at": "2025-01-01T00:00:00.000Z",
             "question_ids": list(question_ids),
             "answers": {qid: "yes" for qid in question_ids},
@@ -110,7 +133,7 @@ class TestAnswersRoundtripQuestionnaire:
         )
 
     def test_wrong_format_shows_alert(self, questionnaire_page: Page) -> None:
-        payload = {"format": "something-else", "version": 2, "question_ids": [], "answers": {}}
+        payload = {"format": "something-else", "version": 3, "question_ids": [], "answers": {}}
         recorder = DialogRecorder(questionnaire_page)
         upload_payload(questionnaire_page, 'input[x-ref="answersFile"]', payload)
         recorder.wait_for_alerts()
@@ -133,7 +156,7 @@ class TestAnswersRoundtripQuestionnaire:
         recorder.wait_for_confirms()
         msg = recorder.confirms()[0]["message"]
         assert "Schema version was 99" in msg
-        assert "current: 2" in msg
+        assert "current: 3" in msg
         # No alert path on version mismatch any more.
         assert recorder.alerts() == []
 
@@ -147,7 +170,7 @@ class TestAnswersRoundtripQuestionnaire:
         kept = question_ids[:2]
         payload = {
             "format": "riskformgen-answers",
-            "version": 2,
+            "version": 3,
             "exported_at": "2025-01-01T00:00:00.000Z",
             "question_ids": list(kept),
             "answers": {qid: "yes" for qid in kept},
@@ -190,7 +213,7 @@ class TestAnswersRoundtripQuestionnaire:
         file_ids = [*question_ids, extra_id]
         payload = {
             "format": "riskformgen-answers",
-            "version": 2,
+            "version": 3,
             "exported_at": "2025-01-01T00:00:00.000Z",
             "question_ids": file_ids,
             "answers": {**{qid: "yes" for qid in question_ids}, extra_id: "yes"},
@@ -219,7 +242,7 @@ class TestAnswersRoundtripQuestionnaire:
         )
         payload = {
             "format": "riskformgen-answers",
-            "version": 2,
+            "version": 3,
             "exported_at": "2025-01-01T00:00:00.000Z",
             "question_ids": question_ids[:1],
             "answers": {first: "should-not-apply"},
@@ -246,6 +269,31 @@ class TestAssessmentImportsQuestionnaireJson:
     questionnaire' button. Confirm the same import surface works on the
     assessment factory."""
 
+    def test_assessment_picks_up_system_identity_from_questionnaire(
+        self, assessment_page: Page
+    ) -> None:
+        question_ids: list[str] = get_scope_field(
+            assessment_page, "_questionIds", scope=ASSESSMENT
+        )
+        payload = {
+            "format": "riskformgen-answers",
+            "version": 3,
+            "exported_at": "2025-01-01T00:00:00.000Z",
+            "system_name": "Loaded System",
+            "system_owner": "Loaded Owner",
+            "question_ids": list(question_ids),
+            "answers": {qid: "" for qid in question_ids},
+            "detail_ids": [],
+            "details": {},
+            "property_ids": [],
+            "properties": {},
+        }
+        recorder = DialogRecorder(assessment_page)
+        upload_payload(assessment_page, 'input[x-ref="answersFile"]', payload)
+        assessment_page.wait_for_function(f"{ASSESSMENT}.system_name === 'Loaded System'")
+        assert get_scope_field(assessment_page, "system_owner", scope=ASSESSMENT) == "Loaded Owner"
+        assert recorder.alerts() == []
+
     def test_assessment_loads_questionnaire_json(self, assessment_page: Page) -> None:
         question_ids: list[str] = get_scope_field(
             assessment_page, "_questionIds", scope=ASSESSMENT
@@ -253,7 +301,7 @@ class TestAssessmentImportsQuestionnaireJson:
         first = question_ids[0]
         payload = {
             "format": "riskformgen-answers",
-            "version": 2,
+            "version": 3,
             "exported_at": "2025-01-01T00:00:00.000Z",
             "question_ids": list(question_ids),
             "answers": {qid: ("yes" if qid == first else "") for qid in question_ids},
@@ -300,7 +348,7 @@ class TestAssessmentRoundtrip:
             assessment_page, "Save assessment", "riskformgen-assessment.json"
         )
         assert payload["format"] == "riskformgen-assessment"
-        assert payload["version"] == 4
+        assert payload["version"] == 5
         assert payload["control_effectiveness"][target] == "partial"
         assert payload["residual_likelihood"][target] == "rare"
         assert payload["residual_consequence"][target] == "minor"
@@ -379,7 +427,7 @@ class TestAssessmentRoundtrip:
 
         payload = {
             "format": "riskformgen-assessment",
-            "version": 4,
+            "version": 5,
             "exported_at": "2025-01-01T00:00:00.000Z",
             "risk_ids": list(risk_ids),
             "property_ids": [],
@@ -434,7 +482,7 @@ class TestAssessmentRoundtrip:
         recorder.wait_for_confirms()
         msg = recorder.confirms()[0]["message"]
         assert "Schema version was 1" in msg
-        assert "current: 4" in msg
+        assert "current: 5" in msg
         assert recorder.alerts() == []
 
 
@@ -442,11 +490,13 @@ class TestDownloadShape:
     def test_questionnaire_export_shape(self, questionnaire_page: Page) -> None:
         payload = download_payload(questionnaire_page, "Save answers", "riskformgen-answers.json")
         assert payload["format"] == "riskformgen-answers"
-        assert payload["version"] == 2
+        assert payload["version"] == 3
         # Build identifier embedded so the registry / re-import path can
         # detect form drift; non-empty 8-char hex.
         assert isinstance(payload["build_id"], str) and len(payload["build_id"]) == 8
         for key in (
+            "system_name",
+            "system_owner",
             "question_ids",
             "answers",
             "detail_ids",
@@ -463,9 +513,11 @@ class TestDownloadShape:
             assessment_page, "Save assessment", "riskformgen-assessment.json"
         )
         assert payload["format"] == "riskformgen-assessment"
-        assert payload["version"] == 4
+        assert payload["version"] == 5
         assert isinstance(payload["build_id"], str) and len(payload["build_id"]) == 8
         for key in (
+            "system_name",
+            "system_owner",
             "risk_ids",
             "property_ids",
             "properties",

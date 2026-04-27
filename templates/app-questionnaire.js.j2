@@ -3,6 +3,8 @@ document.addEventListener('alpine:init', () => {
     activeTab: Alpine.$persist('{{ sections[0].id }}').as('_x_q_activeTab'),
     answers: Alpine.$persist({{ answers_init_js }}).as('_x_q_answers'),
     details: Alpine.$persist({{ details_init_js }}).as('_x_q_details'),
+    system_name: Alpine.$persist({{ system_name_init_js }}).as('_x_q_system_name'),
+    system_owner: Alpine.$persist({{ system_owner_init_js }}).as('_x_q_system_owner'),
     _questionIds: {{ question_ids_js }},
     _detailIds: {{ detail_ids_js }},
     _propertyIds: {{ property_ids_js }},
@@ -15,6 +17,8 @@ document.addEventListener('alpine:init', () => {
       for (const id of this._detailIds) {
         if (!(id in this.details)) this.details[id] = '';
       }
+      if (typeof this.system_name !== 'string') this.system_name = '';
+      if (typeof this.system_owner !== 'string') this.system_owner = '';
     },
     _downloadJson(data, filename) {
       const blob = new Blob([JSON.stringify(data, null, 2)], {type: 'application/json'});
@@ -33,6 +37,8 @@ document.addEventListener('alpine:init', () => {
       const freshDetails = {};
       for (const id of this._detailIds) freshDetails[id] = '';
       this.details = freshDetails;
+      this.system_name = '';
+      this.system_owner = '';
     },
     _propertySnapshot() {
       const snapshot = {};
@@ -42,9 +48,11 @@ document.addEventListener('alpine:init', () => {
     exportAnswers() {
       this._downloadJson({
         format: 'riskformgen-answers',
-        version: 2,
+        version: 3,
         build_id: this._buildId,
         exported_at: new Date().toISOString(),
+        system_name: this.system_name,
+        system_owner: this.system_owner,
         question_ids: this._questionIds,
         answers: this.answers,
         detail_ids: this._detailIds,
@@ -92,7 +100,7 @@ document.addEventListener('alpine:init', () => {
     importAnswers(event) {
       this._importJson(event, {
         format: 'riskformgen-answers',
-        version: 2,
+        version: 3,
         fileIdsKey: 'question_ids',
         currentIds: this._questionIds,
         label: 'answers',
@@ -114,6 +122,8 @@ document.addEventListener('alpine:init', () => {
               if (did in data.details) this.details[did] = data.details[did];
             }
           }
+          if (typeof data.system_name === 'string') this.system_name = data.system_name;
+          if (typeof data.system_owner === 'string') this.system_owner = data.system_owner;
         },
       });
     },

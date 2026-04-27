@@ -42,10 +42,13 @@ persona always knows which view they are in.
    root:
 
        registry/<slug>/
-         questionnaire.json    # required, format `riskformgen-answers` v2
+         questionnaire.json    # required, format `riskformgen-answers` v3
          assessment.json       # optional — system in progress if missing
-         meta.yaml             # required, supplies the display name (and
-                               # optional owner / notes)
+
+   The system's display name and owner are read directly off the
+   questionnaire JSON's `system_name` / `system_owner` fields — the
+   system owner self-reports both as part of filling out the form. The
+   slug remains operator-controlled (folder name).
 
    The build reads these at compile time and emits a static index page
    (`registry.html`) plus one `registry/<slug>.html` per record. The
@@ -148,6 +151,16 @@ being applied in the project.
 
 ### System
 This is the entity being assessed for risk.
+
+### System identity
+
+`system_name` and `system_owner` are top-level fields on every
+questionnaire and assessment JSON. The system owner enters them once
+when filling out the questionnaire, and the values ride along on every
+export. The assessment view picks them up when a questionnaire is
+loaded; the registry surfaces them on the index table and the per-system
+page. The slug under `registry/<slug>/` stays operator-controlled — it
+is the stable identifier that may not match `system_name` over time.
 
 ### Properties
 

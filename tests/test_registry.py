@@ -1,9 +1,10 @@
 """Unit tests for the registry loader.
 
 The loader walks `registry/<slug>/`, validates each system's
-questionnaire/assessment JSON shape and the `meta.yaml` metadata, warns
-on ids that no longer exist in the form, and returns a list of
-`SystemRecord`s sorted newest-first. These tests pin that contract.
+questionnaire/assessment JSON shape, warns on ids that no longer exist
+in the form, and returns a list of `SystemRecord`s sorted newest-first.
+The display name and owner come from the questionnaire JSON's
+`system_name` / `system_owner` fields. These tests pin that contract.
 """
 
 from __future__ import annotations
@@ -13,7 +14,6 @@ import logging
 from pathlib import Path
 
 import pytest
-import yaml
 
 import config
 from models import (
@@ -74,11 +74,15 @@ def _write_questionnaire(
     version: int = config.QUESTIONNAIRE_VERSION,
     fmt: str = config.QUESTIONNAIRE_FORMAT,
     exported_at: str = "2026-04-26T08:00:00Z",
+    system_name: str = "Acme",
+    system_owner: str = "Jane",
 ) -> None:
     payload = {
         "format": fmt,
         "version": version,
         "exported_at": exported_at,
+        "system_name": system_name,
+        "system_owner": system_owner,
         "question_ids": list((answers or {"q1": "yes"}).keys()),
         "answers": answers or {"q1": "yes"},
         "detail_ids": [],
@@ -129,11 +133,6 @@ def _write_assessment(
     (folder / "assessment.json").write_text(json.dumps(payload))
 
 
-def _write_meta(folder: Path, name: str = "Acme", **extra: object) -> None:
-    payload: dict[str, object] = {"name": name, **extra}
-    (folder / "meta.yaml").write_text(yaml.safe_dump(payload))
-
-
 def _make_system(root: Path, slug: str, **kw: object) -> Path:
     folder = root / slug
     folder.mkdir()
@@ -156,23 +155,21 @@ class TestLoadRegistryHappyPath:
 
     def test_single_system_loads(self, tmp_path: Path, form: dict) -> None:
         folder = _make_system(tmp_path, "acme")
-        _write_meta(folder, "Acme Payments", owner="Jane")
-        _write_questionnaire(folder)
+        _write_questionnaire(folder, system_name="Acme Payments", system_owner="Jane")
         _write_assessment(folder)
 
         records = load_registry(tmp_path, **form)
         assert len(records) == 1
         rec = records[0]
         assert rec.slug == "acme"
-        assert rec.meta.name == "Acme Payments"
-        assert rec.meta.owner == "Jane"
+        assert rec.system_name == "Acme Payments"
+        assert rec.system_owner == "Jane"
         assert rec.assessment is not None
         assert rec.exported_at == "2026-04-26T09:00:00Z"
 
     def test_questionnaire_only_system_is_accepted(self, tmp_path: Path, form: dict) -> None:
         folder = _make_system(tmp_path, "drafty")
-        _write_meta(folder, "Drafty")
-        _write_questionnaire(folder)
+        _write_questionnaire(folder, system_name="Drafty")
 
         records = load_registry(tmp_path, **form)
         assert len(records) == 1
@@ -182,13 +179,11 @@ class TestLoadRegistryHappyPath:
 
     def test_records_sorted_newest_first(self, tmp_path: Path, form: dict) -> None:
         a = _make_system(tmp_path, "a-old")
-        _write_meta(a, "Old")
-        _write_questionnaire(a, exported_at="2026-01-01T00:00:00Z")
+        _write_questionnaire(a, system_name="Old", exported_at="2026-01-01T00:00:00Z")
         _write_assessment(a, exported_at="2026-01-02T00:00:00Z")
 
         b = _make_system(tmp_path, "b-new")
-        _write_meta(b, "New")
-        _write_questionnaire(b, exported_at="2026-04-01T00:00:00Z")
+        _write_questionnaire(b, system_name="New", exported_at="2026-04-01T00:00:00Z")
         _write_assessment(b, exported_at="2026-04-25T00:00:00Z")
 
         records = load_registry(tmp_path, **form)
@@ -213,42 +208,25 @@ class TestLoadRegistryHappyPath:
 
 
 class TestValidationHardFails:
-    def test_missing_meta_fails(self, tmp_path: Path, form: dict) -> None:
-        folder = _make_system(tmp_path, "acme")
-        _write_questionnaire(folder)
-        with pytest.raises(ValueError, match=r"Missing.*meta\.yaml"):
-            load_registry(tmp_path, **form)
-
     def test_missing_questionnaire_fails(self, tmp_path: Path, form: dict) -> None:
-        folder = _make_system(tmp_path, "acme")
-        _write_meta(folder)
+        _make_system(tmp_path, "acme")
         with pytest.raises(ValueError, match=r"Missing.*questionnaire\.json"):
-            load_registry(tmp_path, **form)
-
-    def test_meta_missing_name_fails(self, tmp_path: Path, form: dict) -> None:
-        folder = _make_system(tmp_path, "acme")
-        (folder / "meta.yaml").write_text("owner: Jane\n")
-        _write_questionnaire(folder)
-        with pytest.raises(ValueError, match="'name' is required"):
             load_registry(tmp_path, **form)
 
     def test_questionnaire_wrong_format_fails(self, tmp_path: Path, form: dict) -> None:
         folder = _make_system(tmp_path, "acme")
-        _write_meta(folder)
         _write_questionnaire(folder, fmt="some-other-tool")
         with pytest.raises(ValueError, match="wrong format"):
             load_registry(tmp_path, **form)
 
     def test_questionnaire_wrong_version_fails(self, tmp_path: Path, form: dict) -> None:
         folder = _make_system(tmp_path, "acme")
-        _write_meta(folder)
         _write_questionnaire(folder, version=1)
         with pytest.raises(ValueError, match="incompatible version"):
             load_registry(tmp_path, **form)
 
     def test_assessment_wrong_version_fails(self, tmp_path: Path, form: dict) -> None:
         folder = _make_system(tmp_path, "acme")
-        _write_meta(folder)
         _write_questionnaire(folder)
         _write_assessment(folder, version=2)
         with pytest.raises(ValueError, match="incompatible version"):
@@ -256,17 +234,28 @@ class TestValidationHardFails:
 
     def test_invalid_slug_fails(self, tmp_path: Path, form: dict) -> None:
         folder = _make_system(tmp_path, "Capital_Bad")
-        _write_meta(folder)
         _write_questionnaire(folder)
         with pytest.raises(ValueError, match="Invalid system slug"):
             load_registry(tmp_path, **form)
 
     def test_invalid_json_fails(self, tmp_path: Path, form: dict) -> None:
         folder = _make_system(tmp_path, "acme")
-        _write_meta(folder)
         (folder / "questionnaire.json").write_text("{not json")
         with pytest.raises(ValueError, match="invalid JSON"):
             load_registry(tmp_path, **form)
+
+
+class TestSystemIdentityWarnings:
+    def test_missing_system_name_warns_but_loads(
+        self, tmp_path: Path, form: dict, caplog: pytest.LogCaptureFixture
+    ) -> None:
+        folder = _make_system(tmp_path, "acme")
+        _write_questionnaire(folder, system_name="")
+        with caplog.at_level(logging.WARNING):
+            records = load_registry(tmp_path, **form)
+        assert len(records) == 1
+        assert records[0].system_name == ""
+        assert any("system_name" in r.message for r in caplog.records)
 
 
 # ---------------------------------------------------------------------------
@@ -279,7 +268,6 @@ class TestUnknownIdsWarn:
         self, tmp_path: Path, form: dict, caplog: pytest.LogCaptureFixture
     ) -> None:
         folder = _make_system(tmp_path, "acme")
-        _write_meta(folder)
         _write_questionnaire(
             folder,
             answers={"q1": "yes", "q_old_removed": "yes"},
@@ -294,7 +282,6 @@ class TestUnknownIdsWarn:
         self, tmp_path: Path, form: dict, caplog: pytest.LogCaptureFixture
     ) -> None:
         folder = _make_system(tmp_path, "acme")
-        _write_meta(folder)
         _write_questionnaire(folder)
         _write_assessment(
             folder,
@@ -337,7 +324,6 @@ def _record(
 ) -> SystemRecord:
     return SystemRecord(
         slug="x",
-        meta=__import__("registry").SystemMeta(name="X"),
         questionnaire={"properties": {}},
         assessment={
             "inherent": inherent,
@@ -352,7 +338,6 @@ class TestWorstResidualLevel:
     def test_no_assessment_is_not_applicable(self) -> None:
         rec = SystemRecord(
             slug="x",
-            meta=__import__("registry").SystemMeta(name="X"),
             questionnaire={},
             assessment=None,
         )
@@ -427,7 +412,6 @@ def _record_with_aggregate(
 ) -> SystemRecord:
     return SystemRecord(
         slug="x",
-        meta=__import__("registry").SystemMeta(name="X"),
         questionnaire={"properties": {}},
         assessment={
             "inherent": inherent,
@@ -462,6 +446,8 @@ class TestHistoryLoading:
             "format": config.QUESTIONNAIRE_FORMAT,
             "version": config.QUESTIONNAIRE_VERSION,
             "exported_at": q_exported_at,
+            "system_name": "Acme",
+            "system_owner": "Jane",
             "question_ids": list((answers or {"q1": "yes"}).keys()),
             "answers": answers or {"q1": "yes"},
             "detail_ids": [],
@@ -474,6 +460,8 @@ class TestHistoryLoading:
             "version": config.ASSESSMENT_VERSION,
             "exported_at": a_exported_at,
             "questionnaire_exported_at": q_exported_at,
+            "system_name": "Acme",
+            "system_owner": "Jane",
             "risk_ids": ["r1"],
             "property_ids": list(q_payload["property_ids"]),
             "properties": dict(q_payload["properties"]),
@@ -499,7 +487,6 @@ class TestHistoryLoading:
 
     def test_no_history_dir_means_empty_history(self, tmp_path: Path, form: dict) -> None:
         folder = _make_system(tmp_path, "acme")
-        _write_meta(folder)
         _write_questionnaire(folder)
         _write_assessment(folder)
         records = load_registry(tmp_path, **form)
@@ -507,7 +494,6 @@ class TestHistoryLoading:
 
     def test_single_history_pair_loaded_oldest_first(self, tmp_path: Path, form: dict) -> None:
         folder = _make_system(tmp_path, "acme")
-        _write_meta(folder)
         _write_questionnaire(folder, exported_at="2026-04-01T08:00:00Z")
         _write_assessment(folder, exported_at="2026-04-01T09:00:00Z")
         self._write_history_pair(
@@ -529,7 +515,6 @@ class TestHistoryLoading:
 
     def test_multiple_history_pairs_sorted_oldest_first(self, tmp_path: Path, form: dict) -> None:
         folder = _make_system(tmp_path, "acme")
-        _write_meta(folder)
         _write_questionnaire(folder, exported_at="2026-04-01T08:00:00Z")
         _write_assessment(folder, exported_at="2026-04-01T09:00:00Z")
         # Write the newer pair first to verify sort logic isn't insertion-order.
@@ -560,7 +545,6 @@ class TestHistoryLoading:
         self, tmp_path: Path, form: dict
     ) -> None:
         folder = _make_system(tmp_path, "acme")
-        _write_meta(folder)
         # Current: q1=yes, p1=True, r1 high.
         _write_questionnaire(folder, exported_at="2026-04-01T08:00:00Z")
         _write_assessment(folder, exported_at="2026-04-01T09:00:00Z")
@@ -572,6 +556,8 @@ class TestHistoryLoading:
             "format": config.QUESTIONNAIRE_FORMAT,
             "version": config.QUESTIONNAIRE_VERSION,
             "exported_at": "2026-01-15T10:00:00Z",
+            "system_name": "Acme",
+            "system_owner": "Jane",
             "question_ids": ["q1"],
             "answers": {"q1": "no"},
             "detail_ids": [],
@@ -622,7 +608,6 @@ class TestHistoryLoading:
         the latest unused questionnaire whose `exported_at` <= the
         assessment's. Pins the legacy fallback path."""
         folder = _make_system(tmp_path, "acme")
-        _write_meta(folder)
         _write_questionnaire(folder)
         _write_assessment(folder)
 
@@ -632,6 +617,8 @@ class TestHistoryLoading:
             "format": config.QUESTIONNAIRE_FORMAT,
             "version": config.QUESTIONNAIRE_VERSION,
             "exported_at": "2025-12-01T10:00:00Z",
+            "system_name": "Acme",
+            "system_owner": "Jane",
             "question_ids": ["q1"],
             "answers": {"q1": "yes"},
             "detail_ids": [],
@@ -673,7 +660,6 @@ class TestHistoryLoading:
         """A historical cycle where only the questionnaire was committed (no
         assessment) is preserved as a questionnaire-only history entry."""
         folder = _make_system(tmp_path, "acme")
-        _write_meta(folder)
         _write_questionnaire(folder, exported_at="2026-04-01T08:00:00Z")
         _write_assessment(folder, exported_at="2026-04-01T09:00:00Z")
         history_dir = folder / "history"
@@ -682,6 +668,8 @@ class TestHistoryLoading:
             "format": config.QUESTIONNAIRE_FORMAT,
             "version": config.QUESTIONNAIRE_VERSION,
             "exported_at": "2026-01-15T10:00:00Z",
+            "system_name": "Acme",
+            "system_owner": "Jane",
             "question_ids": ["q1"],
             "answers": {"q1": "yes"},
             "detail_ids": [],
@@ -699,7 +687,6 @@ class TestAggregateResidualLevel:
     def test_no_assessment_is_not_applicable(self) -> None:
         rec = SystemRecord(
             slug="x",
-            meta=__import__("registry").SystemMeta(name="X"),
             questionnaire={},
             assessment=None,
         )
@@ -730,7 +717,6 @@ class TestAggregateResidualLevel:
         # Older payload without the aggregate field at all — fallback path.
         rec = SystemRecord(
             slug="x",
-            meta=__import__("registry").SystemMeta(name="X"),
             questionnaire={"properties": {}},
             assessment={
                 "inherent": {

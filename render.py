@@ -18,7 +18,7 @@ from models import (
     SubSection,
     all_questions,
 )
-from registry import SystemMeta, SystemRecord, aggregate_residual_level
+from registry import SystemRecord, aggregate_residual_level
 
 
 def create_environment() -> Environment:
@@ -345,6 +345,8 @@ def _build_template_context(
         "risk_matrix_js": json.dumps(config.RISK_MATRIX),
         "answers_init_js": json.dumps({q.id: "" for q in question_views}),
         "details_init_js": json.dumps({did: "" for did in detail_ids}),
+        "system_name_init_js": json.dumps(""),
+        "system_owner_init_js": json.dumps(""),
         "control_effectiveness_init_js": json.dumps({r.id: "" for r in risk_views}),
         "residual_likelihood_init_js": json.dumps({r.id: "" for r in risk_views}),
         "residual_consequence_init_js": json.dumps({r.id: "" for r in risk_views}),
@@ -477,8 +479,8 @@ def _build_registry_row(record: SystemRecord, current_build_id: str = "") -> dic
     record_build_id = _record_build_id(record)
     return {
         "slug": record.slug,
-        "name": record.meta.name,
-        "owner": record.meta.owner,
+        "name": record.system_name or record.slug,
+        "owner": record.system_owner,
         "last_assessed": _format_date(record.exported_at),
         "has_assessment": record.assessment is not None,
         "residual_level": level,
@@ -760,7 +762,6 @@ def _build_snapshot_view(
     # SystemRecord; build a throwaway one over the raw payloads.
     pseudo = SystemRecord(
         slug="",
-        meta=SystemMeta(name=""),
         questionnaire=questionnaire,
         assessment=assessment,
     )
@@ -781,6 +782,8 @@ def _build_snapshot_view(
         "exported_at": _format_date(exported_at),
         "record_build_id": snapshot_build_id,
         "stale_build": bool(current_build_id) and snapshot_build_id != current_build_id,
+        "system_name": str(questionnaire.get("system_name", "") or ""),
+        "system_owner": str(questionnaire.get("system_owner", "") or ""),
         "sections": section_views,
         "risks": risk_views,
         "has_assessment": assessment is not None,
@@ -848,8 +851,9 @@ def _build_registry_system_view(
 
     return {
         "record": record,
-        "meta": record.meta,
         "slug": record.slug,
+        "system_name": record.system_name or record.slug,
+        "system_owner": record.system_owner,
         "snapshot": snapshot,
         "history": history_views,
         "current_change_summary": record.current_change_summary,

@@ -2,10 +2,14 @@
 
 Each system lives in its own folder under `registry/<slug>/`:
 
-    questionnaire.json   # required, format `riskformgen-answers` v2
+    questionnaire.json   # required, format `riskformgen-answers` v3
     assessment.json      # optional — system in progress if missing
-    meta.yaml            # required, supplies the display name (and owner/notes)
     history/             # optional — prior questionnaire/assessment pairs
+
+The display name and owner come from the questionnaire JSON's
+`system_name` / `system_owner` fields — the system owner self-reports
+both as part of filling out the form. The slug remains the folder name
+(operator-controlled).
 
 Files inside `history/` end in `-questionnaire.json` or `-assessment.json`;
 the prefix is conventionally the file's own `exported_at` with colons
@@ -33,8 +37,6 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
 
-import yaml
-
 import config
 from diff import ChangeSummary, diff_pair
 from models import Control, Property, Risk, Section, all_questions
@@ -42,13 +44,6 @@ from models import Control, Property, Risk, Section, all_questions
 logger = logging.getLogger(__name__)
 
 _SLUG_RE = re.compile(r"^[a-z0-9][a-z0-9-]*$")
-
-
-@dataclass(frozen=True)
-class SystemMeta:
-    name: str
-    owner: str | None = None
-    notes: str | None = None
 
 
 @dataclass(frozen=True)
@@ -75,11 +70,15 @@ class HistoryEntry:
 
 @dataclass(frozen=True)
 class SystemRecord:
-    """One committed system: meta, questionnaire JSON, optional assessment JSON.
+    """One committed system: questionnaire JSON, optional assessment JSON.
 
     Both JSON payloads are kept as dicts so templates can render them
     directly. Validation has already verified format/version and warned on
     unknown ids; downstream code can trust the basic shape.
+
+    The display name and owner are read directly off the questionnaire's
+    `system_name` / `system_owner` fields — the system owner self-reports
+    them.
 
     `history` holds prior pairs in oldest-first order;
     `current_change_summary` is the diff of the current pair against the
@@ -87,7 +86,6 @@ class SystemRecord:
     """
 
     slug: str
-    meta: SystemMeta
     questionnaire: dict[str, Any]
     assessment: dict[str, Any] | None
     history: tuple[HistoryEntry, ...] = ()
@@ -100,19 +98,13 @@ class SystemRecord:
             return str(self.assessment.get("exported_at", ""))
         return str(self.questionnaire.get("exported_at", ""))
 
+    @property
+    def system_name(self) -> str:
+        return str(self.questionnaire.get("system_name", "") or "")
 
-def _parse_meta(path: Path) -> SystemMeta:
-    raw = yaml.safe_load(path.read_text()) or {}
-    if not isinstance(raw, dict):
-        raise ValueError(f"{path}: must be a mapping")
-    name = raw.get("name")
-    if not isinstance(name, str) or not name.strip():
-        raise ValueError(f"{path}: 'name' is required and must be a non-empty string")
-    return SystemMeta(
-        name=name,
-        owner=raw.get("owner"),
-        notes=raw.get("notes"),
-    )
+    @property
+    def system_owner(self) -> str:
+        return str(self.questionnaire.get("system_owner", "") or "")
 
 
 def _parse_json(path: Path) -> dict[str, Any]:
@@ -162,6 +154,13 @@ def _validate_questionnaire(
     _check_format_version(payload, config.QUESTIONNAIRE_FORMAT, config.QUESTIONNAIRE_VERSION, path)
     _warn_unknown_ids(slug, "question", payload.get("question_ids", []), question_ids)
     _warn_unknown_ids(slug, "property", payload.get("property_ids", []), property_ids)
+    name = payload.get("system_name")
+    if not isinstance(name, str) or not name.strip():
+        logger.warning(
+            "[%s] %s: missing or empty 'system_name' — system will display without a name.",
+            slug,
+            path.name,
+        )
 
 
 def _validate_assessment(
@@ -270,11 +269,6 @@ def _load_system(
             f"(lowercase letters, digits, hyphens; start with letter or digit)"
         )
 
-    meta_path = folder / "meta.yaml"
-    if not meta_path.exists():
-        raise ValueError(f"Missing {meta_path} for system {slug!r}")
-    meta = _parse_meta(meta_path)
-
     q_path = folder / "questionnaire.json"
     if not q_path.exists():
         raise ValueError(f"Missing {q_path} for system {slug!r}")
@@ -310,7 +304,6 @@ def _load_system(
 
     return SystemRecord(
         slug=slug,
-        meta=meta,
         questionnaire=questionnaire,
         assessment=assessment,
         history=tuple(history),

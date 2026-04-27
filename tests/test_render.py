@@ -15,7 +15,7 @@ from models import (
     Section,
     SubSection,
 )
-from registry import SystemMeta, SystemRecord
+from registry import SystemRecord
 from render import (
     _compile_property_getter,
     _compile_question_visibility,
@@ -360,7 +360,6 @@ class TestRenderRegistry:
         current_summary = diff_pair(prior_q, prior_a, rec.questionnaire, rec.assessment)
         rec_with_history = SystemRecord(
             slug=rec.slug,
-            meta=rec.meta,
             questionnaire=rec.questionnaire,
             assessment=rec.assessment,
             history=history,
@@ -400,7 +399,6 @@ class TestRenderRegistry:
         summary = diff_pair(prior_q, None, rec.questionnaire, rec.assessment)
         rec_with_summary = SystemRecord(
             slug=rec.slug,
-            meta=rec.meta,
             questionnaire=rec.questionnaire,
             assessment=rec.assessment,
             current_change_summary=summary,
@@ -433,8 +431,10 @@ def sample_record_factory(sample_questions):
     ) -> SystemRecord:
         questionnaire = {
             "format": "riskformgen-answers",
-            "version": 2,
+            "version": config.QUESTIONNAIRE_VERSION,
             "exported_at": "2026-04-01T08:00:00Z",
+            "system_name": name,
+            "system_owner": "Owner",
             "question_ids": [q.id for q in sample_questions],
             "answers": {q.id: "yes" for q in sample_questions},
             "detail_ids": [],
@@ -456,6 +456,8 @@ def sample_record_factory(sample_questions):
                 "format": "riskformgen-assessment",
                 "version": config.ASSESSMENT_VERSION,
                 "exported_at": assessment_at,
+                "system_name": name,
+                "system_owner": "Owner",
                 "risk_ids": ["r1"],
                 "property_ids": ["prop_a", "prop_b"],
                 "properties": {"prop_a": True, "prop_b": True},
@@ -471,7 +473,6 @@ def sample_record_factory(sample_questions):
             }
         return SystemRecord(
             slug=slug,
-            meta=SystemMeta(name=name, owner="Owner"),
             questionnaire=questionnaire,
             assessment=assessment,
         )
