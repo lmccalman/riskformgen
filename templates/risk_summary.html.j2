@@ -17,7 +17,7 @@
 
     {# ── Modelled risk: likelihood × consequence → level ── #}
     <div class="risk-card-section">
-      <div class="risk-grid">
+      <div class="risk-grid-summary">
         {# Likelihood #}
         <div>
           <span class="dim-label">Likelihood</span>
@@ -85,7 +85,11 @@
               />
               {{ ctrl.description }}
             </label>
-            <div x-show="mandated_controls['{{ risk.id }}']['{{ ctrl.id }}']" x-cloak>
+            <div
+              class="mandated-comment"
+              x-show="mandated_controls['{{ risk.id }}']['{{ ctrl.id }}']"
+              x-cloak
+            >
               <textarea
                 class="textarea"
                 x-model="mandated_comments['{{ risk.id }}']['{{ ctrl.id }}']"

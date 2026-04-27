@@ -95,6 +95,12 @@ body.persona-registry      { border-top: 6px solid var(--ent-bark-light); }
   text-decoration: underline;
 }
 
+.page-footer {
+  margin-top: 3rem;
+  padding-top: 1.5rem;
+  border-top: 1px solid var(--ent-bark-border);
+}
+
 /* ── Landing page ── */
 .landing-intro {
   margin-bottom: 2.5rem;
@@ -109,7 +115,7 @@ body.persona-registry      { border-top: 6px solid var(--ent-bark-light); }
   display: block;
   padding: 1.5rem 1.75rem;
   background: var(--ent-bg-card);
-  border: 1px solid var(--ent-bark-border);
+  border: none;
   border-left: 4px solid var(--ent-bark-light);
   border-radius: 12px;
   box-shadow: 0 2px 8px var(--ent-shadow);
@@ -209,9 +215,11 @@ body.persona-registry      { border-top: 6px solid var(--ent-bark-light); }
 }
 
 .save-load-bar-import-only {
-  padding-top: 0;
   margin-top: 0;
-  border-top: none;
+  padding: 0;
+  background: transparent;
+  border: none;
+  border-radius: 0;
 }
 
 /* ── Registry ── */
@@ -415,10 +423,29 @@ body.persona-registry      { border-top: 6px solid var(--ent-bark-light); }
 
 .tabs.is-boxed {
   margin-bottom: 2rem;
+  overflow-x: auto;
+  overflow-y: hidden;
+  scrollbar-width: thin;
+  scrollbar-color: var(--ent-bark-border) transparent;
+}
+
+.tabs.is-boxed::-webkit-scrollbar {
+  height: 6px;
+}
+
+.tabs.is-boxed::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.tabs.is-boxed::-webkit-scrollbar-thumb {
+  background: var(--ent-bark-border);
+  border-radius: 3px;
 }
 
 .tabs.is-boxed ul {
   border-bottom-color: var(--ent-bark-border);
+  flex-wrap: nowrap;
+  min-width: max-content;
 }
 
 .tabs.is-boxed li a {
@@ -427,6 +454,7 @@ body.persona-registry      { border-top: 6px solid var(--ent-bark-light); }
   border-color: transparent;
   border-radius: 8px 8px 0 0;
   padding: 0.75em 1.25em;
+  white-space: nowrap;
   transition: color 0.2s, background-color 0.2s, border-color 0.2s;
 }
 
@@ -495,8 +523,8 @@ body.persona-registry      { border-top: 6px solid var(--ent-bark-light); }
 }
 
 .risk-card-section {
-  padding-top: 1.25rem;
-  margin-top: 1.25rem;
+  padding-top: 1rem;
+  margin-top: 1rem;
   border-top: 1px solid var(--ent-bark-border);
 }
 
@@ -508,6 +536,12 @@ body.persona-registry      { border-top: 6px solid var(--ent-bark-light); }
 
 .risk-card-section .dim-label {
   margin-bottom: 0.5rem;
+}
+
+/* Mandate-controls free-text comment — indent under its checkbox and
+   give breathing room before the next mandate row. */
+.mandated-comment {
+  margin: 0.5rem 0 0.75rem 1.5rem;
 }
 
 /* ── Boxes (subsections) ── */
@@ -604,6 +638,20 @@ body.persona-registry      { border-top: 6px solid var(--ent-bark-light); }
 }
 
 .risk-grid .dim-label {
+  margin-bottom: 0.35rem;
+}
+
+/* Compact summary variant — used for the inherent-risk header row so the
+   three small badges sit close together at the start of the card instead of
+   stretching across thirds. */
+.risk-grid-summary {
+  display: grid;
+  grid-template-columns: repeat(3, max-content);
+  gap: 2rem;
+  justify-content: start;
+}
+
+.risk-grid-summary .dim-label {
   margin-bottom: 0.35rem;
 }
 
@@ -832,11 +880,14 @@ body.persona-registry      { border-top: 6px solid var(--ent-bark-light); }
 /* ── Save/load bar ── */
 .save-load-bar {
   display: flex;
+  align-items: center;
   gap: 0.5rem;
   justify-content: flex-end;
-  padding-top: 1.5rem;
-  margin-top: 1rem;
-  border-top: 1px solid var(--ent-bark-border);
+  margin-top: 1.5rem;
+  padding: 1rem 1.25rem;
+  background: var(--ent-bg-card);
+  border: 1px solid var(--ent-bark-border);
+  border-radius: 8px;
 }
 
 /* ── Debug panel ── */
