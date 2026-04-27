@@ -42,6 +42,14 @@ uv run pytest tests/ -v
 
 Use `uv run ruff check --fix .` and `uv run ruff format .` to auto-fix lint and formatting issues.
 
+**For changes that affect rendered output (templates, CSS, render.py, new questions/risks/controls), also regenerate and view the screenshot tour:**
+
+```bash
+uv run python scripts/screenshot.py
+```
+
+PNGs land in `tmp/screenshots/` — read them with the Read tool to verify spacing, colour, and layout on the landing page, questionnaire (empty/filled/debug), assessment (empty/loaded/single risk card/answers tab), and registry (index + example-system). Skip when the change is purely backend (parsing, validation, registry data shape, etc.) and can't move pixels.
+
 ## Working with SPEC.md
 
 `SPEC.md` captures the high-level design decisions that explain the purpose and function of the code — the kind of context a new contributor needs that isn't obvious from reading the source.

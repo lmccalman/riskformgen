@@ -208,6 +208,7 @@ __marimo__/
 
 # Generated output
 output/
+tmp/
 
 # Editor frontend
 editor/frontend/node_modules/
